@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CheckpointFile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.utils</a> &gt; <span class="el_source">CheckpointFile.java</span></div><h1>CheckpointFile.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.utils;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.UtilAll;
+
+/**
+ * Entry Checkpoint file util
+ * Format:
+ * &lt;li&gt;First line:  Entries size
+ * &lt;li&gt;Second line: Entries crc32
+ * &lt;li&gt;Next: Entry data per line
+ * &lt;p&gt;
+ * Example:
+ * &lt;li&gt;2 (size)
+ * &lt;li&gt;773307083 (crc32)
+ * &lt;li&gt;7-7000 (entry data)
+ * &lt;li&gt;8-8000 (entry data)
+ */
+public class CheckpointFile&lt;T&gt; {
+
+    /**
+     * Not check crc32 when value is 0
+     */
+    private static final int NOT_CHECK_CRC_MAGIC_CODE = 0;
+    private final String filePath;
+    private final CheckpointSerializer&lt;T&gt; serializer;
+
+    public interface CheckpointSerializer&lt;T&gt; {
+        /**
+         * Serialize entry to line
+         */
+        String toLine(final T entry);
+
+        /**
+         * DeSerialize line to entry
+         */
+        T fromLine(final String line);
+    }
+
+<span class="fc" id="L65">    public CheckpointFile(final String filePath, final CheckpointSerializer&lt;T&gt; serializer) {</span>
+<span class="fc" id="L66">        this.filePath = filePath;</span>
+<span class="fc" id="L67">        this.serializer = serializer;</span>
+<span class="fc" id="L68">    }</span>
+
+    public String getBackFilePath() {
+<span class="fc" id="L71">        return this.filePath + &quot;.bak&quot;;</span>
+    }
+
+    /**
+     * Write entries to file
+     */
+    public void write(final List&lt;T&gt; entries) throws IOException {
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (entries.isEmpty()) {</span>
+<span class="nc" id="L79">            return;</span>
+        }
+<span class="fc" id="L81">        synchronized (this) {</span>
+<span class="fc" id="L82">            StringBuilder entryContent = new StringBuilder();</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            for (T entry : entries) {</span>
+<span class="fc" id="L84">                final String line = this.serializer.toLine(entry);</span>
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">                if (line != null &amp;&amp; !line.isEmpty()) {</span>
+<span class="fc" id="L86">                    entryContent.append(line);</span>
+<span class="fc" id="L87">                    entryContent.append(System.lineSeparator());</span>
+                }
+<span class="fc" id="L89">            }</span>
+<span class="fc" id="L90">            int crc32 = UtilAll.crc32(entryContent.toString().getBytes(StandardCharsets.UTF_8));</span>
+
+<span class="fc" id="L92">            String content = entries.size() + System.lineSeparator() +</span>
+<span class="fc" id="L93">                crc32 + System.lineSeparator() + entryContent;</span>
+<span class="fc" id="L94">            MixAll.string2File(content, this.filePath);</span>
+<span class="fc" id="L95">        }</span>
+<span class="fc" id="L96">    }</span>
+
+    private List&lt;T&gt; read(String filePath) throws IOException {
+<span class="fc" id="L99">        final ArrayList&lt;T&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L100">        synchronized (this) {</span>
+<span class="fc" id="L101">            final File file = new File(filePath);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (!file.exists()) {</span>
+<span class="fc" id="L103">                return result;</span>
+            }
+<span class="fc" id="L105">            try (BufferedReader reader = Files.newBufferedReader(file.toPath())) {</span>
+                // Read size
+<span class="fc" id="L107">                int expectedLines = Integer.parseInt(reader.readLine());</span>
+
+                // Read block crc
+<span class="fc" id="L110">                int expectedCrc32 = Integer.parseInt(reader.readLine());</span>
+
+                // Read entries
+<span class="fc" id="L113">                StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L114">                String line = reader.readLine();</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                while (line != null) {</span>
+<span class="fc" id="L116">                    sb.append(line).append(System.lineSeparator());</span>
+<span class="fc" id="L117">                    final T entry = this.serializer.fromLine(line);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                    if (entry != null) {</span>
+<span class="fc" id="L119">                        result.add(entry);</span>
+                    }
+<span class="fc" id="L121">                    line = reader.readLine();</span>
+<span class="fc" id="L122">                }</span>
+<span class="fc" id="L123">                int truthCrc32 = UtilAll.crc32(sb.toString().getBytes(StandardCharsets.UTF_8));</span>
+
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                if (result.size() != expectedLines) {</span>
+<span class="nc" id="L126">                    final String err = String.format(</span>
+<span class="nc" id="L127">                        &quot;Expect %d entries, only found %d entries&quot;, expectedLines, result.size());</span>
+<span class="nc" id="L128">                    throw new IOException(err);</span>
+                }
+
+<span class="pc bpc" id="L131" title="2 of 4 branches missed.">                if (NOT_CHECK_CRC_MAGIC_CODE != expectedCrc32 &amp;&amp; truthCrc32 != expectedCrc32) {</span>
+<span class="nc" id="L132">                    final String err = String.format(</span>
+<span class="nc" id="L133">                        &quot;Entries crc32 not match, file=%s, truth=%s&quot;, expectedCrc32, truthCrc32);</span>
+<span class="nc" id="L134">                    throw new IOException(err);</span>
+                }
+<span class="fc" id="L136">                return result;</span>
+<span class="fc" id="L137">            }</span>
+        }
+    }
+
+    /**
+     * Read entries from file
+     */
+    public List&lt;T&gt; read() throws IOException {
+        try {
+<span class="fc" id="L146">            List&lt;T&gt; result = this.read(this.filePath);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (CollectionUtils.isEmpty(result)) {</span>
+<span class="fc" id="L148">                result = this.read(this.getBackFilePath());</span>
+            }
+<span class="fc" id="L150">            return result;</span>
+<span class="nc" id="L151">        } catch (IOException e) {</span>
+<span class="nc" id="L152">            return this.read(this.getBackFilePath());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

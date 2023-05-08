@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClientLogger.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.log</a> &gt; <span class="el_source">ClientLogger.java</span></div><h1>ClientLogger.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.log;
+
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.logging.InnerLoggerFactory;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+import org.apache.rocketmq.logging.inner.Appender;
+import org.apache.rocketmq.logging.inner.Layout;
+import org.apache.rocketmq.logging.inner.Level;
+import org.apache.rocketmq.logging.inner.Logger;
+import org.apache.rocketmq.logging.inner.LoggingBuilder;
+import org.apache.rocketmq.logging.inner.LoggingEvent;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
+
+<span class="nc" id="L31">public class ClientLogger {</span>
+
+    public static final String CLIENT_LOG_USESLF4J = &quot;rocketmq.client.logUseSlf4j&quot;;
+    public static final String CLIENT_LOG_ROOT = &quot;rocketmq.client.logRoot&quot;;
+    public static final String CLIENT_LOG_MAXINDEX = &quot;rocketmq.client.logFileMaxIndex&quot;;
+    public static final String CLIENT_LOG_FILESIZE = &quot;rocketmq.client.logFileMaxSize&quot;;
+    public static final String CLIENT_LOG_LEVEL = &quot;rocketmq.client.logLevel&quot;;
+    public static final String CLIENT_LOG_ADDITIVE = &quot;rocketmq.client.log.additive&quot;;
+    public static final String CLIENT_LOG_FILENAME = &quot;rocketmq.client.logFileName&quot;;
+    public static final String CLIENT_LOG_ASYNC_QUEUESIZE = &quot;rocketmq.client.logAsyncQueueSize&quot;;
+    public static final String ROCKETMQ_CLIENT_APPENDER_NAME = &quot;RocketmqClientAppender&quot;;
+
+    private static final InternalLogger CLIENT_LOGGER;
+
+    private static final boolean CLIENT_USE_SLF4J;
+
+<span class="fc" id="L47">    private static Appender appenderProxy = new AppenderProxy();</span>
+
+    //private static Appender rocketmqClientAppender = null;
+
+    static {
+<span class="fc" id="L52">        CLIENT_USE_SLF4J = Boolean.parseBoolean(System.getProperty(CLIENT_LOG_USESLF4J, &quot;false&quot;));</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (!CLIENT_USE_SLF4J) {</span>
+<span class="fc" id="L54">            InternalLoggerFactory.setCurrentLoggerType(InnerLoggerFactory.LOGGER_INNER);</span>
+<span class="fc" id="L55">            CLIENT_LOGGER = createLogger(LoggerName.CLIENT_LOGGER_NAME);</span>
+<span class="fc" id="L56">            createLogger(LoggerName.COMMON_LOGGER_NAME);</span>
+<span class="fc" id="L57">            createLogger(RemotingHelper.ROCKETMQ_REMOTING);</span>
+<span class="fc" id="L58">            Logger.getRootLogger().addAppender(appenderProxy);</span>
+        } else {
+<span class="nc" id="L60">            CLIENT_LOGGER = InternalLoggerFactory.getLogger(LoggerName.CLIENT_LOGGER_NAME);</span>
+        }
+<span class="fc" id="L62">    }</span>
+
+    private static synchronized Appender createClientAppender() {
+<span class="fc" id="L65">        String clientLogRoot = System.getProperty(CLIENT_LOG_ROOT, System.getProperty(&quot;user.home&quot;) + &quot;/logs/rocketmqlogs&quot;);</span>
+<span class="fc" id="L66">        String clientLogMaxIndex = System.getProperty(CLIENT_LOG_MAXINDEX, &quot;10&quot;);</span>
+<span class="fc" id="L67">        String clientLogFileName = System.getProperty(CLIENT_LOG_FILENAME, &quot;rocketmq_client.log&quot;);</span>
+<span class="fc" id="L68">        String maxFileSize = System.getProperty(CLIENT_LOG_FILESIZE, &quot;1073741824&quot;);</span>
+<span class="fc" id="L69">        String asyncQueueSize = System.getProperty(CLIENT_LOG_ASYNC_QUEUESIZE, &quot;1024&quot;);</span>
+
+<span class="fc" id="L71">        String logFileName = clientLogRoot + &quot;/&quot; + clientLogFileName;</span>
+
+<span class="fc" id="L73">        int maxFileIndex = Integer.parseInt(clientLogMaxIndex);</span>
+<span class="fc" id="L74">        int queueSize = Integer.parseInt(asyncQueueSize);</span>
+
+<span class="fc" id="L76">        Layout layout = LoggingBuilder.newLayoutBuilder().withDefaultLayout().build();</span>
+
+<span class="fc" id="L78">        Appender rocketmqClientAppender = LoggingBuilder.newAppenderBuilder()</span>
+<span class="fc" id="L79">            .withRollingFileAppender(logFileName, maxFileSize, maxFileIndex)</span>
+<span class="fc" id="L80">            .withAsync(false, queueSize).withName(ROCKETMQ_CLIENT_APPENDER_NAME).withLayout(layout).build();</span>
+
+<span class="fc" id="L82">        return rocketmqClientAppender;</span>
+    }
+
+    private static InternalLogger createLogger(final String loggerName) {
+<span class="fc" id="L86">        String clientLogLevel = System.getProperty(CLIENT_LOG_LEVEL, &quot;INFO&quot;);</span>
+<span class="fc" id="L87">        boolean additive = &quot;true&quot;.equalsIgnoreCase(System.getProperty(CLIENT_LOG_ADDITIVE));</span>
+<span class="fc" id="L88">        InternalLogger logger = InternalLoggerFactory.getLogger(loggerName);</span>
+<span class="fc" id="L89">        InnerLoggerFactory.InnerLogger innerLogger = (InnerLoggerFactory.InnerLogger) logger;</span>
+<span class="fc" id="L90">        Logger realLogger = innerLogger.getLogger();</span>
+
+        //if (rocketmqClientAppender == null) {
+        //   createClientAppender();
+        //}
+
+<span class="fc" id="L96">        realLogger.addAppender(appenderProxy);</span>
+<span class="fc" id="L97">        realLogger.setLevel(Level.toLevel(clientLogLevel));</span>
+<span class="fc" id="L98">        realLogger.setAdditivity(additive);</span>
+<span class="fc" id="L99">        return logger;</span>
+    }
+
+    public static InternalLogger getLog() {
+<span class="fc" id="L103">        return CLIENT_LOGGER;</span>
+    }
+
+<span class="fc" id="L106">    static class AppenderProxy extends Appender {</span>
+        private Appender proxy;
+
+        @Override
+        protected void append(LoggingEvent event) {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (null == proxy) {</span>
+<span class="fc" id="L112">                proxy = ClientLogger.createClientAppender();</span>
+            }
+<span class="fc" id="L114">            proxy.doAppend(event);</span>
+<span class="fc" id="L115">        }</span>
+
+        @Override
+        public void close() {
+<span class="nc bnc" id="L119" title="All 2 branches missed.">            if (null != proxy) {</span>
+<span class="nc" id="L120">                proxy.close();</span>
+            }
+<span class="nc" id="L122">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

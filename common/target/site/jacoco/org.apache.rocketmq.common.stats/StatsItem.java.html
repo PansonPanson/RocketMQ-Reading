@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StatsItem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.stats</a> &gt; <span class="el_source">StatsItem.java</span></div><h1>StatsItem.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.stats;
+
+import java.util.LinkedList;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.LongAdder;
+
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.logging.InternalLogger;
+
+public class StatsItem {
+
+<span class="fc" id="L30">    private final LongAdder value = new LongAdder();</span>
+
+<span class="fc" id="L32">    private final LongAdder times = new LongAdder();</span>
+
+<span class="fc" id="L34">    private final LinkedList&lt;CallSnapshot&gt; csListMinute = new LinkedList&lt;CallSnapshot&gt;();</span>
+
+<span class="fc" id="L36">    private final LinkedList&lt;CallSnapshot&gt; csListHour = new LinkedList&lt;CallSnapshot&gt;();</span>
+
+<span class="fc" id="L38">    private final LinkedList&lt;CallSnapshot&gt; csListDay = new LinkedList&lt;CallSnapshot&gt;();</span>
+
+    private final String statsName;
+    private final String statsKey;
+    private final ScheduledExecutorService scheduledExecutorService;
+    private final InternalLogger log;
+
+    public StatsItem(String statsName, String statsKey, ScheduledExecutorService scheduledExecutorService,
+<span class="fc" id="L46">        InternalLogger log) {</span>
+<span class="fc" id="L47">        this.statsName = statsName;</span>
+<span class="fc" id="L48">        this.statsKey = statsKey;</span>
+<span class="fc" id="L49">        this.scheduledExecutorService = scheduledExecutorService;</span>
+<span class="fc" id="L50">        this.log = log;</span>
+<span class="fc" id="L51">    }</span>
+
+    private static StatsSnapshot computeStatsData(final LinkedList&lt;CallSnapshot&gt; csList) {
+<span class="fc" id="L54">        StatsSnapshot statsSnapshot = new StatsSnapshot();</span>
+<span class="fc" id="L55">        synchronized (csList) {</span>
+<span class="fc" id="L56">            double tps = 0;</span>
+<span class="fc" id="L57">            double avgpt = 0;</span>
+<span class="fc" id="L58">            long sum = 0;</span>
+<span class="fc" id="L59">            long timesDiff = 0;</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            if (!csList.isEmpty()) {</span>
+<span class="fc" id="L61">                CallSnapshot first = csList.getFirst();</span>
+<span class="fc" id="L62">                CallSnapshot last = csList.getLast();</span>
+<span class="fc" id="L63">                sum = last.getValue() - first.getValue();</span>
+<span class="fc" id="L64">                tps = (sum * 1000.0d) / (last.getTimestamp() - first.getTimestamp());</span>
+
+<span class="fc" id="L66">                timesDiff = last.getTimes() - first.getTimes();</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                if (timesDiff &gt; 0) {</span>
+<span class="fc" id="L68">                    avgpt = (sum * 1.0d) / timesDiff;</span>
+                }
+            }
+
+<span class="fc" id="L72">            statsSnapshot.setSum(sum);</span>
+<span class="fc" id="L73">            statsSnapshot.setTps(tps);</span>
+<span class="fc" id="L74">            statsSnapshot.setAvgpt(avgpt);</span>
+<span class="fc" id="L75">            statsSnapshot.setTimes(timesDiff);</span>
+<span class="fc" id="L76">        }</span>
+
+<span class="fc" id="L78">        return statsSnapshot;</span>
+    }
+
+    public StatsSnapshot getStatsDataInMinute() {
+<span class="fc" id="L82">        return computeStatsData(this.csListMinute);</span>
+    }
+
+    public StatsSnapshot getStatsDataInHour() {
+<span class="fc" id="L86">        return computeStatsData(this.csListHour);</span>
+    }
+
+    public StatsSnapshot getStatsDataInDay() {
+<span class="fc" id="L90">        return computeStatsData(this.csListDay);</span>
+    }
+
+    public void init() {
+
+<span class="nc" id="L95">        this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L99">                    samplingInSeconds();</span>
+<span class="nc" id="L100">                } catch (Throwable ignored) {</span>
+<span class="nc" id="L101">                }</span>
+<span class="nc" id="L102">            }</span>
+        }, 0, 10, TimeUnit.SECONDS);
+
+<span class="nc" id="L105">        this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L109">                    samplingInMinutes();</span>
+<span class="nc" id="L110">                } catch (Throwable ignored) {</span>
+<span class="nc" id="L111">                }</span>
+<span class="nc" id="L112">            }</span>
+        }, 0, 10, TimeUnit.MINUTES);
+
+<span class="nc" id="L115">        this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L119">                    samplingInHour();</span>
+<span class="nc" id="L120">                } catch (Throwable ignored) {</span>
+<span class="nc" id="L121">                }</span>
+<span class="nc" id="L122">            }</span>
+        }, 0, 1, TimeUnit.HOURS);
+
+<span class="nc" id="L125">        this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L129">                    printAtMinutes();</span>
+<span class="nc" id="L130">                } catch (Throwable ignored) {</span>
+<span class="nc" id="L131">                }</span>
+<span class="nc" id="L132">            }</span>
+<span class="nc" id="L133">        }, Math.abs(UtilAll.computeNextMinutesTimeMillis() - System.currentTimeMillis()), 1000 * 60, TimeUnit.MILLISECONDS);</span>
+
+<span class="nc" id="L135">        this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L139">                    printAtHour();</span>
+<span class="nc" id="L140">                } catch (Throwable ignored) {</span>
+<span class="nc" id="L141">                }</span>
+<span class="nc" id="L142">            }</span>
+<span class="nc" id="L143">        }, Math.abs(UtilAll.computeNextHourTimeMillis() - System.currentTimeMillis()), 1000 * 60 * 60, TimeUnit.MILLISECONDS);</span>
+
+<span class="nc" id="L145">        this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L149">                    printAtDay();</span>
+<span class="nc" id="L150">                } catch (Throwable ignored) {</span>
+<span class="nc" id="L151">                }</span>
+<span class="nc" id="L152">            }</span>
+<span class="nc" id="L153">        }, Math.abs(UtilAll.computeNextMorningTimeMillis() - System.currentTimeMillis()) - 2000, 1000 * 60 * 60 * 24, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L154">    }</span>
+
+    public void samplingInSeconds() {
+<span class="fc" id="L157">        synchronized (this.csListMinute) {</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            if (this.csListMinute.size() == 0) {</span>
+<span class="fc" id="L159">                this.csListMinute.add(new CallSnapshot(System.currentTimeMillis() - 10 * 1000, 0, 0));</span>
+            }
+<span class="fc" id="L161">            this.csListMinute.add(new CallSnapshot(System.currentTimeMillis(), this.times.sum(), this.value</span>
+<span class="fc" id="L162">                .sum()));</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            if (this.csListMinute.size() &gt; 7) {</span>
+<span class="nc" id="L164">                this.csListMinute.removeFirst();</span>
+            }
+<span class="fc" id="L166">        }</span>
+<span class="fc" id="L167">    }</span>
+
+    public void samplingInMinutes() {
+<span class="fc" id="L170">        synchronized (this.csListHour) {</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (this.csListHour.size() == 0) {</span>
+<span class="fc" id="L172">                this.csListHour.add(new CallSnapshot(System.currentTimeMillis() - 10 * 60 * 1000, 0, 0));</span>
+            }
+<span class="fc" id="L174">            this.csListHour.add(new CallSnapshot(System.currentTimeMillis(), this.times.sum(), this.value</span>
+<span class="fc" id="L175">                .sum()));</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (this.csListHour.size() &gt; 7) {</span>
+<span class="nc" id="L177">                this.csListHour.removeFirst();</span>
+            }
+<span class="fc" id="L179">        }</span>
+<span class="fc" id="L180">    }</span>
+
+    public void samplingInHour() {
+<span class="fc" id="L183">        synchronized (this.csListDay) {</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            if (this.csListDay.size() == 0) {</span>
+<span class="fc" id="L185">                this.csListDay.add(new CallSnapshot(System.currentTimeMillis() - 1 * 60 * 60 * 1000, 0, 0));</span>
+            }
+<span class="fc" id="L187">            this.csListDay.add(new CallSnapshot(System.currentTimeMillis(), this.times.sum(), this.value</span>
+<span class="fc" id="L188">                .sum()));</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            if (this.csListDay.size() &gt; 25) {</span>
+<span class="nc" id="L190">                this.csListDay.removeFirst();</span>
+            }
+<span class="fc" id="L192">        }</span>
+<span class="fc" id="L193">    }</span>
+
+    public void printAtMinutes() {
+<span class="nc" id="L196">        StatsSnapshot ss = computeStatsData(this.csListMinute);</span>
+<span class="nc" id="L197">        log.info(String.format(&quot;[%s] [%s] Stats In One Minute, &quot;, this.statsName, this.statsKey) + statPrintDetail(ss));</span>
+<span class="nc" id="L198">    }</span>
+
+    public void printAtHour() {
+<span class="nc" id="L201">        StatsSnapshot ss = computeStatsData(this.csListHour);</span>
+<span class="nc" id="L202">        log.info(String.format(&quot;[%s] [%s] Stats In One Hour, &quot;, this.statsName, this.statsKey) + statPrintDetail(ss));</span>
+
+<span class="nc" id="L204">    }</span>
+
+    public void printAtDay() {
+<span class="nc" id="L207">        StatsSnapshot ss = computeStatsData(this.csListDay);</span>
+<span class="nc" id="L208">        log.info(String.format(&quot;[%s] [%s] Stats In One Day, &quot;, this.statsName, this.statsKey) + statPrintDetail(ss));</span>
+<span class="nc" id="L209">    }</span>
+
+    protected String statPrintDetail(StatsSnapshot ss) {
+<span class="nc" id="L212">        return String.format(&quot;SUM: %d TPS: %.2f AVGPT: %.2f&quot;,</span>
+<span class="nc" id="L213">                ss.getSum(),</span>
+<span class="nc" id="L214">                ss.getTps(),</span>
+<span class="nc" id="L215">                ss.getAvgpt());</span>
+    }
+
+    public LongAdder getValue() {
+<span class="fc" id="L219">        return value;</span>
+    }
+
+    public String getStatsKey() {
+<span class="nc" id="L223">        return statsKey;</span>
+    }
+
+    public String getStatsName() {
+<span class="nc" id="L227">        return statsName;</span>
+    }
+
+    public LongAdder getTimes() {
+<span class="fc" id="L231">        return times;</span>
+    }
+}
+
+class CallSnapshot {
+    private final long timestamp;
+    private final long times;
+
+    private final long value;
+
+    public CallSnapshot(long timestamp, long times, long value) {
+<span class="fc" id="L242">        super();</span>
+<span class="fc" id="L243">        this.timestamp = timestamp;</span>
+<span class="fc" id="L244">        this.times = times;</span>
+<span class="fc" id="L245">        this.value = value;</span>
+<span class="fc" id="L246">    }</span>
+
+    public long getTimestamp() {
+<span class="fc" id="L249">        return timestamp;</span>
+    }
+
+    public long getTimes() {
+<span class="fc" id="L253">        return times;</span>
+    }
+
+    public long getValue() {
+<span class="fc" id="L257">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

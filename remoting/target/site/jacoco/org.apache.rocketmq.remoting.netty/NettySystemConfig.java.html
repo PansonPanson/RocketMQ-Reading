@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NettySystemConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-remoting 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.remoting.netty</a> &gt; <span class="el_source">NettySystemConfig.java</span></div><h1>NettySystemConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.remoting.netty;
+
+<span class="nc" id="L20">public class NettySystemConfig {</span>
+    public static final String COM_ROCKETMQ_REMOTING_NETTY_POOLED_BYTE_BUF_ALLOCATOR_ENABLE =
+        &quot;com.rocketmq.remoting.nettyPooledByteBufAllocatorEnable&quot;;
+    public static final String COM_ROCKETMQ_REMOTING_SOCKET_SNDBUF_SIZE =
+        &quot;com.rocketmq.remoting.socket.sndbuf.size&quot;;
+    public static final String COM_ROCKETMQ_REMOTING_SOCKET_RCVBUF_SIZE =
+        &quot;com.rocketmq.remoting.socket.rcvbuf.size&quot;;
+    public static final String COM_ROCKETMQ_REMOTING_SOCKET_BACKLOG =
+        &quot;com.rocketmq.remoting.socket.backlog&quot;;
+    public static final String COM_ROCKETMQ_REMOTING_CLIENT_ASYNC_SEMAPHORE_VALUE =
+        &quot;com.rocketmq.remoting.clientAsyncSemaphoreValue&quot;;
+    public static final String COM_ROCKETMQ_REMOTING_CLIENT_ONEWAY_SEMAPHORE_VALUE =
+        &quot;com.rocketmq.remoting.clientOnewaySemaphoreValue&quot;;
+    public static final String COM_ROCKETMQ_REMOTING_CLIENT_WORKER_SIZE =
+        &quot;com.rocketmq.remoting.client.worker.size&quot;;
+    public static final String COM_ROCKETMQ_REMOTING_CLIENT_CONNECT_TIMEOUT =
+        &quot;com.rocketmq.remoting.client.connect.timeout&quot;;
+    public static final String COM_ROCKETMQ_REMOTING_CLIENT_CHANNEL_MAX_IDLE_SECONDS =
+        &quot;com.rocketmq.remoting.client.channel.maxIdleTimeSeconds&quot;;
+    public static final String COM_ROCKETMQ_REMOTING_CLIENT_CLOSE_SOCKET_IF_TIMEOUT =
+        &quot;com.rocketmq.remoting.client.closeSocketIfTimeout&quot;;
+    public static final String COM_ROCKETMQ_REMOTING_WRITE_BUFFER_HIGH_WATER_MARK_VALUE =
+        &quot;com.rocketmq.remoting.write.buffer.high.water.mark&quot;;
+    public static final String COM_ROCKETMQ_REMOTING_WRITE_BUFFER_LOW_WATER_MARK =
+        &quot;com.rocketmq.remoting.write.buffer.low.water.mark&quot;;
+
+<span class="fc" id="L46">    public static final boolean NETTY_POOLED_BYTE_BUF_ALLOCATOR_ENABLE = //</span>
+<span class="fc" id="L47">        Boolean.parseBoolean(System.getProperty(COM_ROCKETMQ_REMOTING_NETTY_POOLED_BYTE_BUF_ALLOCATOR_ENABLE, &quot;false&quot;));</span>
+<span class="fc" id="L48">    public static final int CLIENT_ASYNC_SEMAPHORE_VALUE = //</span>
+<span class="fc" id="L49">        Integer.parseInt(System.getProperty(COM_ROCKETMQ_REMOTING_CLIENT_ASYNC_SEMAPHORE_VALUE, &quot;65535&quot;));</span>
+<span class="fc" id="L50">    public static final int CLIENT_ONEWAY_SEMAPHORE_VALUE =</span>
+<span class="fc" id="L51">        Integer.parseInt(System.getProperty(COM_ROCKETMQ_REMOTING_CLIENT_ONEWAY_SEMAPHORE_VALUE, &quot;65535&quot;));</span>
+<span class="fc" id="L52">    public static int socketSndbufSize =</span>
+<span class="fc" id="L53">        Integer.parseInt(System.getProperty(COM_ROCKETMQ_REMOTING_SOCKET_SNDBUF_SIZE, &quot;0&quot;));</span>
+<span class="fc" id="L54">    public static int socketRcvbufSize =</span>
+<span class="fc" id="L55">        Integer.parseInt(System.getProperty(COM_ROCKETMQ_REMOTING_SOCKET_RCVBUF_SIZE, &quot;0&quot;));</span>
+<span class="fc" id="L56">    public static int socketBacklog =</span>
+<span class="fc" id="L57">        Integer.parseInt(System.getProperty(COM_ROCKETMQ_REMOTING_SOCKET_BACKLOG, &quot;1024&quot;));</span>
+<span class="fc" id="L58">    public static int clientWorkerSize =</span>
+<span class="fc" id="L59">        Integer.parseInt(System.getProperty(COM_ROCKETMQ_REMOTING_CLIENT_WORKER_SIZE, &quot;4&quot;));</span>
+<span class="fc" id="L60">    public static int connectTimeoutMillis =</span>
+<span class="fc" id="L61">        Integer.parseInt(System.getProperty(COM_ROCKETMQ_REMOTING_CLIENT_CONNECT_TIMEOUT, &quot;3000&quot;));</span>
+<span class="fc" id="L62">    public static int clientChannelMaxIdleTimeSeconds =</span>
+<span class="fc" id="L63">        Integer.parseInt(System.getProperty(COM_ROCKETMQ_REMOTING_CLIENT_CHANNEL_MAX_IDLE_SECONDS, &quot;120&quot;));</span>
+<span class="fc" id="L64">    public static boolean clientCloseSocketIfTimeout =</span>
+<span class="fc" id="L65">        Boolean.parseBoolean(System.getProperty(COM_ROCKETMQ_REMOTING_CLIENT_CLOSE_SOCKET_IF_TIMEOUT, &quot;true&quot;));</span>
+<span class="fc" id="L66">    public static int writeBufferHighWaterMark =</span>
+<span class="fc" id="L67">        Integer.parseInt(System.getProperty(COM_ROCKETMQ_REMOTING_WRITE_BUFFER_HIGH_WATER_MARK_VALUE, &quot;0&quot;));</span>
+<span class="fc" id="L68">    public static int writeBufferLowWaterMark =</span>
+<span class="fc" id="L69">        Integer.parseInt(System.getProperty(COM_ROCKETMQ_REMOTING_WRITE_BUFFER_LOW_WATER_MARK, &quot;0&quot;));</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

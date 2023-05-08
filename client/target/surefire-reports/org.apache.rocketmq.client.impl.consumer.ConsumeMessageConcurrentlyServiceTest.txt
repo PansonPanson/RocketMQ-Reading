@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.apache.rocketmq.client.impl.consumer.ConsumeMessageConcurrentlyServiceTest
+-------------------------------------------------------------------------------
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.257 sec - in org.apache.rocketmq.client.impl.consumer.ConsumeMessageConcurrentlyServiceTest

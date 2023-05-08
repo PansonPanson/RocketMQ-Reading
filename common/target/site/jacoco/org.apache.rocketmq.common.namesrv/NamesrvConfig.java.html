@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NamesrvConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.namesrv</a> &gt; <span class="el_source">NamesrvConfig.java</span></div><h1>NamesrvConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * $Id: NamesrvConfig.java 1839 2013-05-16 02:12:02Z vintagewang@apache.org $
+ */
+package org.apache.rocketmq.common.namesrv;
+
+import java.io.File;
+import org.apache.rocketmq.common.MixAll;
+
+<span class="nc" id="L26">public class NamesrvConfig {</span>
+
+<span class="nc" id="L28">    private String rocketmqHome = System.getProperty(MixAll.ROCKETMQ_HOME_PROPERTY, System.getenv(MixAll.ROCKETMQ_HOME_ENV));</span>
+<span class="nc" id="L29">    private String kvConfigPath = System.getProperty(&quot;user.home&quot;) + File.separator + &quot;namesrv&quot; + File.separator + &quot;kvConfig.json&quot;;</span>
+<span class="nc" id="L30">    private String configStorePath = System.getProperty(&quot;user.home&quot;) + File.separator + &quot;namesrv&quot; + File.separator + &quot;namesrv.properties&quot;;</span>
+<span class="nc" id="L31">    private String productEnvName = &quot;center&quot;;</span>
+<span class="nc" id="L32">    private boolean clusterTest = false;</span>
+<span class="nc" id="L33">    private boolean orderMessageEnable = false;</span>
+<span class="nc" id="L34">    private boolean returnOrderTopicConfigToBroker = true;</span>
+
+    /**
+     * Indicates the nums of thread to handle client requests, like GET_ROUTEINTO_BY_TOPIC.
+     */
+<span class="nc" id="L39">    private int clientRequestThreadPoolNums = 8;</span>
+    /**
+     * Indicates the nums of thread to handle broker or operation requests, like REGISTER_BROKER.
+     */
+<span class="nc" id="L43">    private int defaultThreadPoolNums = 16;</span>
+    /**
+     * Indicates the capacity of queue to hold client requests.
+     */
+<span class="nc" id="L47">    private int clientRequestThreadPoolQueueCapacity = 50000;</span>
+    /**
+     * Indicates the capacity of queue to hold broker or operation requests.
+     */
+<span class="nc" id="L51">    private int defaultThreadPoolQueueCapacity = 10000;</span>
+    /**
+     * Interval of periodic scanning for non-active broker;
+     */
+<span class="nc" id="L55">    private long scanNotActiveBrokerInterval = 5 * 1000;</span>
+
+<span class="nc" id="L57">    private int unRegisterBrokerQueueCapacity = 3000;</span>
+
+    /**
+     * Support acting master or not.
+     *
+     * The slave can be an acting master when master node is down to support following operations:
+     * 1. support lock/unlock message queue operation.
+     * 2. support searchOffset, query maxOffset/minOffset operation.
+     * 3. support query earliest msg store time.
+     */
+<span class="nc" id="L67">    private boolean supportActingMaster = false;</span>
+
+<span class="nc" id="L69">    private volatile boolean enableAllTopicList = true;</span>
+
+
+<span class="nc" id="L72">    private volatile boolean enableTopicList = true;</span>
+
+<span class="nc" id="L74">    private volatile boolean notifyMinBrokerIdChanged = false;</span>
+
+
+    public boolean isOrderMessageEnable() {
+<span class="nc" id="L78">        return orderMessageEnable;</span>
+    }
+
+    public void setOrderMessageEnable(boolean orderMessageEnable) {
+<span class="nc" id="L82">        this.orderMessageEnable = orderMessageEnable;</span>
+<span class="nc" id="L83">    }</span>
+
+    public String getRocketmqHome() {
+<span class="nc" id="L86">        return rocketmqHome;</span>
+    }
+
+    public void setRocketmqHome(String rocketmqHome) {
+<span class="nc" id="L90">        this.rocketmqHome = rocketmqHome;</span>
+<span class="nc" id="L91">    }</span>
+
+    public String getKvConfigPath() {
+<span class="nc" id="L94">        return kvConfigPath;</span>
+    }
+
+    public void setKvConfigPath(String kvConfigPath) {
+<span class="nc" id="L98">        this.kvConfigPath = kvConfigPath;</span>
+<span class="nc" id="L99">    }</span>
+
+    public String getProductEnvName() {
+<span class="nc" id="L102">        return productEnvName;</span>
+    }
+
+    public void setProductEnvName(String productEnvName) {
+<span class="nc" id="L106">        this.productEnvName = productEnvName;</span>
+<span class="nc" id="L107">    }</span>
+
+    public boolean isClusterTest() {
+<span class="nc" id="L110">        return clusterTest;</span>
+    }
+
+    public void setClusterTest(boolean clusterTest) {
+<span class="nc" id="L114">        this.clusterTest = clusterTest;</span>
+<span class="nc" id="L115">    }</span>
+
+    public String getConfigStorePath() {
+<span class="nc" id="L118">        return configStorePath;</span>
+    }
+
+    public void setConfigStorePath(final String configStorePath) {
+<span class="nc" id="L122">        this.configStorePath = configStorePath;</span>
+<span class="nc" id="L123">    }</span>
+
+    public boolean isReturnOrderTopicConfigToBroker() {
+<span class="nc" id="L126">        return returnOrderTopicConfigToBroker;</span>
+    }
+
+    public void setReturnOrderTopicConfigToBroker(boolean returnOrderTopicConfigToBroker) {
+<span class="nc" id="L130">        this.returnOrderTopicConfigToBroker = returnOrderTopicConfigToBroker;</span>
+<span class="nc" id="L131">    }</span>
+
+    public int getClientRequestThreadPoolNums() {
+<span class="nc" id="L134">        return clientRequestThreadPoolNums;</span>
+    }
+
+    public void setClientRequestThreadPoolNums(final int clientRequestThreadPoolNums) {
+<span class="nc" id="L138">        this.clientRequestThreadPoolNums = clientRequestThreadPoolNums;</span>
+<span class="nc" id="L139">    }</span>
+
+    public int getDefaultThreadPoolNums() {
+<span class="nc" id="L142">        return defaultThreadPoolNums;</span>
+    }
+
+    public void setDefaultThreadPoolNums(final int defaultThreadPoolNums) {
+<span class="nc" id="L146">        this.defaultThreadPoolNums = defaultThreadPoolNums;</span>
+<span class="nc" id="L147">    }</span>
+
+    public int getClientRequestThreadPoolQueueCapacity() {
+<span class="nc" id="L150">        return clientRequestThreadPoolQueueCapacity;</span>
+    }
+
+    public void setClientRequestThreadPoolQueueCapacity(final int clientRequestThreadPoolQueueCapacity) {
+<span class="nc" id="L154">        this.clientRequestThreadPoolQueueCapacity = clientRequestThreadPoolQueueCapacity;</span>
+<span class="nc" id="L155">    }</span>
+
+    public int getDefaultThreadPoolQueueCapacity() {
+<span class="nc" id="L158">        return defaultThreadPoolQueueCapacity;</span>
+    }
+
+    public void setDefaultThreadPoolQueueCapacity(final int defaultThreadPoolQueueCapacity) {
+<span class="nc" id="L162">        this.defaultThreadPoolQueueCapacity = defaultThreadPoolQueueCapacity;</span>
+<span class="nc" id="L163">    }</span>
+
+    public long getScanNotActiveBrokerInterval() {
+<span class="nc" id="L166">        return scanNotActiveBrokerInterval;</span>
+    }
+
+    public void setScanNotActiveBrokerInterval(long scanNotActiveBrokerInterval) {
+<span class="nc" id="L170">        this.scanNotActiveBrokerInterval = scanNotActiveBrokerInterval;</span>
+<span class="nc" id="L171">    }</span>
+
+    public int getUnRegisterBrokerQueueCapacity() {
+<span class="nc" id="L174">        return unRegisterBrokerQueueCapacity;</span>
+    }
+
+    public void setUnRegisterBrokerQueueCapacity(final int unRegisterBrokerQueueCapacity) {
+<span class="nc" id="L178">        this.unRegisterBrokerQueueCapacity = unRegisterBrokerQueueCapacity;</span>
+<span class="nc" id="L179">    }</span>
+
+    public boolean isSupportActingMaster() {
+<span class="nc" id="L182">        return supportActingMaster;</span>
+    }
+
+    public void setSupportActingMaster(final boolean supportActingMaster) {
+<span class="nc" id="L186">        this.supportActingMaster = supportActingMaster;</span>
+<span class="nc" id="L187">    }</span>
+
+    public boolean isEnableAllTopicList() {
+<span class="nc" id="L190">        return enableAllTopicList;</span>
+    }
+
+    public void setEnableAllTopicList(boolean enableAllTopicList) {
+<span class="nc" id="L194">        this.enableAllTopicList = enableAllTopicList;</span>
+<span class="nc" id="L195">    }</span>
+
+    public boolean isEnableTopicList() {
+<span class="nc" id="L198">        return enableTopicList;</span>
+    }
+
+    public void setEnableTopicList(boolean enableTopicList) {
+<span class="nc" id="L202">        this.enableTopicList = enableTopicList;</span>
+<span class="nc" id="L203">    }</span>
+
+    public boolean isNotifyMinBrokerIdChanged() {
+<span class="nc" id="L206">        return notifyMinBrokerIdChanged;</span>
+    }
+
+    public void setNotifyMinBrokerIdChanged(boolean notifyMinBrokerIdChanged) {
+<span class="nc" id="L210">        this.notifyMinBrokerIdChanged = notifyMinBrokerIdChanged;</span>
+<span class="nc" id="L211">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

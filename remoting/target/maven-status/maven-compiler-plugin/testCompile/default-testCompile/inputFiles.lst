@@ -1,0 +1,13 @@
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/netty/NettyRemotingClientTest.java
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/protocol/RemotingSerializableTest.java
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/netty/NettyClientConfigTest.java
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/netty/FileRegionEncoderTest.java
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/protocol/RemotingCommandTest.java
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/netty/NettyServerConfigTest.java
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/protocol/RocketMQSerializableTest.java
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/RemotingServerTest.java
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/protocol/LanguageCodeTest.java
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/protocol/RequestTypeTest.java
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/netty/NettyRemotingAbstractTest.java
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/SubRemotingServerTest.java
+/Users/panson/Documents/project/github/rocketmq/remoting/src/test/java/org/apache/rocketmq/remoting/TlsTest.java

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResponseFuture.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-remoting 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.remoting.netty</a> &gt; <span class="el_source">ResponseFuture.java</span></div><h1>ResponseFuture.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.remoting.netty;
+
+import io.netty.channel.Channel;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.rocketmq.remoting.InvokeCallback;
+import org.apache.rocketmq.remoting.common.SemaphoreReleaseOnlyOnce;
+import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+
+public class ResponseFuture {
+    private final Channel channel;
+    private final int opaque;
+    private final RemotingCommand request;
+    private final long timeoutMillis;
+    private final InvokeCallback invokeCallback;
+<span class="fc" id="L33">    private final long beginTimestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L34">    private final CountDownLatch countDownLatch = new CountDownLatch(1);</span>
+
+    private final SemaphoreReleaseOnlyOnce once;
+
+<span class="fc" id="L38">    private final AtomicBoolean executeCallbackOnlyOnce = new AtomicBoolean(false);</span>
+    private volatile RemotingCommand responseCommand;
+<span class="fc" id="L40">    private volatile boolean sendRequestOK = true;</span>
+    private volatile Throwable cause;
+<span class="fc" id="L42">    private volatile boolean interrupted = false;</span>
+
+    public ResponseFuture(Channel channel, int opaque, long timeoutMillis, InvokeCallback invokeCallback,
+                          SemaphoreReleaseOnlyOnce once) {
+<span class="fc" id="L46">        this(channel, opaque, null, timeoutMillis, invokeCallback, once);</span>
+<span class="fc" id="L47">    }</span>
+
+    public ResponseFuture(Channel channel, int opaque, RemotingCommand request, long timeoutMillis, InvokeCallback invokeCallback,
+<span class="fc" id="L50">                          SemaphoreReleaseOnlyOnce once) {</span>
+<span class="fc" id="L51">        this.channel = channel;</span>
+<span class="fc" id="L52">        this.opaque = opaque;</span>
+<span class="fc" id="L53">        this.request = request;</span>
+<span class="fc" id="L54">        this.timeoutMillis = timeoutMillis;</span>
+<span class="fc" id="L55">        this.invokeCallback = invokeCallback;</span>
+<span class="fc" id="L56">        this.once = once;</span>
+<span class="fc" id="L57">    }</span>
+
+    public void executeInvokeCallback() {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (invokeCallback != null) {</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (this.executeCallbackOnlyOnce.compareAndSet(false, true)) {</span>
+<span class="fc" id="L62">                invokeCallback.operationComplete(this);</span>
+            }
+        }
+<span class="fc" id="L65">    }</span>
+
+    public void interrupt() {
+<span class="nc" id="L68">        interrupted = true;</span>
+<span class="nc" id="L69">        executeInvokeCallback();</span>
+<span class="nc" id="L70">    }</span>
+
+    public void release() {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (this.once != null) {</span>
+<span class="fc" id="L74">            this.once.release();</span>
+        }
+<span class="fc" id="L76">    }</span>
+
+    public boolean isTimeout() {
+<span class="nc" id="L79">        long diff = System.currentTimeMillis() - this.beginTimestamp;</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        return diff &gt; this.timeoutMillis;</span>
+    }
+
+    public RemotingCommand waitResponse(final long timeoutMillis) throws InterruptedException {
+<span class="fc" id="L84">        this.countDownLatch.await(timeoutMillis, TimeUnit.MILLISECONDS);</span>
+<span class="fc" id="L85">        return this.responseCommand;</span>
+    }
+
+    public void putResponse(final RemotingCommand responseCommand) {
+<span class="fc" id="L89">        this.responseCommand = responseCommand;</span>
+<span class="fc" id="L90">        this.countDownLatch.countDown();</span>
+<span class="fc" id="L91">    }</span>
+
+    public long getBeginTimestamp() {
+<span class="fc" id="L94">        return beginTimestamp;</span>
+    }
+
+    public boolean isSendRequestOK() {
+<span class="fc" id="L98">        return sendRequestOK;</span>
+    }
+
+    public void setSendRequestOK(boolean sendRequestOK) {
+<span class="fc" id="L102">        this.sendRequestOK = sendRequestOK;</span>
+<span class="fc" id="L103">    }</span>
+
+    public long getTimeoutMillis() {
+<span class="fc" id="L106">        return timeoutMillis;</span>
+    }
+
+    public InvokeCallback getInvokeCallback() {
+<span class="fc" id="L110">        return invokeCallback;</span>
+    }
+
+    public Throwable getCause() {
+<span class="fc" id="L114">        return cause;</span>
+    }
+
+    public void setCause(Throwable cause) {
+<span class="fc" id="L118">        this.cause = cause;</span>
+<span class="fc" id="L119">    }</span>
+
+    public RemotingCommand getResponseCommand() {
+<span class="fc" id="L122">        return responseCommand;</span>
+    }
+
+    public void setResponseCommand(RemotingCommand responseCommand) {
+<span class="fc" id="L126">        this.responseCommand = responseCommand;</span>
+<span class="fc" id="L127">    }</span>
+
+    public int getOpaque() {
+<span class="nc" id="L130">        return opaque;</span>
+    }
+
+    public RemotingCommand getRequestCommand() {
+<span class="nc" id="L134">        return request;</span>
+    }
+
+    public Channel getChannel() {
+<span class="fc" id="L138">        return channel;</span>
+    }
+
+    public boolean isInterrupted() {
+<span class="nc" id="L142">        return interrupted;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L147">        return &quot;ResponseFuture [responseCommand=&quot; + responseCommand + &quot;, sendRequestOK=&quot; + sendRequestOK</span>
+            + &quot;, cause=&quot; + cause + &quot;, opaque=&quot; + opaque + &quot;, timeoutMillis=&quot; + timeoutMillis
+            + &quot;, invokeCallback=&quot; + invokeCallback + &quot;, beginTimestamp=&quot; + beginTimestamp
+            + &quot;, countDownLatch=&quot; + countDownLatch + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

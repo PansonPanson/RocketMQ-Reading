@@ -1,0 +1,739 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UtilAll.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common</a> &gt; <span class="el_source">UtilAll.java</span></div><h1>UtilAll.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.Method;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.nio.ByteBuffer;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.text.NumberFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.zip.CRC32;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterInputStream;
+import org.apache.commons.validator.routines.InetAddressValidator;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
+
+<span class="nc" id="L51">public class UtilAll {</span>
+<span class="fc" id="L52">    private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);</span>
+<span class="fc" id="L53">    private static final InternalLogger STORE_LOG = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);</span>
+
+
+    public static final String YYYY_MM_DD_HH_MM_SS = &quot;yyyy-MM-dd HH:mm:ss&quot;;
+    public static final String YYYY_MM_DD_HH_MM_SS_SSS = &quot;yyyy-MM-dd#HH:mm:ss:SSS&quot;;
+    public static final String YYYYMMDDHHMMSS = &quot;yyyyMMddHHmmss&quot;;
+<span class="fc" id="L59">    final static char[] HEX_ARRAY = &quot;0123456789ABCDEF&quot;.toCharArray();</span>
+<span class="fc" id="L60">    final static String HOST_NAME = ManagementFactory.getRuntimeMXBean().getName(); // format: &quot;pid@hostname&quot;</span>
+
+    public static int getPid() {
+        try {
+<span class="fc" id="L64">            return Integer.parseInt(HOST_NAME.substring(0, HOST_NAME.indexOf('@')));</span>
+<span class="nc" id="L65">        } catch (Exception e) {</span>
+<span class="nc" id="L66">            return -1;</span>
+        }
+    }
+
+    public static void sleep(long sleepMs) {
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (sleepMs &lt; 0) {</span>
+<span class="nc" id="L72">            return;</span>
+        }
+        try {
+<span class="nc" id="L75">            Thread.sleep(sleepMs);</span>
+<span class="nc" id="L76">        } catch (Throwable ignored) {</span>
+
+<span class="nc" id="L78">        }</span>
+
+<span class="nc" id="L80">    }</span>
+
+    public static String currentStackTrace() {
+<span class="fc" id="L83">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L84">        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (StackTraceElement ste : stackTrace) {</span>
+<span class="fc" id="L86">            sb.append(&quot;\n\t&quot;);</span>
+<span class="fc" id="L87">            sb.append(ste.toString());</span>
+        }
+
+<span class="fc" id="L90">        return sb.toString();</span>
+    }
+
+    public static String offset2FileName(final long offset) {
+<span class="nc" id="L94">        final NumberFormat nf = NumberFormat.getInstance();</span>
+<span class="nc" id="L95">        nf.setMinimumIntegerDigits(20);</span>
+<span class="nc" id="L96">        nf.setMaximumFractionDigits(0);</span>
+<span class="nc" id="L97">        nf.setGroupingUsed(false);</span>
+<span class="nc" id="L98">        return nf.format(offset);</span>
+    }
+
+    public static long computeElapsedTimeMilliseconds(final long beginTime) {
+<span class="nc" id="L102">        return System.currentTimeMillis() - beginTime;</span>
+    }
+
+    public static boolean isItTimeToDo(final String when) {
+<span class="nc" id="L106">        String[] whiles = when.split(&quot;;&quot;);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (whiles.length &gt; 0) {</span>
+<span class="nc" id="L108">            Calendar now = Calendar.getInstance();</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            for (String w : whiles) {</span>
+<span class="nc" id="L110">                int nowHour = Integer.parseInt(w);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                if (nowHour == now.get(Calendar.HOUR_OF_DAY)) {</span>
+<span class="nc" id="L112">                    return true;</span>
+                }
+            }
+        }
+
+<span class="nc" id="L117">        return false;</span>
+    }
+
+    public static String timeMillisToHumanString() {
+<span class="nc" id="L121">        return timeMillisToHumanString(System.currentTimeMillis());</span>
+    }
+
+    public static String timeMillisToHumanString(final long t) {
+<span class="nc" id="L125">        Calendar cal = Calendar.getInstance();</span>
+<span class="nc" id="L126">        cal.setTimeInMillis(t);</span>
+<span class="nc" id="L127">        return String.format(&quot;%04d%02d%02d%02d%02d%02d%03d&quot;, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1,</span>
+<span class="nc" id="L128">            cal.get(Calendar.DAY_OF_MONTH), cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), cal.get(Calendar.SECOND),</span>
+<span class="nc" id="L129">            cal.get(Calendar.MILLISECOND));</span>
+    }
+
+    public static long computeNextMorningTimeMillis() {
+<span class="fc" id="L133">        Calendar cal = Calendar.getInstance();</span>
+<span class="fc" id="L134">        cal.setTimeInMillis(System.currentTimeMillis());</span>
+<span class="fc" id="L135">        cal.add(Calendar.DAY_OF_MONTH, 1);</span>
+<span class="fc" id="L136">        cal.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="fc" id="L137">        cal.set(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L138">        cal.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L139">        cal.set(Calendar.MILLISECOND, 0);</span>
+
+<span class="fc" id="L141">        return cal.getTimeInMillis();</span>
+    }
+
+    public static long computeNextMinutesTimeMillis() {
+<span class="fc" id="L145">        Calendar cal = Calendar.getInstance();</span>
+<span class="fc" id="L146">        cal.setTimeInMillis(System.currentTimeMillis());</span>
+<span class="fc" id="L147">        cal.add(Calendar.DAY_OF_MONTH, 0);</span>
+<span class="fc" id="L148">        cal.add(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="fc" id="L149">        cal.add(Calendar.MINUTE, 1);</span>
+<span class="fc" id="L150">        cal.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L151">        cal.set(Calendar.MILLISECOND, 0);</span>
+
+<span class="fc" id="L153">        return cal.getTimeInMillis();</span>
+    }
+
+    public static long computeNextHourTimeMillis() {
+<span class="fc" id="L157">        Calendar cal = Calendar.getInstance();</span>
+<span class="fc" id="L158">        cal.setTimeInMillis(System.currentTimeMillis());</span>
+<span class="fc" id="L159">        cal.add(Calendar.DAY_OF_MONTH, 0);</span>
+<span class="fc" id="L160">        cal.add(Calendar.HOUR_OF_DAY, 1);</span>
+<span class="fc" id="L161">        cal.set(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L162">        cal.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L163">        cal.set(Calendar.MILLISECOND, 0);</span>
+
+<span class="fc" id="L165">        return cal.getTimeInMillis();</span>
+    }
+
+    public static long computeNextHalfHourTimeMillis() {
+<span class="nc" id="L169">        Calendar cal = Calendar.getInstance();</span>
+<span class="nc" id="L170">        cal.setTimeInMillis(System.currentTimeMillis());</span>
+<span class="nc" id="L171">        cal.add(Calendar.DAY_OF_MONTH, 0);</span>
+<span class="nc" id="L172">        cal.add(Calendar.HOUR_OF_DAY, 1);</span>
+<span class="nc" id="L173">        cal.set(Calendar.MINUTE, 30);</span>
+<span class="nc" id="L174">        cal.set(Calendar.SECOND, 0);</span>
+<span class="nc" id="L175">        cal.set(Calendar.MILLISECOND, 0);</span>
+
+<span class="nc" id="L177">        return cal.getTimeInMillis();</span>
+    }
+
+    public static String timeMillisToHumanString2(final long t) {
+<span class="nc" id="L181">        Calendar cal = Calendar.getInstance();</span>
+<span class="nc" id="L182">        cal.setTimeInMillis(t);</span>
+<span class="nc" id="L183">        return String.format(&quot;%04d-%02d-%02d %02d:%02d:%02d,%03d&quot;,</span>
+<span class="nc" id="L184">            cal.get(Calendar.YEAR),</span>
+<span class="nc" id="L185">            cal.get(Calendar.MONTH) + 1,</span>
+<span class="nc" id="L186">            cal.get(Calendar.DAY_OF_MONTH),</span>
+<span class="nc" id="L187">            cal.get(Calendar.HOUR_OF_DAY),</span>
+<span class="nc" id="L188">            cal.get(Calendar.MINUTE),</span>
+<span class="nc" id="L189">            cal.get(Calendar.SECOND),</span>
+<span class="nc" id="L190">            cal.get(Calendar.MILLISECOND));</span>
+    }
+
+    public static String timeMillisToHumanString3(final long t) {
+<span class="nc" id="L194">        Calendar cal = Calendar.getInstance();</span>
+<span class="nc" id="L195">        cal.setTimeInMillis(t);</span>
+<span class="nc" id="L196">        return String.format(&quot;%04d%02d%02d%02d%02d%02d&quot;,</span>
+<span class="nc" id="L197">            cal.get(Calendar.YEAR),</span>
+<span class="nc" id="L198">            cal.get(Calendar.MONTH) + 1,</span>
+<span class="nc" id="L199">            cal.get(Calendar.DAY_OF_MONTH),</span>
+<span class="nc" id="L200">            cal.get(Calendar.HOUR_OF_DAY),</span>
+<span class="nc" id="L201">            cal.get(Calendar.MINUTE),</span>
+<span class="nc" id="L202">            cal.get(Calendar.SECOND));</span>
+    }
+
+    public static long getTotalSpace(final String path) {
+<span class="nc bnc" id="L206" title="All 4 branches missed.">        if (null == path || path.isEmpty())</span>
+<span class="nc" id="L207">            return -1;</span>
+        try {
+<span class="nc" id="L209">            File file = new File(path);</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            if (!file.exists())</span>
+<span class="nc" id="L211">                return -1;</span>
+<span class="nc" id="L212">            return  file.getTotalSpace();</span>
+<span class="nc" id="L213">        } catch (Exception e) {</span>
+<span class="nc" id="L214">            return -1;</span>
+        }
+    }
+
+    public static boolean isPathExists(final String path) {
+<span class="nc" id="L219">        File file = new File(path);</span>
+<span class="nc" id="L220">        return file.exists();</span>
+    }
+
+    public static double getDiskPartitionSpaceUsedPercent(final String path) {
+<span class="fc bfc" id="L224" title="All 4 branches covered.">        if (null == path || path.isEmpty()) {</span>
+<span class="fc" id="L225">            STORE_LOG.error(&quot;Error when measuring disk space usage, path is null or empty, path : {}&quot;, path);</span>
+<span class="fc" id="L226">            return -1;</span>
+        }
+
+
+        try {
+<span class="fc" id="L231">            File file = new File(path);</span>
+
+<span class="fc bfc" id="L233" title="All 2 branches covered.">            if (!file.exists()) {</span>
+<span class="fc" id="L234">                STORE_LOG.error(&quot;Error when measuring disk space usage, file doesn't exist on this path: {}&quot;, path);</span>
+<span class="fc" id="L235">                return -1;</span>
+            }
+
+<span class="fc" id="L238">            long totalSpace = file.getTotalSpace();</span>
+
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            if (totalSpace &gt; 0) {</span>
+<span class="fc" id="L241">                long usedSpace = totalSpace - file.getFreeSpace();</span>
+<span class="fc" id="L242">                long usableSpace = file.getUsableSpace();</span>
+<span class="fc" id="L243">                long entireSpace = usedSpace + usableSpace;</span>
+<span class="fc" id="L244">                long roundNum = 0;</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">                if (usedSpace * 100 % entireSpace != 0) {</span>
+<span class="fc" id="L246">                    roundNum = 1;</span>
+                }
+<span class="fc" id="L248">                long result = usedSpace * 100 / entireSpace + roundNum;</span>
+<span class="fc" id="L249">                return result / 100.0;</span>
+            }
+<span class="nc" id="L251">        } catch (Exception e) {</span>
+<span class="nc" id="L252">            STORE_LOG.error(&quot;Error when measuring disk space usage, got exception: :&quot;, e);</span>
+<span class="nc" id="L253">            return -1;</span>
+<span class="nc" id="L254">        }</span>
+
+<span class="nc" id="L256">        return -1;</span>
+    }
+
+    public static long getDiskPartitionTotalSpace(final String path) {
+<span class="nc bnc" id="L260" title="All 4 branches missed.">        if (null == path || path.isEmpty()) {</span>
+<span class="nc" id="L261">            return -1;</span>
+        }
+
+        try {
+<span class="nc" id="L265">            File file = new File(path);</span>
+
+
+<span class="nc bnc" id="L268" title="All 2 branches missed.">            if (!file.exists()) {</span>
+<span class="nc" id="L269">                return -1;</span>
+            }
+
+<span class="nc" id="L272">            return file.getTotalSpace() -  file.getFreeSpace() + file.getUsableSpace();</span>
+<span class="nc" id="L273">        } catch (Exception e) {</span>
+<span class="nc" id="L274">            return -1;</span>
+        }
+    }
+
+    public static int crc32(byte[] array) {
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        if (array != null) {</span>
+<span class="fc" id="L280">            return crc32(array, 0, array.length);</span>
+        }
+
+<span class="nc" id="L283">        return 0;</span>
+    }
+
+    public static int crc32(byte[] array, int offset, int length) {
+<span class="fc" id="L287">        CRC32 crc32 = new CRC32();</span>
+<span class="fc" id="L288">        crc32.update(array, offset, length);</span>
+<span class="fc" id="L289">        return (int) (crc32.getValue() &amp; 0x7FFFFFFF);</span>
+    }
+
+    public static String bytes2string(byte[] src) {
+<span class="fc" id="L293">        char[] hexChars = new char[src.length * 2];</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        for (int j = 0; j &lt; src.length; j++) {</span>
+<span class="fc" id="L295">            int v = src[j] &amp; 0xFF;</span>
+<span class="fc" id="L296">            hexChars[j * 2] = HEX_ARRAY[v &gt;&gt;&gt; 4];</span>
+<span class="fc" id="L297">            hexChars[j * 2 + 1] = HEX_ARRAY[v &amp; 0x0F];</span>
+        }
+<span class="fc" id="L299">        return new String(hexChars);</span>
+    }
+
+    public static void writeInt(char[] buffer, int pos, int value) {
+<span class="fc" id="L303">        char[] hexArray = HEX_ARRAY;</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        for (int moveBits = 28; moveBits &gt;= 0; moveBits -= 4) {</span>
+<span class="fc" id="L305">            buffer[pos++] = hexArray[(value &gt;&gt;&gt; moveBits) &amp; 0x0F];</span>
+        }
+<span class="fc" id="L307">    }</span>
+
+    public static void writeShort(char[] buffer, int pos, int value) {
+<span class="fc" id="L310">        char[] hexArray = HEX_ARRAY;</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        for (int moveBits = 12; moveBits &gt;= 0; moveBits -= 4) {</span>
+<span class="fc" id="L312">            buffer[pos++] = hexArray[(value &gt;&gt;&gt; moveBits) &amp; 0x0F];</span>
+        }
+<span class="fc" id="L314">    }</span>
+
+    public static byte[] string2bytes(String hexString) {
+<span class="pc bpc" id="L317" title="2 of 4 branches missed.">        if (hexString == null || hexString.equals(&quot;&quot;)) {</span>
+<span class="nc" id="L318">            return null;</span>
+        }
+<span class="fc" id="L320">        hexString = hexString.toUpperCase();</span>
+<span class="fc" id="L321">        int length = hexString.length() / 2;</span>
+<span class="fc" id="L322">        char[] hexChars = hexString.toCharArray();</span>
+<span class="fc" id="L323">        byte[] d = new byte[length];</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L325">            int pos = i * 2;</span>
+<span class="fc" id="L326">            d[i] = (byte) (charToByte(hexChars[pos]) &lt;&lt; 4 | charToByte(hexChars[pos + 1]));</span>
+        }
+<span class="fc" id="L328">        return d;</span>
+    }
+
+    private static byte charToByte(char c) {
+<span class="fc" id="L332">        return (byte) &quot;0123456789ABCDEF&quot;.indexOf(c);</span>
+    }
+
+    /**
+     * use {@link org.apache.rocketmq.common.compression.Compressor#decompress(byte[])} instead.
+     */
+    @Deprecated
+    public static byte[] uncompress(final byte[] src) throws IOException {
+<span class="nc" id="L340">        byte[] result = src;</span>
+<span class="nc" id="L341">        byte[] uncompressData = new byte[src.length];</span>
+<span class="nc" id="L342">        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(src);</span>
+<span class="nc" id="L343">        InflaterInputStream inflaterInputStream = new InflaterInputStream(byteArrayInputStream);</span>
+<span class="nc" id="L344">        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(src.length);</span>
+
+        try {
+            while (true) {
+<span class="nc" id="L348">                int len = inflaterInputStream.read(uncompressData, 0, uncompressData.length);</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">                if (len &lt;= 0) {</span>
+<span class="nc" id="L350">                    break;</span>
+                }
+<span class="nc" id="L352">                byteArrayOutputStream.write(uncompressData, 0, len);</span>
+<span class="nc" id="L353">            }</span>
+<span class="nc" id="L354">            byteArrayOutputStream.flush();</span>
+<span class="nc" id="L355">            result = byteArrayOutputStream.toByteArray();</span>
+<span class="nc" id="L356">        } catch (IOException e) {</span>
+<span class="nc" id="L357">            throw e;</span>
+        } finally {
+            try {
+<span class="nc" id="L360">                byteArrayInputStream.close();</span>
+<span class="nc" id="L361">            } catch (IOException e) {</span>
+<span class="nc" id="L362">                log.error(&quot;Failed to close the stream&quot;, e);</span>
+<span class="nc" id="L363">            }</span>
+            try {
+<span class="nc" id="L365">                inflaterInputStream.close();</span>
+<span class="nc" id="L366">            } catch (IOException e) {</span>
+<span class="nc" id="L367">                log.error(&quot;Failed to close the stream&quot;, e);</span>
+<span class="nc" id="L368">            }</span>
+            try {
+<span class="nc" id="L370">                byteArrayOutputStream.close();</span>
+<span class="nc" id="L371">            } catch (IOException e) {</span>
+<span class="nc" id="L372">                log.error(&quot;Failed to close the stream&quot;, e);</span>
+<span class="nc" id="L373">            }</span>
+        }
+
+<span class="nc" id="L376">        return result;</span>
+    }
+
+    /**
+     * use {@link org.apache.rocketmq.common.compression.Compressor#compress(byte[], int)} instead.
+     */
+    @Deprecated
+    public static byte[] compress(final byte[] src, final int level) throws IOException {
+<span class="nc" id="L384">        byte[] result = src;</span>
+<span class="nc" id="L385">        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(src.length);</span>
+<span class="nc" id="L386">        java.util.zip.Deflater defeater = new java.util.zip.Deflater(level);</span>
+<span class="nc" id="L387">        DeflaterOutputStream deflaterOutputStream = new DeflaterOutputStream(byteArrayOutputStream, defeater);</span>
+        try {
+<span class="nc" id="L389">            deflaterOutputStream.write(src);</span>
+<span class="nc" id="L390">            deflaterOutputStream.finish();</span>
+<span class="nc" id="L391">            deflaterOutputStream.close();</span>
+<span class="nc" id="L392">            result = byteArrayOutputStream.toByteArray();</span>
+<span class="nc" id="L393">        } catch (IOException e) {</span>
+<span class="nc" id="L394">            defeater.end();</span>
+<span class="nc" id="L395">            throw e;</span>
+        } finally {
+            try {
+<span class="nc" id="L398">                byteArrayOutputStream.close();</span>
+<span class="nc" id="L399">            } catch (IOException ignored) {</span>
+<span class="nc" id="L400">            }</span>
+
+<span class="nc" id="L402">            defeater.end();</span>
+        }
+
+<span class="nc" id="L405">        return result;</span>
+    }
+
+    public static int asInt(String str, int defaultValue) {
+        try {
+<span class="nc" id="L410">            return Integer.parseInt(str);</span>
+<span class="nc" id="L411">        } catch (Exception e) {</span>
+<span class="nc" id="L412">            return defaultValue;</span>
+        }
+    }
+
+    public static long asLong(String str, long defaultValue) {
+        try {
+<span class="nc" id="L418">            return Long.parseLong(str);</span>
+<span class="nc" id="L419">        } catch (Exception e) {</span>
+<span class="nc" id="L420">            return defaultValue;</span>
+        }
+    }
+
+    public static String formatDate(Date date, String pattern) {
+<span class="fc" id="L425">        SimpleDateFormat df = new SimpleDateFormat(pattern);</span>
+<span class="fc" id="L426">        return df.format(date);</span>
+    }
+
+    public static Date parseDate(String date, String pattern) {
+<span class="nc" id="L430">        SimpleDateFormat df = new SimpleDateFormat(pattern);</span>
+        try {
+<span class="nc" id="L432">            return df.parse(date);</span>
+<span class="nc" id="L433">        } catch (ParseException e) {</span>
+<span class="nc" id="L434">            return null;</span>
+        }
+    }
+
+    public static String responseCode2String(final int code) {
+<span class="nc" id="L439">        return Integer.toString(code);</span>
+    }
+
+    public static String frontStringAtLeast(final String str, final int size) {
+<span class="nc bnc" id="L443" title="All 2 branches missed.">        if (str != null) {</span>
+<span class="nc bnc" id="L444" title="All 2 branches missed.">            if (str.length() &gt; size) {</span>
+<span class="nc" id="L445">                return str.substring(0, size);</span>
+            }
+        }
+
+<span class="nc" id="L449">        return str;</span>
+    }
+
+    public static boolean isBlank(String str) {
+        int strLen;
+<span class="pc bpc" id="L454" title="1 of 4 branches missed.">        if (str == null || (strLen = str.length()) == 0) {</span>
+<span class="fc" id="L455">            return true;</span>
+        }
+<span class="fc bfc" id="L457" title="All 2 branches covered.">        for (int i = 0; i &lt; strLen; i++) {</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">            if (!Character.isWhitespace(str.charAt(i))) {</span>
+<span class="fc" id="L459">                return false;</span>
+            }
+        }
+<span class="fc" id="L462">        return true;</span>
+    }
+
+    public static String jstack() {
+<span class="nc" id="L466">        return jstack(Thread.getAllStackTraces());</span>
+    }
+
+    public static String jstack(Map&lt;Thread, StackTraceElement[]&gt; map) {
+<span class="nc" id="L470">        StringBuilder result = new StringBuilder();</span>
+        try {
+<span class="nc" id="L472">            Iterator&lt;Map.Entry&lt;Thread, StackTraceElement[]&gt;&gt; ite = map.entrySet().iterator();</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">            while (ite.hasNext()) {</span>
+<span class="nc" id="L474">                Map.Entry&lt;Thread, StackTraceElement[]&gt; entry = ite.next();</span>
+<span class="nc" id="L475">                StackTraceElement[] elements = entry.getValue();</span>
+<span class="nc" id="L476">                Thread thread = entry.getKey();</span>
+<span class="nc bnc" id="L477" title="All 4 branches missed.">                if (elements != null &amp;&amp; elements.length &gt; 0) {</span>
+<span class="nc" id="L478">                    String threadName = entry.getKey().getName();</span>
+<span class="nc" id="L479">                    result.append(String.format(&quot;%-40sTID: %d STATE: %s%n&quot;, threadName, thread.getId(), thread.getState()));</span>
+<span class="nc bnc" id="L480" title="All 2 branches missed.">                    for (StackTraceElement el : elements) {</span>
+<span class="nc" id="L481">                        result.append(String.format(&quot;%-40s%s%n&quot;, threadName, el.toString()));</span>
+                    }
+<span class="nc" id="L483">                    result.append(&quot;\n&quot;);</span>
+                }
+<span class="nc" id="L485">            }</span>
+<span class="nc" id="L486">        } catch (Throwable e) {</span>
+<span class="nc" id="L487">            result.append(RemotingHelper.exceptionSimpleDesc(e));</span>
+<span class="nc" id="L488">        }</span>
+
+<span class="nc" id="L490">        return result.toString();</span>
+    }
+
+    public static boolean isInternalIP(byte[] ip) {
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">        if (ip.length != 4) {</span>
+<span class="nc" id="L495">            throw new RuntimeException(&quot;illegal ipv4 bytes&quot;);</span>
+        }
+
+        //10.0.0.0~10.255.255.255
+        //172.16.0.0~172.31.255.255
+        //192.168.0.0~192.168.255.255
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">        if (ip[0] == (byte) 10) {</span>
+
+<span class="nc" id="L503">            return true;</span>
+<span class="fc bfc" id="L504" title="All 2 branches covered.">        } else if (ip[0] == (byte) 172) {</span>
+<span class="pc bpc" id="L505" title="2 of 4 branches missed.">            if (ip[1] &gt;= (byte) 16 &amp;&amp; ip[1] &lt;= (byte) 31) {</span>
+<span class="fc" id="L506">                return true;</span>
+            }
+<span class="pc bpc" id="L508" title="1 of 2 branches missed.">        } else if (ip[0] == (byte) 192) {</span>
+<span class="nc bnc" id="L509" title="All 2 branches missed.">            if (ip[1] == (byte) 168) {</span>
+<span class="nc" id="L510">                return true;</span>
+            }
+        }
+<span class="fc" id="L513">        return false;</span>
+    }
+
+    public static boolean isInternalV6IP(InetAddress inetAddr) {
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">        if (inetAddr.isAnyLocalAddress() // Wild card ipv6</span>
+<span class="fc bfc" id="L518" title="All 2 branches covered.">            || inetAddr.isLinkLocalAddress() // Single broadcast ipv6 address: fe80:xx:xx...</span>
+<span class="fc bfc" id="L519" title="All 2 branches covered.">            || inetAddr.isLoopbackAddress() //Loopback ipv6 address</span>
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">            || inetAddr.isSiteLocalAddress()) { // Site local ipv6 address: fec0:xx:xx...</span>
+<span class="fc" id="L521">            return true;</span>
+        }
+<span class="fc" id="L523">        return false;</span>
+    }
+
+    private static boolean ipCheck(byte[] ip) {
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">        if (ip.length != 4) {</span>
+<span class="nc" id="L528">            throw new RuntimeException(&quot;illegal ipv4 bytes&quot;);</span>
+        }
+
+<span class="fc" id="L531">        InetAddressValidator validator = InetAddressValidator.getInstance();</span>
+<span class="fc" id="L532">        return validator.isValidInet4Address(ipToIPv4Str(ip));</span>
+    }
+
+    private static boolean ipV6Check(byte[] ip) {
+<span class="pc bpc" id="L536" title="1 of 2 branches missed.">        if (ip.length != 16) {</span>
+<span class="nc" id="L537">            throw new RuntimeException(&quot;illegal ipv6 bytes&quot;);</span>
+        }
+
+<span class="fc" id="L540">        InetAddressValidator validator = InetAddressValidator.getInstance();</span>
+<span class="fc" id="L541">        return validator.isValidInet6Address(ipToIPv6Str(ip));</span>
+    }
+
+    public static String ipToIPv4Str(byte[] ip) {
+<span class="pc bpc" id="L545" title="1 of 2 branches missed.">        if (ip.length != 4) {</span>
+<span class="nc" id="L546">            return null;</span>
+        }
+<span class="fc" id="L548">        return new StringBuilder().append(ip[0] &amp; 0xFF).append(&quot;.&quot;).append(</span>
+<span class="fc" id="L549">            ip[1] &amp; 0xFF).append(&quot;.&quot;).append(ip[2] &amp; 0xFF)</span>
+<span class="fc" id="L550">            .append(&quot;.&quot;).append(ip[3] &amp; 0xFF).toString();</span>
+    }
+
+    public static String ipToIPv6Str(byte[] ip) {
+<span class="pc bpc" id="L554" title="1 of 2 branches missed.">        if (ip.length != 16) {</span>
+<span class="nc" id="L555">            return null;</span>
+        }
+
+<span class="fc" id="L558">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L559" title="All 2 branches covered.">        for (int i = 0; i &lt; ip.length; i++) {</span>
+<span class="fc" id="L560">            String hex = Integer.toHexString(ip[i] &amp; 0xFF);</span>
+<span class="fc bfc" id="L561" title="All 2 branches covered.">            if (hex.length() &lt; 2) {</span>
+<span class="fc" id="L562">                sb.append(0);</span>
+            }
+<span class="fc" id="L564">            sb.append(hex);</span>
+<span class="fc bfc" id="L565" title="All 4 branches covered.">            if (i % 2 == 1 &amp;&amp; i &lt; ip.length - 1) {</span>
+<span class="fc" id="L566">                sb.append(&quot;:&quot;);</span>
+            }
+        }
+<span class="fc" id="L569">        return sb.toString();</span>
+    }
+
+    public static byte[] getIP() {
+        try {
+<span class="fc" id="L574">            Enumeration allNetInterfaces = NetworkInterface.getNetworkInterfaces();</span>
+<span class="fc" id="L575">            InetAddress ip = null;</span>
+<span class="fc" id="L576">            byte[] internalIP = null;</span>
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">            while (allNetInterfaces.hasMoreElements()) {</span>
+<span class="fc" id="L578">                NetworkInterface netInterface = (NetworkInterface) allNetInterfaces.nextElement();</span>
+<span class="fc" id="L579">                Enumeration addresses = netInterface.getInetAddresses();</span>
+<span class="fc bfc" id="L580" title="All 2 branches covered.">                while (addresses.hasMoreElements()) {</span>
+<span class="fc" id="L581">                    ip = (InetAddress) addresses.nextElement();</span>
+<span class="pc bpc" id="L582" title="1 of 4 branches missed.">                    if (ip != null &amp;&amp; ip instanceof Inet4Address) {</span>
+<span class="fc" id="L583">                        byte[] ipByte = ip.getAddress();</span>
+<span class="pc bpc" id="L584" title="1 of 2 branches missed.">                        if (ipByte.length == 4) {</span>
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">                            if (ipCheck(ipByte)) {</span>
+<span class="fc bfc" id="L586" title="All 2 branches covered.">                                if (!isInternalIP(ipByte)) {</span>
+<span class="fc" id="L587">                                    return ipByte;</span>
+<span class="pc bpc" id="L588" title="1 of 2 branches missed.">                                } else if (internalIP == null) {</span>
+<span class="fc" id="L589">                                    internalIP = ipByte;</span>
+                                }
+                            }
+                        }
+<span class="pc bpc" id="L593" title="2 of 4 branches missed.">                    } else if (ip != null &amp;&amp; ip instanceof Inet6Address) {</span>
+<span class="fc" id="L594">                        byte[] ipByte = ip.getAddress();</span>
+<span class="pc bpc" id="L595" title="1 of 2 branches missed.">                        if (ipByte.length == 16) {</span>
+<span class="pc bpc" id="L596" title="1 of 2 branches missed.">                            if (ipV6Check(ipByte)) {</span>
+<span class="pc bpc" id="L597" title="1 of 2 branches missed.">                                if (!isInternalV6IP(ip)) {</span>
+<span class="nc" id="L598">                                    return ipByte;</span>
+                                }
+                            }
+                        }
+<span class="fc" id="L602">                    }</span>
+                }
+<span class="fc" id="L604">            }</span>
+<span class="nc bnc" id="L605" title="All 2 branches missed.">            if (internalIP != null) {</span>
+<span class="nc" id="L606">                return internalIP;</span>
+            } else {
+<span class="nc" id="L608">                throw new RuntimeException(&quot;Can not get local ip&quot;);</span>
+            }
+<span class="nc" id="L610">        } catch (Exception e) {</span>
+<span class="nc" id="L611">            throw new RuntimeException(&quot;Can not get local ip&quot;, e);</span>
+        }
+    }
+
+    public static void deleteFile(File file) {
+<span class="fc bfc" id="L616" title="All 2 branches covered.">        if (!file.exists()) {</span>
+<span class="fc" id="L617">            return;</span>
+        }
+<span class="fc bfc" id="L619" title="All 2 branches covered.">        if (file.isFile()) {</span>
+<span class="fc" id="L620">            file.delete();</span>
+<span class="pc bpc" id="L621" title="1 of 2 branches missed.">        } else if (file.isDirectory()) {</span>
+<span class="fc" id="L622">            File[] files = file.listFiles();</span>
+<span class="fc bfc" id="L623" title="All 2 branches covered.">            for (File file1 : files) {</span>
+<span class="fc" id="L624">                deleteFile(file1);</span>
+            }
+<span class="fc" id="L626">            file.delete();</span>
+        }
+<span class="fc" id="L628">    }</span>
+
+    public static String join(List&lt;String&gt; list, String splitter) {
+<span class="fc bfc" id="L631" title="All 2 branches covered.">        if (list == null) {</span>
+<span class="fc" id="L632">            return null;</span>
+        }
+
+<span class="fc" id="L635">        StringBuilder str = new StringBuilder();</span>
+<span class="fc bfc" id="L636" title="All 2 branches covered.">        for (int i = 0; i &lt; list.size(); i++) {</span>
+<span class="fc" id="L637">            str.append(list.get(i));</span>
+<span class="fc bfc" id="L638" title="All 2 branches covered.">            if (i == list.size() - 1) {</span>
+<span class="fc" id="L639">                break;</span>
+            }
+<span class="fc" id="L641">            str.append(splitter);</span>
+        }
+<span class="fc" id="L643">        return str.toString();</span>
+    }
+
+    public static List&lt;String&gt; split(String str, String splitter) {
+<span class="nc bnc" id="L647" title="All 2 branches missed.">        if (str == null) {</span>
+<span class="nc" id="L648">            return null;</span>
+        }
+
+<span class="nc" id="L651">        String[] addrArray = str.split(splitter);</span>
+<span class="nc" id="L652">        return Arrays.asList(addrArray);</span>
+    }
+
+    public static void deleteEmptyDirectory(File file) {
+<span class="nc bnc" id="L656" title="All 4 branches missed.">        if (file == null || !file.exists()) {</span>
+<span class="nc" id="L657">            return;</span>
+        }
+<span class="nc bnc" id="L659" title="All 2 branches missed.">        if (!file.isDirectory()) {</span>
+<span class="nc" id="L660">            return;</span>
+        }
+<span class="nc" id="L662">        File[] files = file.listFiles();</span>
+<span class="nc bnc" id="L663" title="All 4 branches missed.">        if (files == null || files.length &lt;= 0) {</span>
+<span class="nc" id="L664">            file.delete();</span>
+<span class="nc" id="L665">            STORE_LOG.info(&quot;delete empty direct, {}&quot;, file.getPath());</span>
+        }
+<span class="nc" id="L667">    }</span>
+
+    public static void cleanBuffer(final ByteBuffer buffer) {
+<span class="pc bpc" id="L670" title="3 of 6 branches missed.">        if (buffer == null || !buffer.isDirect() || buffer.capacity() == 0) {</span>
+<span class="fc" id="L671">            return;</span>
+        }
+<span class="nc" id="L673">        invoke(invoke(viewed(buffer), &quot;cleaner&quot;), &quot;clean&quot;);</span>
+<span class="nc" id="L674">    }</span>
+
+    public static Object invoke(final Object target, final String methodName, final Class&lt;?&gt;... args) {
+<span class="pc" id="L677">        return AccessController.doPrivileged(new PrivilegedAction&lt;Object&gt;() {</span>
+            @Override
+            public Object run() {
+                try {
+<span class="nc" id="L681">                    Method method = method(target, methodName, args);</span>
+<span class="nc" id="L682">                    method.setAccessible(true);</span>
+<span class="nc" id="L683">                    return method.invoke(target);</span>
+<span class="fc" id="L684">                } catch (Exception e) {</span>
+<span class="fc" id="L685">                    throw new IllegalStateException(e);</span>
+                }
+            }
+        });
+    }
+
+    public static Method method(Object target, String methodName, Class&lt;?&gt;[] args) throws NoSuchMethodException {
+        try {
+<span class="nc" id="L693">            return target.getClass().getMethod(methodName, args);</span>
+<span class="fc" id="L694">        } catch (NoSuchMethodException e) {</span>
+<span class="nc" id="L695">            return target.getClass().getDeclaredMethod(methodName, args);</span>
+        }
+    }
+
+    private static ByteBuffer viewed(ByteBuffer buffer) {
+<span class="nc" id="L700">        String methodName = &quot;viewedBuffer&quot;;</span>
+
+<span class="nc" id="L702">        Method[] methods = buffer.getClass().getMethods();</span>
+<span class="nc bnc" id="L703" title="All 2 branches missed.">        for (Method method : methods) {</span>
+<span class="nc bnc" id="L704" title="All 2 branches missed.">            if (method.getName().equals(&quot;attachment&quot;)) {</span>
+<span class="nc" id="L705">                methodName = &quot;attachment&quot;;</span>
+<span class="nc" id="L706">                break;</span>
+            }
+        }
+
+<span class="nc" id="L710">        ByteBuffer viewedBuffer = (ByteBuffer) invoke(buffer, methodName);</span>
+<span class="nc bnc" id="L711" title="All 2 branches missed.">        if (viewedBuffer == null) {</span>
+<span class="nc" id="L712">            return buffer;</span>
+        } else {
+<span class="nc" id="L714">            return viewed(viewedBuffer);</span>
+        }
+    }
+
+    public static void ensureDirOK(final String dirName) {
+<span class="nc bnc" id="L719" title="All 2 branches missed.">        if (dirName != null) {</span>
+<span class="nc bnc" id="L720" title="All 2 branches missed.">            if (dirName.contains(MixAll.MULTI_PATH_SPLITTER)) {</span>
+<span class="nc" id="L721">                String[] dirs = dirName.trim().split(MixAll.MULTI_PATH_SPLITTER);</span>
+<span class="nc bnc" id="L722" title="All 2 branches missed.">                for (String dir : dirs) {</span>
+<span class="nc" id="L723">                    createDirIfNotExist(dir);</span>
+                }
+<span class="nc" id="L725">            } else {</span>
+<span class="nc" id="L726">                createDirIfNotExist(dirName);</span>
+            }
+        }
+<span class="nc" id="L729">    }</span>
+
+    private static void  createDirIfNotExist(String dirName) {
+<span class="nc" id="L732">        File f = new File(dirName);</span>
+<span class="nc bnc" id="L733" title="All 2 branches missed.">        if (!f.exists()) {</span>
+<span class="nc" id="L734">            boolean result = f.mkdirs();</span>
+<span class="nc bnc" id="L735" title="All 2 branches missed.">            STORE_LOG.info(dirName + &quot; mkdir &quot; + (result ? &quot;OK&quot; : &quot;Failed&quot;));</span>
+        }
+<span class="nc" id="L737">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

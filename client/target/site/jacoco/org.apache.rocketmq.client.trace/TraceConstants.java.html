@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraceConstants.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.trace</a> &gt; <span class="el_source">TraceConstants.java</span></div><h1>TraceConstants.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.trace;
+
+import org.apache.rocketmq.common.topic.TopicValidator;
+
+<span class="nc" id="L21">public class TraceConstants {</span>
+
+    public static final String GROUP_NAME_PREFIX = &quot;_INNER_TRACE_PRODUCER&quot;;
+    public static final char CONTENT_SPLITOR = (char) 1;
+    public static final char FIELD_SPLITOR = (char) 2;
+    public static final String TRACE_INSTANCE_NAME = &quot;PID_CLIENT_INNER_TRACE_PRODUCER&quot;;
+    public static final String TRACE_TOPIC_PREFIX = TopicValidator.SYSTEM_TOPIC_PREFIX + &quot;TRACE_DATA_&quot;;
+    public static final String TO_PREFIX = &quot;To_&quot;;
+    public static final String FROM_PREFIX = &quot;From_&quot;;
+    public static final String END_TRANSACTION = &quot;EndTransaction&quot;;
+    public static final String ROCKETMQ_SERVICE = &quot;rocketmq&quot;;
+    public static final String ROCKETMQ_SUCCESS = &quot;rocketmq.success&quot;;
+    public static final String ROCKETMQ_TAGS = &quot;rocketmq.tags&quot;;
+    public static final String ROCKETMQ_KEYS = &quot;rocketmq.keys&quot;;
+    public static final String ROCKETMQ_SOTRE_HOST = &quot;rocketmq.store_host&quot;;
+    public static final String ROCKETMQ_BODY_LENGTH = &quot;rocketmq.body_length&quot;;
+    public static final String ROCKETMQ_MSG_ID = &quot;rocketmq.mgs_id&quot;;
+    public static final String ROCKETMQ_MSG_TYPE = &quot;rocketmq.mgs_type&quot;;
+    public static final String ROCKETMQ_REGION_ID = &quot;rocketmq.region_id&quot;;
+    public static final String ROCKETMQ_TRANSACTION_ID = &quot;rocketmq.transaction_id&quot;;
+    public static final String ROCKETMQ_TRANSACTION_STATE = &quot;rocketmq.transaction_state&quot;;
+    public static final String ROCKETMQ_IS_FROM_TRANSACTION_CHECK = &quot;rocketmq.is_from_transaction_check&quot;;
+    public static final String ROCKETMQ_RETRY_TIMERS = &quot;rocketmq.retry_times&quot;;
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

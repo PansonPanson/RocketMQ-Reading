@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Level.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-logging 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.logging.inner</a> &gt; <span class="el_source">Level.java</span></div><h1>Level.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.logging.inner;
+
+import java.io.Serializable;
+
+public class Level implements Serializable {
+
+    transient int level;
+    transient String levelStr;
+    transient int syslogEquivalent;
+
+    public final static int OFF_INT = Integer.MAX_VALUE;
+    public final static int ERROR_INT = 40000;
+    public final static int WARN_INT = 30000;
+    public final static int INFO_INT = 20000;
+    public final static int DEBUG_INT = 10000;
+    public final static int ALL_INT = Integer.MIN_VALUE;
+
+
+    private static final String ALL_NAME = &quot;ALL&quot;;
+
+    private static final String DEBUG_NAME = &quot;DEBUG&quot;;
+
+    private static final String INFO_NAME = &quot;INFO&quot;;
+
+    private static final String WARN_NAME = &quot;WARN&quot;;
+
+    private static final String ERROR_NAME = &quot;ERROR&quot;;
+
+    private static final String OFF_NAME = &quot;OFF&quot;;
+
+<span class="fc" id="L48">    final static public Level OFF = new Level(OFF_INT, OFF_NAME, 0);</span>
+
+<span class="fc" id="L50">    final static public Level ERROR = new Level(ERROR_INT, ERROR_NAME, 3);</span>
+
+<span class="fc" id="L52">    final static public Level WARN = new Level(WARN_INT, WARN_NAME, 4);</span>
+
+<span class="fc" id="L54">    final static public Level INFO = new Level(INFO_INT, INFO_NAME, 6);</span>
+
+<span class="fc" id="L56">    final static public Level DEBUG = new Level(DEBUG_INT, DEBUG_NAME, 7);</span>
+
+<span class="fc" id="L58">    final static public Level ALL = new Level(ALL_INT, ALL_NAME, 7);</span>
+
+    static final long serialVersionUID = 3491141966387921974L;
+
+<span class="fc" id="L62">    protected Level(int level, String levelStr, int syslogEquivalent) {</span>
+<span class="fc" id="L63">        this.level = level;</span>
+<span class="fc" id="L64">        this.levelStr = levelStr;</span>
+<span class="fc" id="L65">        this.syslogEquivalent = syslogEquivalent;</span>
+<span class="fc" id="L66">    }</span>
+
+    public static Level toLevel(String sArg) {
+<span class="fc" id="L69">        return toLevel(sArg, Level.DEBUG);</span>
+    }
+
+    public static Level toLevel(int val) {
+<span class="fc" id="L73">        return toLevel(val, Level.DEBUG);</span>
+    }
+
+    public static Level toLevel(int val, Level defaultLevel) {
+<span class="pc bpc" id="L77" title="6 of 7 branches missed.">        switch (val) {</span>
+            case ALL_INT:
+<span class="nc" id="L79">                return ALL;</span>
+            case DEBUG_INT:
+<span class="nc" id="L81">                return Level.DEBUG;</span>
+            case INFO_INT:
+<span class="nc" id="L83">                return Level.INFO;</span>
+            case WARN_INT:
+<span class="nc" id="L85">                return Level.WARN;</span>
+            case ERROR_INT:
+<span class="nc" id="L87">                return Level.ERROR;</span>
+            case OFF_INT:
+<span class="nc" id="L89">                return OFF;</span>
+            default:
+<span class="fc" id="L91">                return defaultLevel;</span>
+        }
+    }
+
+    public static Level toLevel(String sArg, Level defaultLevel) {
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (sArg == null) {</span>
+<span class="nc" id="L97">            return defaultLevel;</span>
+        }
+<span class="fc" id="L99">        String s = sArg.toUpperCase();</span>
+
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (s.equals(ALL_NAME)) {</span>
+<span class="nc" id="L102">            return Level.ALL;</span>
+        }
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (s.equals(DEBUG_NAME)) {</span>
+<span class="nc" id="L105">            return Level.DEBUG;</span>
+        }
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (s.equals(INFO_NAME)) {</span>
+<span class="fc" id="L108">            return Level.INFO;</span>
+        }
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (s.equals(WARN_NAME)) {</span>
+<span class="nc" id="L111">            return Level.WARN;</span>
+        }
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (s.equals(ERROR_NAME)) {</span>
+<span class="nc" id="L114">            return Level.ERROR;</span>
+        }
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (s.equals(OFF_NAME)) {</span>
+<span class="nc" id="L117">            return Level.OFF;</span>
+        }
+<span class="nc" id="L119">        return defaultLevel;</span>
+    }
+
+
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (o instanceof Level) {</span>
+<span class="fc" id="L125">            Level r = (Level) o;</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            return this.level == r.level;</span>
+        } else {
+<span class="nc" id="L128">            return false;</span>
+        }
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L134">        int result = level;</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        result = 31 * result + (levelStr != null ? levelStr.hashCode() : 0);</span>
+<span class="nc" id="L136">        result = 31 * result + syslogEquivalent;</span>
+<span class="nc" id="L137">        return result;</span>
+    }
+
+    public boolean isGreaterOrEqual(Level r) {
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        return level &gt;= r.level;</span>
+    }
+
+    final public String toString() {
+<span class="fc" id="L145">        return levelStr;</span>
+    }
+
+    public final int toInt() {
+<span class="nc" id="L149">        return level;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

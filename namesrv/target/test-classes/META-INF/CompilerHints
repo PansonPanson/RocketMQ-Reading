@@ -1,0 +1,12 @@
+dontinline,*.*_all_jmhStub
+dontinline,*.*_avgt_jmhStub
+dontinline,*.*_sample_jmhStub
+dontinline,*.*_ss_jmhStub
+dontinline,*.*_thrpt_jmhStub
+inline,org/apache/rocketmq/namesrv/routeinfo/GetRouteInfoBenchmark.pickupTopicRouteData
+inline,org/apache/rocketmq/namesrv/routeinfo/GetRouteInfoBenchmark.setup
+inline,org/apache/rocketmq/namesrv/routeinfo/GetRouteInfoBenchmark.tearDown
+inline,org/apache/rocketmq/namesrv/routeinfo/RegisterBrokerBenchmark.registerBroker
+inline,org/apache/rocketmq/namesrv/routeinfo/RegisterBrokerBenchmark.registerBroker_Throughput
+inline,org/apache/rocketmq/namesrv/routeinfo/RegisterBrokerBenchmark.setup
+inline,org/apache/rocketmq/namesrv/routeinfo/RegisterBrokerBenchmark.tearDown

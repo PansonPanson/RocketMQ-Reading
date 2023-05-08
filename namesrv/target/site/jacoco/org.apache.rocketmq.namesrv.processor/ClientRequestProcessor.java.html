@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClientRequestProcessor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-namesrv 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.namesrv.processor</a> &gt; <span class="el_source">ClientRequestProcessor.java</span></div><h1>ClientRequestProcessor.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.namesrv.processor;
+
+import io.netty.channel.ChannelHandlerContext;
+import org.apache.rocketmq.common.help.FAQUrl;
+import org.apache.rocketmq.common.namesrv.NamesrvUtil;
+import org.apache.rocketmq.common.protocol.ResponseCode;
+import org.apache.rocketmq.common.protocol.header.namesrv.GetRouteInfoRequestHeader;
+import org.apache.rocketmq.common.protocol.route.TopicRouteData;
+import org.apache.rocketmq.common.protocol.route.TopicRouteDatas;
+import org.apache.rocketmq.namesrv.NamesrvController;
+import org.apache.rocketmq.remoting.exception.RemotingCommandException;
+import org.apache.rocketmq.remoting.netty.NettyRequestProcessor;
+import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+
+public class ClientRequestProcessor implements NettyRequestProcessor {
+    protected NamesrvController namesrvController;
+
+<span class="fc" id="L35">    public ClientRequestProcessor(final NamesrvController namesrvController) {</span>
+<span class="fc" id="L36">        this.namesrvController = namesrvController;</span>
+<span class="fc" id="L37">    }</span>
+
+    @Override
+    public RemotingCommand processRequest(final ChannelHandlerContext ctx,
+        final RemotingCommand request) throws Exception {
+<span class="fc" id="L42">        return this.getRouteInfoByTopic(ctx, request);</span>
+    }
+
+    public RemotingCommand getRouteInfoByTopic(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="fc" id="L47">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="fc" id="L48">        final GetRouteInfoRequestHeader requestHeader =</span>
+<span class="fc" id="L49">            (GetRouteInfoRequestHeader) request.decodeCommandCustomHeader(GetRouteInfoRequestHeader.class);</span>
+
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (requestHeader.getTopic().indexOf(GetRouteInfoRequestHeader.split) &lt; 0) {</span>
+<span class="fc" id="L52">            TopicRouteData topicRouteData = this.namesrvController.getRouteInfoManager().pickupTopicRouteData(requestHeader.getTopic());</span>
+
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (topicRouteData != null) {</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                if (this.namesrvController.getNamesrvConfig().isOrderMessageEnable()) {</span>
+<span class="nc" id="L56">                    String orderTopicConf =</span>
+<span class="nc" id="L57">                        this.namesrvController.getKvConfigManager().getKVConfig(NamesrvUtil.NAMESPACE_ORDER_TOPIC_CONFIG,</span>
+<span class="nc" id="L58">                            requestHeader.getTopic());</span>
+<span class="nc" id="L59">                    topicRouteData.setOrderTopicConf(orderTopicConf);</span>
+                }
+
+<span class="fc" id="L62">                byte[] content = topicRouteData.encode();</span>
+<span class="fc" id="L63">                response.setBody(content);</span>
+<span class="fc" id="L64">                response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L65">                response.setRemark(null);</span>
+<span class="fc" id="L66">                return response;</span>
+            }
+
+<span class="fc" id="L69">            response.setCode(ResponseCode.TOPIC_NOT_EXIST);</span>
+<span class="fc" id="L70">            response.setRemark(&quot;No topic route info in name server for the topic: &quot; + requestHeader.getTopic()</span>
+<span class="fc" id="L71">                + FAQUrl.suggestTodo(FAQUrl.APPLY_TOPIC_URL));</span>
+<span class="fc" id="L72">            return response;</span>
+        }
+
+<span class="nc" id="L75">        String[] topics = requestHeader.getTopic().split(String.valueOf(GetRouteInfoRequestHeader.split));</span>
+<span class="nc" id="L76">        TopicRouteDatas topicRouteDatas = new TopicRouteDatas();</span>
+
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        for (String topic : topics) {</span>
+<span class="nc" id="L79">            TopicRouteData topicRouteData = this.namesrvController.getRouteInfoManager().pickupTopicRouteData(topic);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (topicRouteData == null) {</span>
+<span class="nc" id="L81">                continue;</span>
+            }
+
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            if (this.namesrvController.getNamesrvConfig().isOrderMessageEnable()) {</span>
+<span class="nc" id="L85">                String orderTopicConf =</span>
+<span class="nc" id="L86">                    this.namesrvController.getKvConfigManager().getKVConfig(NamesrvUtil.NAMESPACE_ORDER_TOPIC_CONFIG, topic);</span>
+<span class="nc" id="L87">                topicRouteData.setOrderTopicConf(orderTopicConf);</span>
+            }
+
+<span class="nc" id="L90">            topicRouteDatas.getTopics().put(topic, topicRouteData);</span>
+        }
+<span class="nc" id="L92">        response.setBody(topicRouteDatas.encode());</span>
+<span class="nc" id="L93">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="nc" id="L94">        response.setRemark(null);</span>
+<span class="nc" id="L95">        return response;</span>
+    }
+
+    @Override
+    public boolean rejectRequest() {
+<span class="nc" id="L100">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

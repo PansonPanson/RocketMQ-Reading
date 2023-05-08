@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClientRemotingProcessor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.impl</a> &gt; <span class="el_source">ClientRemotingProcessor.java</span></div><h1>ClientRemotingProcessor.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.impl;
+
+import io.netty.channel.ChannelHandlerContext;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.rocketmq.client.impl.factory.MQClientInstance;
+import org.apache.rocketmq.client.impl.producer.MQProducerInner;
+import org.apache.rocketmq.client.log.ClientLogger;
+import org.apache.rocketmq.client.producer.RequestFutureHolder;
+import org.apache.rocketmq.client.producer.RequestResponseFuture;
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.compression.Compressor;
+import org.apache.rocketmq.common.compression.CompressorFactory;
+import org.apache.rocketmq.common.message.MessageAccessor;
+import org.apache.rocketmq.common.message.MessageConst;
+import org.apache.rocketmq.common.message.MessageDecoder;
+import org.apache.rocketmq.common.message.MessageExt;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.protocol.NamespaceUtil;
+import org.apache.rocketmq.common.protocol.RequestCode;
+import org.apache.rocketmq.common.protocol.ResponseCode;
+import org.apache.rocketmq.common.protocol.body.ConsumeMessageDirectlyResult;
+import org.apache.rocketmq.common.protocol.body.ConsumerRunningInfo;
+import org.apache.rocketmq.common.protocol.body.GetConsumerStatusBody;
+import org.apache.rocketmq.common.protocol.body.ResetOffsetBody;
+import org.apache.rocketmq.common.protocol.header.CheckTransactionStateRequestHeader;
+import org.apache.rocketmq.common.protocol.header.ConsumeMessageDirectlyResultRequestHeader;
+import org.apache.rocketmq.common.protocol.header.GetConsumerRunningInfoRequestHeader;
+import org.apache.rocketmq.common.protocol.header.GetConsumerStatusRequestHeader;
+import org.apache.rocketmq.common.protocol.header.NotifyConsumerIdsChangedRequestHeader;
+import org.apache.rocketmq.common.protocol.header.ReplyMessageRequestHeader;
+import org.apache.rocketmq.common.protocol.header.ResetOffsetRequestHeader;
+import org.apache.rocketmq.common.sysflag.MessageSysFlag;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
+import org.apache.rocketmq.remoting.common.RemotingUtil;
+import org.apache.rocketmq.remoting.exception.RemotingCommandException;
+import org.apache.rocketmq.remoting.netty.NettyRequestProcessor;
+import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+
+public class ClientRemotingProcessor implements NettyRequestProcessor {
+<span class="fc" id="L61">    private final InternalLogger log = ClientLogger.getLog();</span>
+    private final MQClientInstance mqClientFactory;
+
+<span class="fc" id="L64">    public ClientRemotingProcessor(final MQClientInstance mqClientFactory) {</span>
+<span class="fc" id="L65">        this.mqClientFactory = mqClientFactory;</span>
+<span class="fc" id="L66">    }</span>
+
+    @Override
+    public RemotingCommand processRequest(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="nc bnc" id="L71" title="All 8 branches missed.">        switch (request.getCode()) {</span>
+            case RequestCode.CHECK_TRANSACTION_STATE:
+<span class="nc" id="L73">                return this.checkTransactionState(ctx, request);</span>
+            case RequestCode.NOTIFY_CONSUMER_IDS_CHANGED:
+<span class="nc" id="L75">                return this.notifyConsumerIdsChanged(ctx, request);</span>
+            case RequestCode.RESET_CONSUMER_CLIENT_OFFSET:
+<span class="nc" id="L77">                return this.resetOffset(ctx, request);</span>
+            case RequestCode.GET_CONSUMER_STATUS_FROM_CLIENT:
+<span class="nc" id="L79">                return this.getConsumeStatus(ctx, request);</span>
+
+            case RequestCode.GET_CONSUMER_RUNNING_INFO:
+<span class="nc" id="L82">                return this.getConsumerRunningInfo(ctx, request);</span>
+
+            case RequestCode.CONSUME_MESSAGE_DIRECTLY:
+<span class="nc" id="L85">                return this.consumeMessageDirectly(ctx, request);</span>
+
+            case RequestCode.PUSH_REPLY_MESSAGE_TO_CLIENT:
+<span class="nc" id="L88">                return this.receiveReplyMessage(ctx, request);</span>
+            default:
+                break;
+        }
+<span class="nc" id="L92">        return null;</span>
+    }
+
+    @Override
+    public boolean rejectRequest() {
+<span class="nc" id="L97">        return false;</span>
+    }
+
+    public RemotingCommand checkTransactionState(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="nc" id="L102">        final CheckTransactionStateRequestHeader requestHeader =</span>
+<span class="nc" id="L103">            (CheckTransactionStateRequestHeader) request.decodeCommandCustomHeader(CheckTransactionStateRequestHeader.class);</span>
+<span class="nc" id="L104">        final ByteBuffer byteBuffer = ByteBuffer.wrap(request.getBody());</span>
+<span class="nc" id="L105">        final MessageExt messageExt = MessageDecoder.decode(byteBuffer);</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (messageExt != null) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (StringUtils.isNotEmpty(this.mqClientFactory.getClientConfig().getNamespace())) {</span>
+<span class="nc" id="L108">                messageExt.setTopic(NamespaceUtil</span>
+<span class="nc" id="L109">                    .withoutNamespace(messageExt.getTopic(), this.mqClientFactory.getClientConfig().getNamespace()));</span>
+            }
+<span class="nc" id="L111">            String transactionId = messageExt.getProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX);</span>
+<span class="nc bnc" id="L112" title="All 4 branches missed.">            if (null != transactionId &amp;&amp; !&quot;&quot;.equals(transactionId)) {</span>
+<span class="nc" id="L113">                messageExt.setTransactionId(transactionId);</span>
+            }
+<span class="nc" id="L115">            final String group = messageExt.getProperty(MessageConst.PROPERTY_PRODUCER_GROUP);</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            if (group != null) {</span>
+<span class="nc" id="L117">                MQProducerInner producer = this.mqClientFactory.selectProducer(group);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                if (producer != null) {</span>
+<span class="nc" id="L119">                    final String addr = RemotingHelper.parseChannelRemoteAddr(ctx.channel());</span>
+<span class="nc" id="L120">                    producer.checkTransactionState(addr, messageExt, requestHeader);</span>
+<span class="nc" id="L121">                } else {</span>
+<span class="nc" id="L122">                    log.debug(&quot;checkTransactionState, pick producer by group[{}] failed&quot;, group);</span>
+                }
+<span class="nc" id="L124">            } else {</span>
+<span class="nc" id="L125">                log.warn(&quot;checkTransactionState, pick producer group failed&quot;);</span>
+            }
+<span class="nc" id="L127">        } else {</span>
+<span class="nc" id="L128">            log.warn(&quot;checkTransactionState, decode message failed&quot;);</span>
+        }
+
+<span class="nc" id="L131">        return null;</span>
+    }
+
+    public RemotingCommand notifyConsumerIdsChanged(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+        try {
+<span class="nc" id="L137">            final NotifyConsumerIdsChangedRequestHeader requestHeader =</span>
+<span class="nc" id="L138">                (NotifyConsumerIdsChangedRequestHeader) request.decodeCommandCustomHeader(NotifyConsumerIdsChangedRequestHeader.class);</span>
+<span class="nc" id="L139">            log.info(&quot;receive broker's notification[{}], the consumer group: {} changed, rebalance immediately&quot;,</span>
+<span class="nc" id="L140">                RemotingHelper.parseChannelRemoteAddr(ctx.channel()),</span>
+<span class="nc" id="L141">                requestHeader.getConsumerGroup());</span>
+<span class="nc" id="L142">            this.mqClientFactory.rebalanceImmediately();</span>
+<span class="nc" id="L143">        } catch (Exception e) {</span>
+<span class="nc" id="L144">            log.error(&quot;notifyConsumerIdsChanged exception&quot;, RemotingHelper.exceptionSimpleDesc(e));</span>
+<span class="nc" id="L145">        }</span>
+<span class="nc" id="L146">        return null;</span>
+    }
+
+    public RemotingCommand resetOffset(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="nc" id="L151">        final ResetOffsetRequestHeader requestHeader =</span>
+<span class="nc" id="L152">            (ResetOffsetRequestHeader) request.decodeCommandCustomHeader(ResetOffsetRequestHeader.class);</span>
+<span class="nc" id="L153">        log.info(&quot;invoke reset offset operation from broker. brokerAddr={}, topic={}, group={}, timestamp={}&quot;,</span>
+<span class="nc" id="L154">            RemotingHelper.parseChannelRemoteAddr(ctx.channel()), requestHeader.getTopic(), requestHeader.getGroup(),</span>
+<span class="nc" id="L155">            requestHeader.getTimestamp());</span>
+<span class="nc" id="L156">        Map&lt;MessageQueue, Long&gt; offsetTable = new HashMap&lt;MessageQueue, Long&gt;();</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (request.getBody() != null) {</span>
+<span class="nc" id="L158">            ResetOffsetBody body = ResetOffsetBody.decode(request.getBody(), ResetOffsetBody.class);</span>
+<span class="nc" id="L159">            offsetTable = body.getOffsetTable();</span>
+        }
+<span class="nc" id="L161">        this.mqClientFactory.resetOffset(requestHeader.getTopic(), requestHeader.getGroup(), offsetTable);</span>
+<span class="nc" id="L162">        return null;</span>
+    }
+
+    @Deprecated
+    public RemotingCommand getConsumeStatus(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="nc" id="L168">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="nc" id="L169">        final GetConsumerStatusRequestHeader requestHeader =</span>
+<span class="nc" id="L170">            (GetConsumerStatusRequestHeader) request.decodeCommandCustomHeader(GetConsumerStatusRequestHeader.class);</span>
+
+<span class="nc" id="L172">        Map&lt;MessageQueue, Long&gt; offsetTable = this.mqClientFactory.getConsumerStatus(requestHeader.getTopic(), requestHeader.getGroup());</span>
+<span class="nc" id="L173">        GetConsumerStatusBody body = new GetConsumerStatusBody();</span>
+<span class="nc" id="L174">        body.setMessageQueueTable(offsetTable);</span>
+<span class="nc" id="L175">        response.setBody(body.encode());</span>
+<span class="nc" id="L176">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="nc" id="L177">        return response;</span>
+    }
+
+    private RemotingCommand getConsumerRunningInfo(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="nc" id="L182">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="nc" id="L183">        final GetConsumerRunningInfoRequestHeader requestHeader =</span>
+<span class="nc" id="L184">            (GetConsumerRunningInfoRequestHeader) request.decodeCommandCustomHeader(GetConsumerRunningInfoRequestHeader.class);</span>
+
+<span class="nc" id="L186">        ConsumerRunningInfo consumerRunningInfo = this.mqClientFactory.consumerRunningInfo(requestHeader.getConsumerGroup());</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (null != consumerRunningInfo) {</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">            if (requestHeader.isJstackEnable()) {</span>
+<span class="nc" id="L189">                Map&lt;Thread, StackTraceElement[]&gt; map = Thread.getAllStackTraces();</span>
+<span class="nc" id="L190">                String jstack = UtilAll.jstack(map);</span>
+<span class="nc" id="L191">                consumerRunningInfo.setJstack(jstack);</span>
+            }
+
+<span class="nc" id="L194">            response.setCode(ResponseCode.SUCCESS);</span>
+<span class="nc" id="L195">            response.setBody(consumerRunningInfo.encode());</span>
+        } else {
+<span class="nc" id="L197">            response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L198">            response.setRemark(String.format(&quot;The Consumer Group &lt;%s&gt; not exist in this consumer&quot;, requestHeader.getConsumerGroup()));</span>
+        }
+
+<span class="nc" id="L201">        return response;</span>
+    }
+
+    private RemotingCommand consumeMessageDirectly(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="nc" id="L206">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="nc" id="L207">        final ConsumeMessageDirectlyResultRequestHeader requestHeader =</span>
+            (ConsumeMessageDirectlyResultRequestHeader) request
+<span class="nc" id="L209">                .decodeCommandCustomHeader(ConsumeMessageDirectlyResultRequestHeader.class);</span>
+
+<span class="nc" id="L211">        final MessageExt msg = MessageDecoder.decode(ByteBuffer.wrap(request.getBody()));</span>
+
+<span class="nc" id="L213">        ConsumeMessageDirectlyResult result =</span>
+<span class="nc" id="L214">            this.mqClientFactory.consumeMessageDirectly(msg, requestHeader.getConsumerGroup(), requestHeader.getBrokerName());</span>
+
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (null != result) {</span>
+<span class="nc" id="L217">            response.setCode(ResponseCode.SUCCESS);</span>
+<span class="nc" id="L218">            response.setBody(result.encode());</span>
+        } else {
+<span class="nc" id="L220">            response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L221">            response.setRemark(String.format(&quot;The Consumer Group &lt;%s&gt; not exist in this consumer&quot;, requestHeader.getConsumerGroup()));</span>
+        }
+
+<span class="nc" id="L224">        return response;</span>
+    }
+
+    private RemotingCommand receiveReplyMessage(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+
+<span class="nc" id="L230">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="nc" id="L231">        long receiveTime = System.currentTimeMillis();</span>
+<span class="nc" id="L232">        ReplyMessageRequestHeader requestHeader = (ReplyMessageRequestHeader) request.decodeCommandCustomHeader(ReplyMessageRequestHeader.class);</span>
+
+        try {
+<span class="nc" id="L235">            MessageExt msg = new MessageExt();</span>
+<span class="nc" id="L236">            msg.setTopic(requestHeader.getTopic());</span>
+<span class="nc" id="L237">            msg.setQueueId(requestHeader.getQueueId());</span>
+<span class="nc" id="L238">            msg.setStoreTimestamp(requestHeader.getStoreTimestamp());</span>
+
+<span class="nc bnc" id="L240" title="All 2 branches missed.">            if (requestHeader.getBornHost() != null) {</span>
+<span class="nc" id="L241">                msg.setBornHost(RemotingUtil.string2SocketAddress(requestHeader.getBornHost()));</span>
+            }
+
+<span class="nc bnc" id="L244" title="All 2 branches missed.">            if (requestHeader.getStoreHost() != null) {</span>
+<span class="nc" id="L245">                msg.setStoreHost(RemotingUtil.string2SocketAddress(requestHeader.getStoreHost()));</span>
+            }
+
+<span class="nc" id="L248">            byte[] body = request.getBody();</span>
+<span class="nc" id="L249">            int sysFlag = requestHeader.getSysFlag();</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            if ((sysFlag &amp; MessageSysFlag.COMPRESSED_FLAG) == MessageSysFlag.COMPRESSED_FLAG) {</span>
+                try {
+<span class="nc" id="L252">                    Compressor compressor = CompressorFactory.getCompressor(MessageSysFlag.getCompressionType(sysFlag));</span>
+<span class="nc" id="L253">                    body = compressor.decompress(body);</span>
+<span class="nc" id="L254">                } catch (IOException e) {</span>
+<span class="nc" id="L255">                    log.warn(&quot;err when uncompress constant&quot;, e);</span>
+<span class="nc" id="L256">                }</span>
+            }
+<span class="nc" id="L258">            msg.setBody(body);</span>
+<span class="nc" id="L259">            msg.setFlag(requestHeader.getFlag());</span>
+<span class="nc" id="L260">            MessageAccessor.setProperties(msg, MessageDecoder.string2messageProperties(requestHeader.getProperties()));</span>
+<span class="nc" id="L261">            MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REPLY_MESSAGE_ARRIVE_TIME, String.valueOf(receiveTime));</span>
+<span class="nc" id="L262">            msg.setBornTimestamp(requestHeader.getBornTimestamp());</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">            msg.setReconsumeTimes(requestHeader.getReconsumeTimes() == null ? 0 : requestHeader.getReconsumeTimes());</span>
+<span class="nc" id="L264">            log.debug(&quot;receive reply message :{}&quot;, msg);</span>
+
+<span class="nc" id="L266">            processReplyMessage(msg);</span>
+
+<span class="nc" id="L268">            response.setCode(ResponseCode.SUCCESS);</span>
+<span class="nc" id="L269">            response.setRemark(null);</span>
+<span class="nc" id="L270">        } catch (Exception e) {</span>
+<span class="nc" id="L271">            log.warn(&quot;unknown err when receiveReplyMsg&quot;, e);</span>
+<span class="nc" id="L272">            response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L273">            response.setRemark(&quot;process reply message fail&quot;);</span>
+<span class="nc" id="L274">        }</span>
+<span class="nc" id="L275">        return response;</span>
+    }
+
+    private void processReplyMessage(MessageExt replyMsg) {
+<span class="nc" id="L279">        final String correlationId = replyMsg.getUserProperty(MessageConst.PROPERTY_CORRELATION_ID);</span>
+<span class="nc" id="L280">        final RequestResponseFuture requestResponseFuture = RequestFutureHolder.getInstance().getRequestFutureTable().get(correlationId);</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        if (requestResponseFuture != null) {</span>
+<span class="nc" id="L282">            requestResponseFuture.putResponseMessage(replyMsg);</span>
+
+<span class="nc" id="L284">            RequestFutureHolder.getInstance().getRequestFutureTable().remove(correlationId);</span>
+
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            if (requestResponseFuture.getRequestCallback() != null) {</span>
+<span class="nc" id="L287">                requestResponseFuture.getRequestCallback().onSuccess(replyMsg);</span>
+            }
+        } else {
+<span class="nc" id="L290">            String bornHost = replyMsg.getBornHostString();</span>
+<span class="nc" id="L291">            log.warn(String.format(&quot;receive reply message, but not matched any request, CorrelationId: %s , reply from host: %s&quot;,</span>
+                correlationId, bornHost));
+        }
+<span class="nc" id="L294">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

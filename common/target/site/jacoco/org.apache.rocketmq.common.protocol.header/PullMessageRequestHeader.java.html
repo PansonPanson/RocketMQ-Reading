@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PullMessageRequestHeader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.header</a> &gt; <span class="el_source">PullMessageRequestHeader.java</span></div><h1>PullMessageRequestHeader.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * $Id: PullMessageRequestHeader.java 1835 2013-05-16 02:00:50Z vintagewang@apache.org $
+ */
+package org.apache.rocketmq.common.protocol.header;
+
+import com.google.common.base.MoreObjects;
+import java.util.HashMap;
+import org.apache.rocketmq.common.rpc.TopicQueueRequestHeader;
+import org.apache.rocketmq.remoting.annotation.CFNotNull;
+import org.apache.rocketmq.remoting.annotation.CFNullable;
+import org.apache.rocketmq.remoting.exception.RemotingCommandException;
+import org.apache.rocketmq.remoting.protocol.FastCodesHeader;
+
+import io.netty.buffer.ByteBuf;
+
+<span class="fc" id="L33">public class PullMessageRequestHeader extends TopicQueueRequestHeader implements FastCodesHeader {</span>
+    @CFNotNull
+    private String consumerGroup;
+    @CFNotNull
+    private String topic;
+    @CFNotNull
+    private Integer queueId;
+    @CFNotNull
+    private Long queueOffset;
+    @CFNotNull
+    private Integer maxMsgNums;
+    @CFNotNull
+    private Integer sysFlag;
+    @CFNotNull
+    private Long commitOffset;
+    @CFNotNull
+    private Long suspendTimeoutMillis;
+    @CFNullable
+    private String subscription;
+    @CFNotNull
+    private Long subVersion;
+    private String expressionType;
+
+    @CFNullable
+    private Integer maxMsgBytes;
+
+    @Override
+    public void checkFields() throws RemotingCommandException {
+<span class="fc" id="L61">    }</span>
+
+    @Override
+    public void encode(ByteBuf out) {
+<span class="nc" id="L65">        writeIfNotNull(out, &quot;consumerGroup&quot;, consumerGroup);</span>
+<span class="nc" id="L66">        writeIfNotNull(out, &quot;topic&quot;, topic);</span>
+<span class="nc" id="L67">        writeIfNotNull(out, &quot;queueId&quot;, queueId);</span>
+<span class="nc" id="L68">        writeIfNotNull(out, &quot;queueOffset&quot;, queueOffset);</span>
+<span class="nc" id="L69">        writeIfNotNull(out, &quot;maxMsgNums&quot;, maxMsgNums);</span>
+<span class="nc" id="L70">        writeIfNotNull(out, &quot;sysFlag&quot;, sysFlag);</span>
+<span class="nc" id="L71">        writeIfNotNull(out, &quot;commitOffset&quot;, commitOffset);</span>
+<span class="nc" id="L72">        writeIfNotNull(out, &quot;suspendTimeoutMillis&quot;, suspendTimeoutMillis);</span>
+<span class="nc" id="L73">        writeIfNotNull(out, &quot;subscription&quot;, subscription);</span>
+<span class="nc" id="L74">        writeIfNotNull(out, &quot;subVersion&quot;, subVersion);</span>
+<span class="nc" id="L75">        writeIfNotNull(out, &quot;expressionType&quot;, expressionType);</span>
+<span class="nc" id="L76">        writeIfNotNull(out, &quot;maxMsgBytes&quot;, maxMsgBytes);</span>
+<span class="nc" id="L77">        writeIfNotNull(out, &quot;lo&quot;, lo);</span>
+<span class="nc" id="L78">        writeIfNotNull(out, &quot;ns&quot;, ns);</span>
+<span class="nc" id="L79">        writeIfNotNull(out, &quot;nsd&quot;, nsd);</span>
+<span class="nc" id="L80">        writeIfNotNull(out, &quot;bname&quot;, bname);</span>
+<span class="nc" id="L81">        writeIfNotNull(out, &quot;oway&quot;, oway);</span>
+<span class="nc" id="L82">    }</span>
+
+    @Override
+    public void decode(HashMap&lt;String, String&gt; fields) throws RemotingCommandException {
+<span class="fc" id="L86">        String str = getAndCheckNotNull(fields, &quot;consumerGroup&quot;);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="fc" id="L88">            this.consumerGroup = str;</span>
+        }
+
+<span class="fc" id="L91">        str = getAndCheckNotNull(fields, &quot;topic&quot;);</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="fc" id="L93">            this.topic = str;</span>
+        }
+
+<span class="fc" id="L96">        str = getAndCheckNotNull(fields, &quot;queueId&quot;);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="fc" id="L98">            this.queueId = Integer.parseInt(str);</span>
+        }
+
+<span class="fc" id="L101">        str = getAndCheckNotNull(fields, &quot;queueOffset&quot;);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="fc" id="L103">            this.queueOffset = Long.parseLong(str);</span>
+        }
+
+<span class="fc" id="L106">        str = getAndCheckNotNull(fields, &quot;maxMsgNums&quot;);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="fc" id="L108">            this.maxMsgNums = Integer.parseInt(str);</span>
+        }
+
+<span class="fc" id="L111">        str = getAndCheckNotNull(fields, &quot;sysFlag&quot;);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="fc" id="L113">            this.sysFlag = Integer.parseInt(str);</span>
+        }
+
+<span class="fc" id="L116">        str = getAndCheckNotNull(fields, &quot;commitOffset&quot;);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="fc" id="L118">            this.commitOffset = Long.parseLong(str);</span>
+        }
+
+<span class="fc" id="L121">        str = getAndCheckNotNull(fields, &quot;suspendTimeoutMillis&quot;);</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="fc" id="L123">            this.suspendTimeoutMillis = Long.parseLong(str);</span>
+        }
+
+<span class="fc" id="L126">        str = fields.get(&quot;subscription&quot;);</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="fc" id="L128">            this.subscription = str;</span>
+        }
+
+<span class="fc" id="L131">        str = getAndCheckNotNull(fields, &quot;subVersion&quot;);</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="fc" id="L133">            this.subVersion = Long.parseLong(str);</span>
+        }
+
+<span class="fc" id="L136">        str = fields.get(&quot;expressionType&quot;);</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="fc" id="L138">            this.expressionType = str;</span>
+        }
+
+<span class="fc" id="L141">        str = fields.get(&quot;maxMsgBytes&quot;);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="fc" id="L143">            this.maxMsgBytes = Integer.parseInt(str);</span>
+        }
+
+<span class="fc" id="L146">        str = fields.get(&quot;lo&quot;);</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="nc" id="L148">            this.lo = Boolean.parseBoolean(str);</span>
+        }
+
+<span class="fc" id="L151">        str = fields.get(&quot;ns&quot;);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="nc" id="L153">            this.ns = str;</span>
+        }
+
+<span class="fc" id="L156">        str = fields.get(&quot;nsd&quot;);</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="nc" id="L158">            this.nsd = Boolean.parseBoolean(str);</span>
+        }
+
+<span class="fc" id="L161">        str = fields.get(&quot;bname&quot;);</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="nc" id="L163">            this.bname = str;</span>
+        }
+
+<span class="fc" id="L166">        str = fields.get(&quot;oway&quot;);</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (str != null) {</span>
+<span class="nc" id="L168">            this.oway = Boolean.parseBoolean(str);</span>
+        }
+<span class="fc" id="L170">    }</span>
+
+    public String getConsumerGroup() {
+<span class="nc" id="L173">        return consumerGroup;</span>
+    }
+
+    public void setConsumerGroup(String consumerGroup) {
+<span class="nc" id="L177">        this.consumerGroup = consumerGroup;</span>
+<span class="nc" id="L178">    }</span>
+
+    @Override
+    public String getTopic() {
+<span class="nc" id="L182">        return topic;</span>
+    }
+
+    @Override
+    public void setTopic(String topic) {
+<span class="nc" id="L187">        this.topic = topic;</span>
+<span class="nc" id="L188">    }</span>
+
+    @Override
+    public Integer getQueueId() {
+<span class="nc" id="L192">        return queueId;</span>
+    }
+
+    @Override
+    public void setQueueId(Integer queueId) {
+<span class="nc" id="L197">        this.queueId = queueId;</span>
+<span class="nc" id="L198">    }</span>
+
+    public Long getQueueOffset() {
+<span class="nc" id="L201">        return queueOffset;</span>
+    }
+
+    public void setQueueOffset(Long queueOffset) {
+<span class="nc" id="L205">        this.queueOffset = queueOffset;</span>
+<span class="nc" id="L206">    }</span>
+
+    public Integer getMaxMsgNums() {
+<span class="nc" id="L209">        return maxMsgNums;</span>
+    }
+
+    public void setMaxMsgNums(Integer maxMsgNums) {
+<span class="nc" id="L213">        this.maxMsgNums = maxMsgNums;</span>
+<span class="nc" id="L214">    }</span>
+
+    public Integer getSysFlag() {
+<span class="nc" id="L217">        return sysFlag;</span>
+    }
+
+    public void setSysFlag(Integer sysFlag) {
+<span class="nc" id="L221">        this.sysFlag = sysFlag;</span>
+<span class="nc" id="L222">    }</span>
+
+    public Long getCommitOffset() {
+<span class="nc" id="L225">        return commitOffset;</span>
+    }
+
+    public void setCommitOffset(Long commitOffset) {
+<span class="nc" id="L229">        this.commitOffset = commitOffset;</span>
+<span class="nc" id="L230">    }</span>
+
+    public Long getSuspendTimeoutMillis() {
+<span class="nc" id="L233">        return suspendTimeoutMillis;</span>
+    }
+
+    public void setSuspendTimeoutMillis(Long suspendTimeoutMillis) {
+<span class="nc" id="L237">        this.suspendTimeoutMillis = suspendTimeoutMillis;</span>
+<span class="nc" id="L238">    }</span>
+
+    public String getSubscription() {
+<span class="nc" id="L241">        return subscription;</span>
+    }
+
+    public void setSubscription(String subscription) {
+<span class="nc" id="L245">        this.subscription = subscription;</span>
+<span class="nc" id="L246">    }</span>
+
+    public Long getSubVersion() {
+<span class="nc" id="L249">        return subVersion;</span>
+    }
+
+    public void setSubVersion(Long subVersion) {
+<span class="nc" id="L253">        this.subVersion = subVersion;</span>
+<span class="nc" id="L254">    }</span>
+
+    public String getExpressionType() {
+<span class="nc" id="L257">        return expressionType;</span>
+    }
+
+    public void setExpressionType(String expressionType) {
+<span class="nc" id="L261">        this.expressionType = expressionType;</span>
+<span class="nc" id="L262">    }</span>
+
+    public Integer getMaxMsgBytes() {
+<span class="nc" id="L265">        return maxMsgBytes;</span>
+    }
+
+    public void setMaxMsgBytes(Integer maxMsgBytes) {
+<span class="nc" id="L269">        this.maxMsgBytes = maxMsgBytes;</span>
+<span class="nc" id="L270">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L274">        return MoreObjects.toStringHelper(this)</span>
+<span class="nc" id="L275">            .add(&quot;consumerGroup&quot;, consumerGroup)</span>
+<span class="nc" id="L276">            .add(&quot;topic&quot;, topic)</span>
+<span class="nc" id="L277">            .add(&quot;queueId&quot;, queueId)</span>
+<span class="nc" id="L278">            .add(&quot;queueOffset&quot;, queueOffset)</span>
+<span class="nc" id="L279">            .add(&quot;maxMsgBytes&quot;, maxMsgBytes)</span>
+<span class="nc" id="L280">            .add(&quot;maxMsgNums&quot;, maxMsgNums)</span>
+<span class="nc" id="L281">            .add(&quot;sysFlag&quot;, sysFlag)</span>
+<span class="nc" id="L282">            .add(&quot;commitOffset&quot;, commitOffset)</span>
+<span class="nc" id="L283">            .add(&quot;suspendTimeoutMillis&quot;, suspendTimeoutMillis)</span>
+<span class="nc" id="L284">            .add(&quot;subscription&quot;, subscription)</span>
+<span class="nc" id="L285">            .add(&quot;subVersion&quot;, subVersion)</span>
+<span class="nc" id="L286">            .add(&quot;expressionType&quot;, expressionType)</span>
+<span class="nc" id="L287">            .toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

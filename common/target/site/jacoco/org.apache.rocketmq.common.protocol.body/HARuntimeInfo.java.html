@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HARuntimeInfo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.body</a> &gt; <span class="el_source">HARuntimeInfo.java</span></div><h1>HARuntimeInfo.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.protocol.body;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
+
+<span class="nc" id="L25">public class HARuntimeInfo extends RemotingSerializable {</span>
+
+    private boolean master;
+    private long masterCommitLogMaxOffset;
+    private int inSyncSlaveNums;
+<span class="nc" id="L30">    private List&lt;HAConnectionRuntimeInfo&gt; haConnectionInfo = new ArrayList&lt;HARuntimeInfo.HAConnectionRuntimeInfo&gt;();</span>
+<span class="nc" id="L31">    private HAClientRuntimeInfo haClientRuntimeInfo = new HAClientRuntimeInfo();</span>
+
+    public boolean isMaster() {
+<span class="nc" id="L34">        return this.master;</span>
+    }
+
+    public void setMaster(boolean master) {
+<span class="nc" id="L38">        this.master = master;</span>
+<span class="nc" id="L39">    }</span>
+
+    public long getMasterCommitLogMaxOffset() {
+<span class="nc" id="L42">        return this.masterCommitLogMaxOffset;</span>
+    }
+
+    public void setMasterCommitLogMaxOffset(long masterCommitLogMaxOffset) {
+<span class="nc" id="L46">        this.masterCommitLogMaxOffset = masterCommitLogMaxOffset;</span>
+<span class="nc" id="L47">    }</span>
+
+    public int getInSyncSlaveNums() {
+<span class="nc" id="L50">        return this.inSyncSlaveNums;</span>
+    }
+
+    public void setInSyncSlaveNums(int inSyncSlaveNums) {
+<span class="nc" id="L54">        this.inSyncSlaveNums = inSyncSlaveNums;</span>
+<span class="nc" id="L55">    }</span>
+
+    public List&lt;HAConnectionRuntimeInfo&gt; getHaConnectionInfo() {
+<span class="nc" id="L58">        return this.haConnectionInfo;</span>
+    }
+
+    public void setHaConnectionInfo(List&lt;HAConnectionRuntimeInfo&gt; haConnectionInfo) {
+<span class="nc" id="L62">        this.haConnectionInfo = haConnectionInfo;</span>
+<span class="nc" id="L63">    }</span>
+
+    public HAClientRuntimeInfo getHaClientRuntimeInfo() {
+<span class="nc" id="L66">        return this.haClientRuntimeInfo;</span>
+    }
+
+    public void setHaClientRuntimeInfo(HAClientRuntimeInfo haClientRuntimeInfo) {
+<span class="nc" id="L70">        this.haClientRuntimeInfo = haClientRuntimeInfo;</span>
+<span class="nc" id="L71">    }</span>
+
+<span class="nc" id="L73">    public static class HAConnectionRuntimeInfo extends RemotingSerializable {</span>
+        private String addr;
+        private long slaveAckOffset;
+        private long diff;
+        private boolean inSync;
+        private long transferredByteInSecond;
+        private long transferFromWhere;
+
+        public String getAddr() {
+<span class="nc" id="L82">            return this.addr;</span>
+        }
+
+        public void setAddr(String addr) {
+<span class="nc" id="L86">            this.addr = addr;</span>
+<span class="nc" id="L87">        }</span>
+
+        public long getSlaveAckOffset() {
+<span class="nc" id="L90">            return this.slaveAckOffset;</span>
+        }
+
+        public void setSlaveAckOffset(long slaveAckOffset) {
+<span class="nc" id="L94">            this.slaveAckOffset = slaveAckOffset;</span>
+<span class="nc" id="L95">        }</span>
+
+        public long getDiff() {
+<span class="nc" id="L98">            return this.diff;</span>
+        }
+
+        public void setDiff(long diff) {
+<span class="nc" id="L102">            this.diff = diff;</span>
+<span class="nc" id="L103">        }</span>
+
+        public boolean isInSync() {
+<span class="nc" id="L106">            return this.inSync;</span>
+        }
+
+        public void setInSync(boolean inSync) {
+<span class="nc" id="L110">            this.inSync = inSync;</span>
+<span class="nc" id="L111">        }</span>
+
+        public long getTransferredByteInSecond() {
+<span class="nc" id="L114">            return this.transferredByteInSecond;</span>
+        }
+
+        public void setTransferredByteInSecond(long transferredByteInSecond) {
+<span class="nc" id="L118">            this.transferredByteInSecond = transferredByteInSecond;</span>
+<span class="nc" id="L119">        }</span>
+
+        public long getTransferFromWhere() {
+<span class="nc" id="L122">            return transferFromWhere;</span>
+        }
+
+        public void setTransferFromWhere(long transferFromWhere) {
+<span class="nc" id="L126">            this.transferFromWhere = transferFromWhere;</span>
+<span class="nc" id="L127">        }</span>
+    }
+
+<span class="nc" id="L130">    public static class HAClientRuntimeInfo extends RemotingSerializable {</span>
+        private String masterAddr;
+        private long transferredByteInSecond;
+        private long maxOffset;
+        private long lastReadTimestamp;
+        private long lastWriteTimestamp;
+        private long masterFlushOffset;
+<span class="nc" id="L137">        private boolean isActivated = false;</span>
+
+        public String getMasterAddr() {
+<span class="nc" id="L140">            return this.masterAddr;</span>
+        }
+
+        public void setMasterAddr(String masterAddr) {
+<span class="nc" id="L144">            this.masterAddr = masterAddr;</span>
+<span class="nc" id="L145">        }</span>
+
+        public long getTransferredByteInSecond() {
+<span class="nc" id="L148">            return this.transferredByteInSecond;</span>
+        }
+
+        public void setTransferredByteInSecond(long transferredByteInSecond) {
+<span class="nc" id="L152">            this.transferredByteInSecond = transferredByteInSecond;</span>
+<span class="nc" id="L153">        }</span>
+
+        public long getMaxOffset() {
+<span class="nc" id="L156">            return this.maxOffset;</span>
+        }
+
+        public void setMaxOffset(long maxOffset) {
+<span class="nc" id="L160">            this.maxOffset = maxOffset;</span>
+<span class="nc" id="L161">        }</span>
+
+        public long getLastReadTimestamp() {
+<span class="nc" id="L164">            return this.lastReadTimestamp;</span>
+        }
+
+        public void setLastReadTimestamp(long lastReadTimestamp) {
+<span class="nc" id="L168">            this.lastReadTimestamp = lastReadTimestamp;</span>
+<span class="nc" id="L169">        }</span>
+
+        public long getLastWriteTimestamp() {
+<span class="nc" id="L172">            return this.lastWriteTimestamp;</span>
+        }
+
+        public void setLastWriteTimestamp(long lastWriteTimestamp) {
+<span class="nc" id="L176">            this.lastWriteTimestamp = lastWriteTimestamp;</span>
+<span class="nc" id="L177">        }</span>
+
+        public long getMasterFlushOffset() {
+<span class="nc" id="L180">            return masterFlushOffset;</span>
+        }
+
+        public void setMasterFlushOffset(long masterFlushOffset) {
+<span class="nc" id="L184">            this.masterFlushOffset = masterFlushOffset;</span>
+<span class="nc" id="L185">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

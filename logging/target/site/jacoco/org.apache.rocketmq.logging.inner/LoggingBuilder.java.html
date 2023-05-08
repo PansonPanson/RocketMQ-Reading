@@ -1,0 +1,1231 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LoggingBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-logging 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.logging.inner</a> &gt; <span class="el_source">LoggingBuilder.java</span></div><h1>LoggingBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.logging.inner;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FilterWriter;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.text.MessageFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TimeZone;
+
+<span class="nc" id="L44">public class LoggingBuilder {</span>
+
+    public static final String SYSTEM_OUT = &quot;System.out&quot;;
+    public static final String SYSTEM_ERR = &quot;System.err&quot;;
+
+    public static final String LOGGING_ENCODING = &quot;rocketmq.logging.inner.encoding&quot;;
+<span class="fc" id="L50">    public static final String ENCODING = System.getProperty(LOGGING_ENCODING, &quot;UTF-8&quot;);</span>
+
+    public static AppenderBuilder newAppenderBuilder() {
+<span class="fc" id="L53">        return new AppenderBuilder();</span>
+    }
+
+    public static class AppenderBuilder {
+        private AsyncAppender asyncAppender;
+
+<span class="fc" id="L59">        private Appender appender = null;</span>
+
+<span class="fc" id="L61">        private AppenderBuilder() {</span>
+
+<span class="fc" id="L63">        }</span>
+
+        public AppenderBuilder withLayout(Layout layout) {
+<span class="fc" id="L66">            appender.setLayout(layout);</span>
+<span class="fc" id="L67">            return this;</span>
+        }
+
+        public AppenderBuilder withName(String name) {
+<span class="fc" id="L71">            appender.setName(name);</span>
+<span class="fc" id="L72">            return this;</span>
+        }
+
+        public AppenderBuilder withConsoleAppender(String target) {
+<span class="fc" id="L76">            ConsoleAppender consoleAppender = new ConsoleAppender();</span>
+<span class="fc" id="L77">            consoleAppender.setTarget(target);</span>
+<span class="fc" id="L78">            consoleAppender.activateOptions();</span>
+<span class="fc" id="L79">            this.appender = consoleAppender;</span>
+<span class="fc" id="L80">            return this;</span>
+        }
+
+        public AppenderBuilder withFileAppender(String file) {
+<span class="fc" id="L84">            FileAppender appender = new FileAppender();</span>
+<span class="fc" id="L85">            appender.setFile(file);</span>
+<span class="fc" id="L86">            appender.setAppend(true);</span>
+<span class="fc" id="L87">            appender.setBufferedIO(false);</span>
+<span class="fc" id="L88">            appender.setEncoding(ENCODING);</span>
+<span class="fc" id="L89">            appender.setImmediateFlush(true);</span>
+<span class="fc" id="L90">            appender.activateOptions();</span>
+<span class="fc" id="L91">            this.appender = appender;</span>
+<span class="fc" id="L92">            return this;</span>
+        }
+
+        public AppenderBuilder withRollingFileAppender(String file, String maxFileSize, int maxFileIndex) {
+<span class="fc" id="L96">            RollingFileAppender appender = new RollingFileAppender();</span>
+<span class="fc" id="L97">            appender.setFile(file);</span>
+<span class="fc" id="L98">            appender.setAppend(true);</span>
+<span class="fc" id="L99">            appender.setBufferedIO(false);</span>
+<span class="fc" id="L100">            appender.setEncoding(ENCODING);</span>
+<span class="fc" id="L101">            appender.setImmediateFlush(true);</span>
+<span class="fc" id="L102">            appender.setMaximumFileSize(Integer.parseInt(maxFileSize));</span>
+<span class="fc" id="L103">            appender.setMaxBackupIndex(maxFileIndex);</span>
+<span class="fc" id="L104">            appender.activateOptions();</span>
+<span class="fc" id="L105">            this.appender = appender;</span>
+<span class="fc" id="L106">            return this;</span>
+        }
+
+        public AppenderBuilder withDailyFileRollingAppender(String file, String datePattern) {
+<span class="fc" id="L110">            DailyRollingFileAppender appender = new DailyRollingFileAppender();</span>
+<span class="fc" id="L111">            appender.setFile(file);</span>
+<span class="fc" id="L112">            appender.setAppend(true);</span>
+<span class="fc" id="L113">            appender.setBufferedIO(false);</span>
+<span class="fc" id="L114">            appender.setEncoding(ENCODING);</span>
+<span class="fc" id="L115">            appender.setImmediateFlush(true);</span>
+<span class="fc" id="L116">            appender.setDatePattern(datePattern);</span>
+<span class="fc" id="L117">            appender.activateOptions();</span>
+<span class="fc" id="L118">            this.appender = appender;</span>
+<span class="fc" id="L119">            return this;</span>
+        }
+
+        public AppenderBuilder withAsync(boolean blocking, int buffSize) {
+<span class="fc" id="L123">            AsyncAppender asyncAppender = new AsyncAppender();</span>
+<span class="fc" id="L124">            asyncAppender.setBlocking(blocking);</span>
+<span class="fc" id="L125">            asyncAppender.setBufferSize(buffSize);</span>
+<span class="fc" id="L126">            this.asyncAppender = asyncAppender;</span>
+<span class="fc" id="L127">            return this;</span>
+        }
+
+        public Appender build() {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            if (appender == null) {</span>
+<span class="nc" id="L132">                throw new RuntimeException(&quot;please specify appender first&quot;);</span>
+            }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (asyncAppender != null) {</span>
+<span class="fc" id="L135">                asyncAppender.addAppender(appender);</span>
+<span class="fc" id="L136">                return asyncAppender;</span>
+            } else {
+<span class="fc" id="L138">                return appender;</span>
+            }
+        }
+    }
+
+    public static class AsyncAppender extends Appender implements Appender.AppenderPipeline {
+
+        public static final int DEFAULT_BUFFER_SIZE = 128;
+
+<span class="fc" id="L147">        private final List&lt;LoggingEvent&gt; buffer = new ArrayList&lt;LoggingEvent&gt;();</span>
+
+<span class="fc" id="L149">        private final Map&lt;String, DiscardSummary&gt; discardMap = new HashMap&lt;String, DiscardSummary&gt;();</span>
+
+<span class="fc" id="L151">        private int bufferSize = DEFAULT_BUFFER_SIZE;</span>
+
+        private final AppenderPipelineImpl appenderPipeline;
+
+        private final Thread dispatcher;
+
+<span class="fc" id="L157">        private boolean blocking = true;</span>
+
+<span class="fc" id="L159">        public AsyncAppender() {</span>
+<span class="fc" id="L160">            appenderPipeline = new AppenderPipelineImpl();</span>
+
+<span class="fc" id="L162">            dispatcher = new Thread(new Dispatcher(this, buffer, discardMap, appenderPipeline));</span>
+
+<span class="fc" id="L164">            dispatcher.setDaemon(true);</span>
+
+<span class="fc" id="L166">            dispatcher.setName(&quot;AsyncAppender-Dispatcher-&quot; + dispatcher.getName());</span>
+<span class="fc" id="L167">            dispatcher.start();</span>
+<span class="fc" id="L168">        }</span>
+
+        public void addAppender(final Appender newAppender) {
+<span class="fc" id="L171">            synchronized (appenderPipeline) {</span>
+<span class="fc" id="L172">                appenderPipeline.addAppender(newAppender);</span>
+<span class="fc" id="L173">            }</span>
+<span class="fc" id="L174">        }</span>
+
+        public void append(final LoggingEvent event) {
+<span class="pc bpc" id="L177" title="3 of 6 branches missed.">            if ((dispatcher == null) || !dispatcher.isAlive() || (bufferSize &lt;= 0)) {</span>
+<span class="nc" id="L178">                synchronized (appenderPipeline) {</span>
+<span class="nc" id="L179">                    appenderPipeline.appendLoopOnAppenders(event);</span>
+<span class="nc" id="L180">                }</span>
+
+<span class="nc" id="L182">                return;</span>
+            }
+
+<span class="fc" id="L185">            event.getThreadName();</span>
+<span class="fc" id="L186">            event.getRenderedMessage();</span>
+
+<span class="fc" id="L188">            synchronized (buffer) {</span>
+                while (true) {
+<span class="fc" id="L190">                    int previousSize = buffer.size();</span>
+
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                    if (previousSize &lt; bufferSize) {</span>
+<span class="fc" id="L193">                        buffer.add(event);</span>
+
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                        if (previousSize == 0) {</span>
+<span class="fc" id="L196">                            buffer.notifyAll();</span>
+                        }
+
+                        break;
+                    }
+
+<span class="nc" id="L202">                    boolean discard = true;</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">                    if (blocking</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                        &amp;&amp; !Thread.interrupted()</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">                        &amp;&amp; Thread.currentThread() != dispatcher) {</span>
+                        try {
+<span class="nc" id="L207">                            buffer.wait();</span>
+<span class="nc" id="L208">                            discard = false;</span>
+<span class="nc" id="L209">                        } catch (InterruptedException e) {</span>
+<span class="nc" id="L210">                            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L211">                        }</span>
+                    }
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                    if (discard) {</span>
+<span class="nc" id="L214">                        String loggerName = event.getLoggerName();</span>
+<span class="nc" id="L215">                        DiscardSummary summary = discardMap.get(loggerName);</span>
+
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                        if (summary == null) {</span>
+<span class="nc" id="L218">                            summary = new DiscardSummary(event);</span>
+<span class="nc" id="L219">                            discardMap.put(loggerName, summary);</span>
+                        } else {
+<span class="nc" id="L221">                            summary.add(event);</span>
+                        }
+
+<span class="nc" id="L224">                        break;</span>
+                    }
+<span class="nc" id="L226">                }</span>
+<span class="fc" id="L227">            }</span>
+<span class="fc" id="L228">        }</span>
+
+        public void close() {
+
+<span class="fc" id="L232">            synchronized (buffer) {</span>
+<span class="fc" id="L233">                closed = true;</span>
+<span class="fc" id="L234">                buffer.notifyAll();</span>
+<span class="fc" id="L235">            }</span>
+
+            try {
+<span class="fc" id="L238">                dispatcher.join();</span>
+<span class="nc" id="L239">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L240">                Thread.currentThread().interrupt();</span>
+<span class="nc" id="L241">                SysLogger.error(</span>
+                    &quot;Got an InterruptedException while waiting for the &quot;
+                        + &quot;dispatcher to finish.&quot;, e);
+<span class="fc" id="L244">            }</span>
+
+<span class="fc" id="L246">            synchronized (appenderPipeline) {</span>
+<span class="fc" id="L247">                Enumeration iter = appenderPipeline.getAllAppenders();</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                if (iter != null) {</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">                    while (iter.hasMoreElements()) {</span>
+<span class="fc" id="L250">                        Object next = iter.nextElement();</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">                        if (next instanceof Appender) {</span>
+<span class="fc" id="L252">                            ((Appender) next).close();</span>
+                        }
+<span class="fc" id="L254">                    }</span>
+                }
+<span class="fc" id="L256">            }</span>
+<span class="fc" id="L257">        }</span>
+
+        public Enumeration getAllAppenders() {
+<span class="nc" id="L260">            synchronized (appenderPipeline) {</span>
+<span class="nc" id="L261">                return appenderPipeline.getAllAppenders();</span>
+            }
+        }
+
+        public Appender getAppender(final String name) {
+<span class="nc" id="L266">            synchronized (appenderPipeline) {</span>
+<span class="nc" id="L267">                return appenderPipeline.getAppender(name);</span>
+            }
+        }
+
+        public boolean isAttached(final Appender appender) {
+<span class="nc" id="L272">            synchronized (appenderPipeline) {</span>
+<span class="nc" id="L273">                return appenderPipeline.isAttached(appender);</span>
+            }
+        }
+
+        public void removeAllAppenders() {
+<span class="nc" id="L278">            synchronized (appenderPipeline) {</span>
+<span class="nc" id="L279">                appenderPipeline.removeAllAppenders();</span>
+<span class="nc" id="L280">            }</span>
+<span class="nc" id="L281">        }</span>
+
+        public void removeAppender(final Appender appender) {
+<span class="nc" id="L284">            synchronized (appenderPipeline) {</span>
+<span class="nc" id="L285">                appenderPipeline.removeAppender(appender);</span>
+<span class="nc" id="L286">            }</span>
+<span class="nc" id="L287">        }</span>
+
+        public void removeAppender(final String name) {
+<span class="nc" id="L290">            synchronized (appenderPipeline) {</span>
+<span class="nc" id="L291">                appenderPipeline.removeAppender(name);</span>
+<span class="nc" id="L292">            }</span>
+<span class="nc" id="L293">        }</span>
+
+        public void setBufferSize(final int size) {
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">            if (size &lt; 0) {</span>
+<span class="nc" id="L297">                throw new NegativeArraySizeException(&quot;size&quot;);</span>
+            }
+
+<span class="fc" id="L300">            synchronized (buffer) {</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">                bufferSize = (size &lt; 1) ? 1 : size;</span>
+<span class="fc" id="L302">                buffer.notifyAll();</span>
+<span class="fc" id="L303">            }</span>
+<span class="fc" id="L304">        }</span>
+
+        public int getBufferSize() {
+<span class="fc" id="L307">            return bufferSize;</span>
+        }
+
+        public void setBlocking(final boolean value) {
+<span class="fc" id="L311">            synchronized (buffer) {</span>
+<span class="fc" id="L312">                blocking = value;</span>
+<span class="fc" id="L313">                buffer.notifyAll();</span>
+<span class="fc" id="L314">            }</span>
+<span class="fc" id="L315">        }</span>
+
+        public boolean getBlocking() {
+<span class="fc" id="L318">            return blocking;</span>
+        }
+
+        private final class DiscardSummary {
+
+            private LoggingEvent maxEvent;
+
+            private int count;
+
+<span class="nc" id="L327">            public DiscardSummary(final LoggingEvent event) {</span>
+<span class="nc" id="L328">                maxEvent = event;</span>
+<span class="nc" id="L329">                count = 1;</span>
+<span class="nc" id="L330">            }</span>
+
+            public void add(final LoggingEvent event) {
+<span class="nc bnc" id="L333" title="All 2 branches missed.">                if (event.getLevel().toInt() &gt; maxEvent.getLevel().toInt()) {</span>
+<span class="nc" id="L334">                    maxEvent = event;</span>
+                }
+<span class="nc" id="L336">                count++;</span>
+<span class="nc" id="L337">            }</span>
+
+            public LoggingEvent createEvent() {
+<span class="nc" id="L340">                String msg =</span>
+<span class="nc" id="L341">                    MessageFormat.format(</span>
+                        &quot;Discarded {0} messages due to full event buffer including: {1}&quot;,
+<span class="nc" id="L343">                        count, maxEvent.getMessage());</span>
+
+<span class="nc" id="L345">                return new LoggingEvent(</span>
+                    &quot;AsyncAppender.DONT_REPORT_LOCATION&quot;,
+<span class="nc" id="L347">                    Logger.getLogger(maxEvent.getLoggerName()),</span>
+<span class="nc" id="L348">                    maxEvent.getLevel(),</span>
+                    msg,
+                    null);
+            }
+        }
+
+        private class Dispatcher implements Runnable {
+
+            private final AsyncAppender parent;
+
+            private final List&lt;LoggingEvent&gt; buffer;
+
+            private final Map&lt;String, DiscardSummary&gt; discardMap;
+
+            private final AppenderPipelineImpl appenderPipeline;
+
+            public Dispatcher(
+                final AsyncAppender parent, final List&lt;LoggingEvent&gt; buffer, final Map&lt;String, DiscardSummary&gt; discardMap,
+<span class="fc" id="L366">                final AppenderPipelineImpl appenderPipeline) {</span>
+
+<span class="fc" id="L368">                this.parent = parent;</span>
+<span class="fc" id="L369">                this.buffer = buffer;</span>
+<span class="fc" id="L370">                this.appenderPipeline = appenderPipeline;</span>
+<span class="fc" id="L371">                this.discardMap = discardMap;</span>
+<span class="fc" id="L372">            }</span>
+
+            public void run() {
+<span class="fc" id="L375">                boolean isActive = true;</span>
+
+                try {
+<span class="fc bfc" id="L378" title="All 2 branches covered.">                    while (isActive) {</span>
+<span class="fc" id="L379">                        LoggingEvent[] events = null;</span>
+
+<span class="fc" id="L381">                        synchronized (buffer) {</span>
+<span class="fc" id="L382">                            int bufferSize = buffer.size();</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">                            isActive = !parent.closed;</span>
+
+<span class="pc bpc" id="L385" title="1 of 4 branches missed.">                            while ((bufferSize == 0) &amp;&amp; isActive) {</span>
+<span class="fc" id="L386">                                buffer.wait();</span>
+<span class="fc" id="L387">                                bufferSize = buffer.size();</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">                                isActive = !parent.closed;</span>
+                            }
+
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">                            if (bufferSize &gt; 0) {</span>
+<span class="fc" id="L392">                                events = new LoggingEvent[bufferSize + discardMap.size()];</span>
+<span class="fc" id="L393">                                buffer.toArray(events);</span>
+
+<span class="fc" id="L395">                                int index = bufferSize;</span>
+<span class="fc" id="L396">                                Collection&lt;DiscardSummary&gt; values = discardMap.values();</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">                                for (DiscardSummary value : values) {</span>
+<span class="nc" id="L398">                                    events[index++] = value.createEvent();</span>
+<span class="nc" id="L399">                                }</span>
+
+<span class="fc" id="L401">                                buffer.clear();</span>
+<span class="fc" id="L402">                                discardMap.clear();</span>
+
+<span class="fc" id="L404">                                buffer.notifyAll();</span>
+                            }
+<span class="fc" id="L406">                        }</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">                        if (events != null) {</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">                            for (LoggingEvent event : events) {</span>
+<span class="fc" id="L409">                                synchronized (appenderPipeline) {</span>
+<span class="fc" id="L410">                                    appenderPipeline.appendLoopOnAppenders(event);</span>
+<span class="fc" id="L411">                                }</span>
+                            }
+                        }
+<span class="fc" id="L414">                    }</span>
+<span class="nc" id="L415">                } catch (InterruptedException ex) {</span>
+<span class="nc" id="L416">                    Thread.currentThread().interrupt();</span>
+<span class="fc" id="L417">                }</span>
+<span class="fc" id="L418">            }</span>
+        }
+    }
+
+    private static class QuietWriter extends FilterWriter {
+
+        protected Appender appender;
+
+        public QuietWriter(Writer writer, Appender appender) {
+<span class="fc" id="L427">            super(writer);</span>
+<span class="fc" id="L428">            this.appender = appender;</span>
+<span class="fc" id="L429">        }</span>
+
+        public void write(String string) {
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">            if (string != null) {</span>
+                try {
+<span class="fc" id="L434">                    out.write(string);</span>
+<span class="nc" id="L435">                } catch (Exception e) {</span>
+<span class="nc" id="L436">                    appender.handleError(&quot;Failed to write [&quot; + string + &quot;].&quot;, e,</span>
+                        Appender.CODE_WRITE_FAILURE);
+<span class="fc" id="L438">                }</span>
+            }
+<span class="fc" id="L440">        }</span>
+
+        public void flush() {
+            try {
+<span class="fc" id="L444">                out.flush();</span>
+<span class="nc" id="L445">            } catch (Exception e) {</span>
+<span class="nc" id="L446">                appender.handleError(&quot;Failed to flush writer,&quot;, e,</span>
+                    Appender.CODE_FLUSH_FAILURE);
+<span class="fc" id="L448">            }</span>
+<span class="fc" id="L449">        }</span>
+    }
+
+    public static class WriterAppender extends Appender {
+
+
+<span class="fc" id="L455">        protected boolean immediateFlush = true;</span>
+
+        protected String encoding;
+
+
+        protected QuietWriter qw;
+
+<span class="fc" id="L462">        public WriterAppender() {</span>
+
+<span class="fc" id="L464">        }</span>
+
+        public void setImmediateFlush(boolean value) {
+<span class="fc" id="L467">            immediateFlush = value;</span>
+<span class="fc" id="L468">        }</span>
+
+
+        public boolean getImmediateFlush() {
+<span class="fc" id="L472">            return immediateFlush;</span>
+        }
+
+        public void activateOptions() {
+<span class="fc" id="L476">        }</span>
+
+
+        public void append(LoggingEvent event) {
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            if (!checkEntryConditions()) {</span>
+<span class="nc" id="L481">                return;</span>
+            }
+<span class="fc" id="L483">            subAppend(event);</span>
+<span class="fc" id="L484">        }</span>
+
+        protected boolean checkEntryConditions() {
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">            if (this.closed) {</span>
+<span class="nc" id="L488">                SysLogger.warn(&quot;Not allowed to write to a closed appender.&quot;);</span>
+<span class="nc" id="L489">                return false;</span>
+            }
+
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">            if (this.qw == null) {</span>
+<span class="nc" id="L493">                handleError(&quot;No output stream or file set for the appender named [&quot; +</span>
+                    name + &quot;].&quot;);
+<span class="nc" id="L495">                return false;</span>
+            }
+
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">            if (this.layout == null) {</span>
+<span class="nc" id="L499">                handleError(&quot;No layout set for the appender named [&quot; + name + &quot;].&quot;);</span>
+<span class="nc" id="L500">                return false;</span>
+            }
+<span class="fc" id="L502">            return true;</span>
+        }
+
+        public synchronized void close() {
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">            if (this.closed) {</span>
+<span class="nc" id="L507">                return;</span>
+            }
+<span class="fc" id="L509">            this.closed = true;</span>
+<span class="fc" id="L510">            writeFooter();</span>
+<span class="fc" id="L511">            reset();</span>
+<span class="fc" id="L512">        }</span>
+
+        protected void closeWriter() {
+<span class="fc bfc" id="L515" title="All 2 branches covered.">            if (qw != null) {</span>
+                try {
+<span class="fc" id="L517">                    qw.close();</span>
+<span class="nc" id="L518">                } catch (IOException e) {</span>
+<span class="nc" id="L519">                    handleError(&quot;Could not close &quot; + qw, e, CODE_CLOSE_FAILURE);</span>
+<span class="fc" id="L520">                }</span>
+            }
+<span class="fc" id="L522">        }</span>
+
+        protected OutputStreamWriter createWriter(OutputStream os) {
+<span class="fc" id="L525">            OutputStreamWriter retval = null;</span>
+
+<span class="fc" id="L527">            String enc = getEncoding();</span>
+<span class="fc bfc" id="L528" title="All 2 branches covered.">            if (enc != null) {</span>
+                try {
+<span class="fc" id="L530">                    retval = new OutputStreamWriter(os, enc);</span>
+<span class="nc" id="L531">                } catch (IOException e) {</span>
+<span class="nc" id="L532">                    SysLogger.warn(&quot;Error initializing output writer.&quot;);</span>
+<span class="nc" id="L533">                    SysLogger.warn(&quot;Unsupported encoding?&quot;);</span>
+<span class="fc" id="L534">                }</span>
+            }
+<span class="fc bfc" id="L536" title="All 2 branches covered.">            if (retval == null) {</span>
+<span class="fc" id="L537">                retval = new OutputStreamWriter(os);</span>
+            }
+<span class="fc" id="L539">            return retval;</span>
+        }
+
+        public String getEncoding() {
+<span class="fc" id="L543">            return encoding;</span>
+        }
+
+        public void setEncoding(String value) {
+<span class="fc" id="L547">            encoding = value;</span>
+<span class="fc" id="L548">        }</span>
+
+
+        public synchronized void setWriter(Writer writer) {
+<span class="fc" id="L552">            reset();</span>
+<span class="fc" id="L553">            this.qw = new QuietWriter(writer, this);</span>
+<span class="fc" id="L554">            writeHeader();</span>
+<span class="fc" id="L555">        }</span>
+
+        protected void subAppend(LoggingEvent event) {
+<span class="fc" id="L558">            this.qw.write(this.layout.format(event));</span>
+
+<span class="pc bpc" id="L560" title="1 of 2 branches missed.">            if (layout.ignoresThrowable()) {</span>
+<span class="nc" id="L561">                String[] s = event.getThrowableStr();</span>
+<span class="nc bnc" id="L562" title="All 2 branches missed.">                if (s != null) {</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">                    for (String s1 : s) {</span>
+<span class="nc" id="L564">                        this.qw.write(s1);</span>
+<span class="nc" id="L565">                        this.qw.write(LINE_SEP);</span>
+                    }
+                }
+            }
+
+<span class="pc bpc" id="L570" title="1 of 2 branches missed.">            if (shouldFlush(event)) {</span>
+<span class="fc" id="L571">                this.qw.flush();</span>
+            }
+<span class="fc" id="L573">        }</span>
+
+        protected void reset() {
+<span class="fc" id="L576">            closeWriter();</span>
+<span class="fc" id="L577">            this.qw = null;</span>
+<span class="fc" id="L578">        }</span>
+
+        protected void writeFooter() {
+<span class="pc bpc" id="L581" title="1 of 2 branches missed.">            if (layout != null) {</span>
+<span class="fc" id="L582">                String f = layout.getFooter();</span>
+<span class="pc bpc" id="L583" title="3 of 4 branches missed.">                if (f != null &amp;&amp; this.qw != null) {</span>
+<span class="nc" id="L584">                    this.qw.write(f);</span>
+<span class="nc" id="L585">                    this.qw.flush();</span>
+                }
+            }
+<span class="fc" id="L588">        }</span>
+
+        protected void writeHeader() {
+<span class="fc bfc" id="L591" title="All 2 branches covered.">            if (layout != null) {</span>
+<span class="fc" id="L592">                String h = layout.getHeader();</span>
+<span class="pc bpc" id="L593" title="3 of 4 branches missed.">                if (h != null &amp;&amp; this.qw != null) {</span>
+<span class="nc" id="L594">                    this.qw.write(h);</span>
+                }
+            }
+<span class="fc" id="L597">        }</span>
+
+        protected boolean shouldFlush(final LoggingEvent event) {
+<span class="pc bpc" id="L600" title="2 of 4 branches missed.">            return event != null &amp;&amp; immediateFlush;</span>
+        }
+    }
+
+
+    public static class FileAppender extends WriterAppender {
+
+<span class="fc" id="L607">        protected boolean fileAppend = true;</span>
+
+<span class="fc" id="L609">        protected String fileName = null;</span>
+
+<span class="fc" id="L611">        protected boolean bufferedIO = false;</span>
+
+<span class="fc" id="L613">        protected int bufferSize = 8 * 1024;</span>
+
+<span class="fc" id="L615">        public FileAppender() {</span>
+<span class="fc" id="L616">        }</span>
+
+        public FileAppender(Layout layout, String filename, boolean append)
+<span class="fc" id="L619">            throws IOException {</span>
+<span class="fc" id="L620">            this.layout = layout;</span>
+<span class="fc" id="L621">            this.setFile(filename, append, false, bufferSize);</span>
+<span class="fc" id="L622">        }</span>
+
+        public void setFile(String file) {
+<span class="fc" id="L625">            fileName = file.trim();</span>
+<span class="fc" id="L626">        }</span>
+
+        public boolean getAppend() {
+<span class="fc" id="L629">            return fileAppend;</span>
+        }
+
+        public String getFile() {
+<span class="nc" id="L633">            return fileName;</span>
+        }
+
+        public void activateOptions() {
+<span class="pc bpc" id="L637" title="1 of 2 branches missed.">            if (fileName != null) {</span>
+                try {
+<span class="fc" id="L639">                    setFile(fileName, fileAppend, bufferedIO, bufferSize);</span>
+<span class="nc" id="L640">                } catch (IOException e) {</span>
+<span class="nc" id="L641">                    handleError(&quot;setFile(&quot; + fileName + &quot;,&quot; + fileAppend + &quot;) call failed.&quot;,</span>
+                        e, CODE_FILE_OPEN_FAILURE);
+<span class="pc" id="L643">                }</span>
+            } else {
+<span class="nc" id="L645">                SysLogger.warn(&quot;File option not set for appender [&quot; + name + &quot;].&quot;);</span>
+<span class="nc" id="L646">                SysLogger.warn(&quot;Are you using FileAppender instead of ConsoleAppender?&quot;);</span>
+            }
+<span class="fc" id="L648">        }</span>
+
+        protected void closeFile() {
+<span class="fc bfc" id="L651" title="All 2 branches covered.">            if (this.qw != null) {</span>
+                try {
+<span class="fc" id="L653">                    this.qw.close();</span>
+<span class="nc" id="L654">                } catch (IOException e) {</span>
+<span class="nc bnc" id="L655" title="All 2 branches missed.">                    if (e instanceof InterruptedIOException) {</span>
+<span class="nc" id="L656">                        Thread.currentThread().interrupt();</span>
+                    }
+<span class="nc" id="L658">                    SysLogger.error(&quot;Could not close &quot; + qw, e);</span>
+<span class="fc" id="L659">                }</span>
+            }
+<span class="fc" id="L661">        }</span>
+
+        public boolean getBufferedIO() {
+<span class="fc" id="L664">            return this.bufferedIO;</span>
+        }
+
+        public int getBufferSize() {
+<span class="fc" id="L668">            return this.bufferSize;</span>
+        }
+
+        public void setAppend(boolean flag) {
+<span class="fc" id="L672">            fileAppend = flag;</span>
+<span class="fc" id="L673">        }</span>
+
+        public void setBufferedIO(boolean bufferedIO) {
+<span class="fc" id="L676">            this.bufferedIO = bufferedIO;</span>
+<span class="pc bpc" id="L677" title="1 of 2 branches missed.">            if (bufferedIO) {</span>
+<span class="nc" id="L678">                immediateFlush = false;</span>
+            }
+<span class="fc" id="L680">        }</span>
+
+        public void setBufferSize(int bufferSize) {
+<span class="fc" id="L683">            this.bufferSize = bufferSize;</span>
+<span class="fc" id="L684">        }</span>
+
+        public synchronized void setFile(String fileName, boolean append, boolean bufferedIO, int bufferSize)
+            throws IOException {
+<span class="fc" id="L688">            SysLogger.debug(&quot;setFile called: &quot; + fileName + &quot;, &quot; + append);</span>
+
+<span class="pc bpc" id="L690" title="1 of 2 branches missed.">            if (bufferedIO) {</span>
+<span class="nc" id="L691">                setImmediateFlush(false);</span>
+            }
+
+<span class="fc" id="L694">            reset();</span>
+            FileOutputStream ostream;
+            try {
+<span class="fc" id="L697">                ostream = new FileOutputStream(fileName, append);</span>
+<span class="nc" id="L698">            } catch (FileNotFoundException ex) {</span>
+<span class="nc" id="L699">                String parentName = new File(fileName).getParent();</span>
+<span class="nc bnc" id="L700" title="All 2 branches missed.">                if (parentName != null) {</span>
+<span class="nc" id="L701">                    File parentDir = new File(parentName);</span>
+<span class="nc bnc" id="L702" title="All 4 branches missed.">                    if (!parentDir.exists() &amp;&amp; parentDir.mkdirs()) {</span>
+<span class="nc" id="L703">                        ostream = new FileOutputStream(fileName, append);</span>
+                    } else {
+<span class="nc" id="L705">                        throw ex;</span>
+                    }
+<span class="nc" id="L707">                } else {</span>
+<span class="nc" id="L708">                    throw ex;</span>
+                }
+<span class="fc" id="L710">            }</span>
+<span class="fc" id="L711">            Writer fw = createWriter(ostream);</span>
+<span class="pc bpc" id="L712" title="1 of 2 branches missed.">            if (bufferedIO) {</span>
+<span class="nc" id="L713">                fw = new BufferedWriter(fw, bufferSize);</span>
+            }
+<span class="fc" id="L715">            this.setQWForFiles(fw);</span>
+<span class="fc" id="L716">            this.fileName = fileName;</span>
+<span class="fc" id="L717">            this.fileAppend = append;</span>
+<span class="fc" id="L718">            this.bufferedIO = bufferedIO;</span>
+<span class="fc" id="L719">            this.bufferSize = bufferSize;</span>
+<span class="fc" id="L720">            writeHeader();</span>
+<span class="fc" id="L721">            SysLogger.debug(&quot;setFile ended&quot;);</span>
+<span class="fc" id="L722">        }</span>
+
+        protected void setQWForFiles(Writer writer) {
+<span class="fc" id="L725">            this.qw = new QuietWriter(writer, this);</span>
+<span class="fc" id="L726">        }</span>
+
+        protected void reset() {
+<span class="fc" id="L729">            closeFile();</span>
+<span class="fc" id="L730">            this.fileName = null;</span>
+<span class="fc" id="L731">            super.reset();</span>
+<span class="fc" id="L732">        }</span>
+    }
+
+
+    public static class RollingFileAppender extends FileAppender {
+
+<span class="fc" id="L738">        protected long maxFileSize = 10 * 1024 * 1024;</span>
+
+<span class="fc" id="L740">        protected int maxBackupIndex = 1;</span>
+
+<span class="fc" id="L742">        private long nextRollover = 0;</span>
+
+        public RollingFileAppender() {
+<span class="fc" id="L745">            super();</span>
+<span class="fc" id="L746">        }</span>
+
+        public int getMaxBackupIndex() {
+<span class="fc" id="L749">            return maxBackupIndex;</span>
+        }
+
+        public long getMaximumFileSize() {
+<span class="fc" id="L753">            return maxFileSize;</span>
+        }
+
+        public void rollOver() {
+            File target;
+            File file;
+
+<span class="pc bpc" id="L760" title="1 of 2 branches missed.">            if (qw != null) {</span>
+<span class="fc" id="L761">                long size = ((CountingQuietWriter) qw).getCount();</span>
+<span class="fc" id="L762">                SysLogger.debug(&quot;rolling over count=&quot; + size);</span>
+<span class="fc" id="L763">                nextRollover = size + maxFileSize;</span>
+            }
+<span class="fc" id="L765">            SysLogger.debug(&quot;maxBackupIndex=&quot; + maxBackupIndex);</span>
+
+<span class="fc" id="L767">            boolean renameSucceeded = true;</span>
+<span class="pc bpc" id="L768" title="1 of 2 branches missed.">            if (maxBackupIndex &gt; 0) {</span>
+<span class="fc" id="L769">                file = new File(fileName + '.' + maxBackupIndex);</span>
+<span class="fc bfc" id="L770" title="All 2 branches covered.">                if (file.exists()) {</span>
+<span class="fc" id="L771">                    renameSucceeded = file.delete();</span>
+                }
+
+<span class="pc bpc" id="L774" title="1 of 4 branches missed.">                for (int i = maxBackupIndex - 1; i &gt;= 1 &amp;&amp; renameSucceeded; i--) {</span>
+<span class="fc" id="L775">                    file = new File(fileName + &quot;.&quot; + i);</span>
+<span class="fc bfc" id="L776" title="All 2 branches covered.">                    if (file.exists()) {</span>
+<span class="fc" id="L777">                        target = new File(fileName + '.' + (i + 1));</span>
+<span class="fc" id="L778">                        SysLogger.debug(&quot;Renaming file &quot; + file + &quot; to &quot; + target);</span>
+<span class="fc" id="L779">                        renameSucceeded = file.renameTo(target);</span>
+                    }
+                }
+
+<span class="pc bpc" id="L783" title="1 of 2 branches missed.">                if (renameSucceeded) {</span>
+<span class="fc" id="L784">                    target = new File(fileName + &quot;.&quot; + 1);</span>
+
+<span class="fc" id="L786">                    this.closeFile(); // keep windows happy.</span>
+
+<span class="fc" id="L788">                    file = new File(fileName);</span>
+<span class="fc" id="L789">                    SysLogger.debug(&quot;Renaming file &quot; + file + &quot; to &quot; + target);</span>
+<span class="fc" id="L790">                    renameSucceeded = file.renameTo(target);</span>
+
+<span class="pc bpc" id="L792" title="1 of 2 branches missed.">                    if (!renameSucceeded) {</span>
+                        try {
+<span class="nc" id="L794">                            this.setFile(fileName, true, bufferedIO, bufferSize);</span>
+<span class="nc" id="L795">                        } catch (IOException e) {</span>
+<span class="nc bnc" id="L796" title="All 2 branches missed.">                            if (e instanceof InterruptedIOException) {</span>
+<span class="nc" id="L797">                                Thread.currentThread().interrupt();</span>
+                            }
+<span class="nc" id="L799">                            SysLogger.error(&quot;setFile(&quot; + fileName + &quot;, true) call failed.&quot;, e);</span>
+<span class="nc" id="L800">                        }</span>
+                    }
+                }
+            }
+
+<span class="pc bpc" id="L805" title="1 of 2 branches missed.">            if (renameSucceeded) {</span>
+                try {
+<span class="fc" id="L807">                    this.setFile(fileName, false, bufferedIO, bufferSize);</span>
+<span class="fc" id="L808">                    nextRollover = 0;</span>
+<span class="nc" id="L809">                } catch (IOException e) {</span>
+<span class="nc bnc" id="L810" title="All 2 branches missed.">                    if (e instanceof InterruptedIOException) {</span>
+<span class="nc" id="L811">                        Thread.currentThread().interrupt();</span>
+                    }
+<span class="nc" id="L813">                    SysLogger.error(&quot;setFile(&quot; + fileName + &quot;, false) call failed.&quot;, e);</span>
+<span class="fc" id="L814">                }</span>
+            }
+<span class="fc" id="L816">        }</span>
+
+        public synchronized void setFile(String fileName, boolean append, boolean bufferedIO, int bufferSize)
+            throws IOException {
+<span class="fc" id="L820">            super.setFile(fileName, append, this.bufferedIO, this.bufferSize);</span>
+<span class="fc bfc" id="L821" title="All 2 branches covered.">            if (append) {</span>
+<span class="fc" id="L822">                File f = new File(fileName);</span>
+<span class="fc" id="L823">                ((CountingQuietWriter) qw).setCount(f.length());</span>
+            }
+<span class="fc" id="L825">        }</span>
+
+        public void setMaxBackupIndex(int maxBackups) {
+<span class="fc" id="L828">            this.maxBackupIndex = maxBackups;</span>
+<span class="fc" id="L829">        }</span>
+
+        public void setMaximumFileSize(long maxFileSize) {
+<span class="fc" id="L832">            this.maxFileSize = maxFileSize;</span>
+<span class="fc" id="L833">        }</span>
+
+        protected void setQWForFiles(Writer writer) {
+<span class="fc" id="L836">            this.qw = new CountingQuietWriter(writer, this);</span>
+<span class="fc" id="L837">        }</span>
+
+        protected void subAppend(LoggingEvent event) {
+<span class="fc" id="L840">            super.subAppend(event);</span>
+<span class="pc bpc" id="L841" title="2 of 4 branches missed.">            if (fileName != null &amp;&amp; qw != null) {</span>
+<span class="fc" id="L842">                long size = ((CountingQuietWriter) qw).getCount();</span>
+<span class="pc bpc" id="L843" title="2 of 4 branches missed.">                if (size &gt;= maxFileSize &amp;&amp; size &gt;= nextRollover) {</span>
+<span class="fc" id="L844">                    rollOver();</span>
+                }
+            }
+<span class="fc" id="L847">        }</span>
+
+        protected class CountingQuietWriter extends QuietWriter {
+
+            protected long count;
+
+<span class="fc" id="L853">            public CountingQuietWriter(Writer writer, Appender appender) {</span>
+<span class="fc" id="L854">                super(writer, appender);</span>
+<span class="fc" id="L855">            }</span>
+
+            public void write(String string) {
+                try {
+<span class="fc" id="L859">                    out.write(string);</span>
+<span class="fc" id="L860">                    count += string.length();</span>
+<span class="nc" id="L861">                } catch (IOException e) {</span>
+<span class="nc" id="L862">                    appender.handleError(&quot;Write failure.&quot;, e, Appender.CODE_WRITE_FAILURE);</span>
+<span class="fc" id="L863">                }</span>
+<span class="fc" id="L864">            }</span>
+
+            public long getCount() {
+<span class="fc" id="L867">                return count;</span>
+            }
+
+            public void setCount(long count) {
+<span class="fc" id="L871">                this.count = count;</span>
+<span class="fc" id="L872">            }</span>
+
+        }
+    }
+
+
+<span class="fc" id="L878">    public static class DailyRollingFileAppender extends FileAppender {</span>
+
+        static final int TOP_OF_TROUBLE = -1;
+        static final int TOP_OF_MINUTE = 0;
+        static final int TOP_OF_HOUR = 1;
+        static final int HALF_DAY = 2;
+        static final int TOP_OF_DAY = 3;
+        static final int TOP_OF_WEEK = 4;
+        static final int TOP_OF_MONTH = 5;
+
+
+        /**
+         * The date pattern. By default, the pattern is set to
+         * &quot;'.'yyyy-MM-dd&quot; meaning daily rollover.
+         */
+<span class="fc" id="L893">        private String datePattern = &quot;'.'yyyy-MM-dd&quot;;</span>
+
+        private String scheduledFilename;
+
+<span class="fc" id="L897">        private long nextCheck = System.currentTimeMillis() - 1;</span>
+
+<span class="fc" id="L899">        Date now = new Date();</span>
+
+        SimpleDateFormat sdf;
+
+<span class="fc" id="L903">        RollingCalendar rc = new RollingCalendar();</span>
+
+<span class="fc" id="L905">        final TimeZone gmtTimeZone = TimeZone.getTimeZone(&quot;GMT&quot;);</span>
+
+
+        public void setDatePattern(String pattern) {
+<span class="fc" id="L909">            datePattern = pattern;</span>
+<span class="fc" id="L910">        }</span>
+
+        public String getDatePattern() {
+<span class="fc" id="L913">            return datePattern;</span>
+        }
+
+        public void activateOptions() {
+<span class="fc" id="L917">            super.activateOptions();</span>
+<span class="pc bpc" id="L918" title="2 of 4 branches missed.">            if (datePattern != null &amp;&amp; fileName != null) {</span>
+<span class="fc" id="L919">                now.setTime(System.currentTimeMillis());</span>
+<span class="fc" id="L920">                sdf = new SimpleDateFormat(datePattern);</span>
+<span class="fc" id="L921">                int type = computeCheckPeriod();</span>
+<span class="fc" id="L922">                printPeriodicity(type);</span>
+<span class="fc" id="L923">                rc.setType(type);</span>
+<span class="fc" id="L924">                File file = new File(fileName);</span>
+<span class="fc" id="L925">                scheduledFilename = fileName + sdf.format(new Date(file.lastModified()));</span>
+
+<span class="fc" id="L927">            } else {</span>
+<span class="nc" id="L928">                SysLogger.error(&quot;Either File or DatePattern options are not set for appender [&quot; + name + &quot;].&quot;);</span>
+            }
+<span class="fc" id="L930">        }</span>
+
+        void printPeriodicity(int type) {
+<span class="pc bpc" id="L933" title="5 of 7 branches missed.">            switch (type) {</span>
+                case TOP_OF_MINUTE:
+<span class="fc" id="L935">                    SysLogger.debug(&quot;Appender [&quot; + name + &quot;] to be rolled every minute.&quot;);</span>
+<span class="fc" id="L936">                    break;</span>
+                case TOP_OF_HOUR:
+<span class="nc" id="L938">                    SysLogger.debug(&quot;Appender [&quot; + name + &quot;] to be rolled on top of every hour.&quot;);</span>
+<span class="nc" id="L939">                    break;</span>
+                case HALF_DAY:
+<span class="nc" id="L941">                    SysLogger.debug(&quot;Appender [&quot; + name + &quot;] to be rolled at midday and midnight.&quot;);</span>
+<span class="nc" id="L942">                    break;</span>
+                case TOP_OF_DAY:
+<span class="fc" id="L944">                    SysLogger.debug(&quot;Appender [&quot; + name + &quot;] to be rolled at midnight.&quot;);</span>
+<span class="fc" id="L945">                    break;</span>
+                case TOP_OF_WEEK:
+<span class="nc" id="L947">                    SysLogger.debug(&quot;Appender [&quot; + name + &quot;] to be rolled at start of week.&quot;);</span>
+<span class="nc" id="L948">                    break;</span>
+                case TOP_OF_MONTH:
+<span class="nc" id="L950">                    SysLogger.debug(&quot;Appender [&quot; + name + &quot;] to be rolled at start of every month.&quot;);</span>
+<span class="nc" id="L951">                    break;</span>
+                default:
+<span class="nc" id="L953">                    SysLogger.warn(&quot;Unknown periodicity for appender [&quot; + name + &quot;].&quot;);</span>
+            }
+<span class="fc" id="L955">        }</span>
+
+        int computeCheckPeriod() {
+<span class="fc" id="L958">            RollingCalendar rollingCalendar = new RollingCalendar(gmtTimeZone, Locale.getDefault());</span>
+            // set sate to 1970-01-01 00:00:00 GMT
+<span class="fc" id="L960">            Date epoch = new Date(0);</span>
+<span class="pc bpc" id="L961" title="1 of 2 branches missed.">            if (datePattern != null) {</span>
+<span class="pc bpc" id="L962" title="1 of 2 branches missed.">                for (int i = TOP_OF_MINUTE; i &lt;= TOP_OF_MONTH; i++) {</span>
+<span class="fc" id="L963">                    SimpleDateFormat simpleDateFormat = new SimpleDateFormat(datePattern);</span>
+<span class="fc" id="L964">                    simpleDateFormat.setTimeZone(gmtTimeZone);</span>
+<span class="fc" id="L965">                    String r0 = simpleDateFormat.format(epoch);</span>
+<span class="fc" id="L966">                    rollingCalendar.setType(i);</span>
+<span class="fc" id="L967">                    Date next = new Date(rollingCalendar.getNextCheckMillis(epoch));</span>
+<span class="fc" id="L968">                    String r1 = simpleDateFormat.format(next);</span>
+<span class="pc bpc" id="L969" title="2 of 6 branches missed.">                    if (r0 != null &amp;&amp; r1 != null &amp;&amp; !r0.equals(r1)) {</span>
+<span class="fc" id="L970">                        return i;</span>
+                    }
+                }
+            }
+<span class="nc" id="L974">            return TOP_OF_TROUBLE;</span>
+        }
+
+        void rollOver() throws IOException {
+
+<span class="pc bpc" id="L979" title="1 of 2 branches missed.">            if (datePattern == null) {</span>
+<span class="nc" id="L980">                handleError(&quot;Missing DatePattern option in rollOver().&quot;);</span>
+<span class="nc" id="L981">                return;</span>
+            }
+
+<span class="fc" id="L984">            String datedFilename = fileName + sdf.format(now);</span>
+
+<span class="pc bpc" id="L986" title="1 of 2 branches missed.">            if (scheduledFilename.equals(datedFilename)) {</span>
+<span class="fc" id="L987">                return;</span>
+            }
+<span class="nc" id="L989">            this.closeFile();</span>
+
+<span class="nc" id="L991">            File target = new File(scheduledFilename);</span>
+<span class="nc bnc" id="L992" title="All 4 branches missed.">            if (target.exists() &amp;&amp; !target.delete()) {</span>
+<span class="nc" id="L993">                SysLogger.error(&quot;Failed to delete [&quot; + scheduledFilename + &quot;].&quot;);</span>
+            }
+
+<span class="nc" id="L996">            File file = new File(fileName);</span>
+<span class="nc" id="L997">            boolean result = file.renameTo(target);</span>
+<span class="nc bnc" id="L998" title="All 2 branches missed.">            if (result) {</span>
+<span class="nc" id="L999">                SysLogger.debug(fileName + &quot; -&gt; &quot; + scheduledFilename);</span>
+            } else {
+<span class="nc" id="L1001">                SysLogger.error(&quot;Failed to rename [&quot; + fileName + &quot;] to [&quot; + scheduledFilename + &quot;].&quot;);</span>
+            }
+
+            try {
+<span class="nc" id="L1005">                this.setFile(fileName, true, this.bufferedIO, this.bufferSize);</span>
+<span class="nc" id="L1006">            } catch (IOException e) {</span>
+<span class="nc" id="L1007">                handleError(&quot;setFile(&quot; + fileName + &quot;, true) call failed.&quot;);</span>
+<span class="nc" id="L1008">            }</span>
+<span class="nc" id="L1009">            scheduledFilename = datedFilename;</span>
+<span class="nc" id="L1010">        }</span>
+
+        protected void subAppend(LoggingEvent event) {
+<span class="fc" id="L1013">            long n = System.currentTimeMillis();</span>
+<span class="fc bfc" id="L1014" title="All 2 branches covered.">            if (n &gt;= nextCheck) {</span>
+<span class="fc" id="L1015">                now.setTime(n);</span>
+<span class="fc" id="L1016">                nextCheck = rc.getNextCheckMillis(now);</span>
+                try {
+<span class="fc" id="L1018">                    rollOver();</span>
+<span class="nc" id="L1019">                } catch (IOException ioe) {</span>
+<span class="nc bnc" id="L1020" title="All 2 branches missed.">                    if (ioe instanceof InterruptedIOException) {</span>
+<span class="nc" id="L1021">                        Thread.currentThread().interrupt();</span>
+                    }
+<span class="nc" id="L1023">                    SysLogger.error(&quot;rollOver() failed.&quot;, ioe);</span>
+<span class="fc" id="L1024">                }</span>
+            }
+<span class="fc" id="L1026">            super.subAppend(event);</span>
+<span class="fc" id="L1027">        }</span>
+    }
+
+    private static class RollingCalendar extends GregorianCalendar {
+        private static final long serialVersionUID = -3560331770601814177L;
+
+<span class="fc" id="L1033">        int type = DailyRollingFileAppender.TOP_OF_TROUBLE;</span>
+
+        RollingCalendar() {
+<span class="fc" id="L1036">            super();</span>
+<span class="fc" id="L1037">        }</span>
+
+        RollingCalendar(TimeZone tz, Locale locale) {
+<span class="fc" id="L1040">            super(tz, locale);</span>
+<span class="fc" id="L1041">        }</span>
+
+        void setType(int type) {
+<span class="fc" id="L1044">            this.type = type;</span>
+<span class="fc" id="L1045">        }</span>
+
+        public long getNextCheckMillis(Date now) {
+<span class="fc" id="L1048">            return getNextCheckDate(now).getTime();</span>
+        }
+
+        public Date getNextCheckDate(Date now) {
+<span class="fc" id="L1052">            this.setTime(now);</span>
+
+<span class="pc bpc" id="L1054" title="3 of 7 branches missed.">            switch (type) {</span>
+                case DailyRollingFileAppender.TOP_OF_MINUTE:
+<span class="fc" id="L1056">                    this.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L1057">                    this.set(Calendar.MILLISECOND, 0);</span>
+<span class="fc" id="L1058">                    this.add(Calendar.MINUTE, 1);</span>
+<span class="fc" id="L1059">                    break;</span>
+                case DailyRollingFileAppender.TOP_OF_HOUR:
+<span class="fc" id="L1061">                    this.set(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L1062">                    this.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L1063">                    this.set(Calendar.MILLISECOND, 0);</span>
+<span class="fc" id="L1064">                    this.add(Calendar.HOUR_OF_DAY, 1);</span>
+<span class="fc" id="L1065">                    break;</span>
+                case DailyRollingFileAppender.HALF_DAY:
+<span class="fc" id="L1067">                    this.set(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L1068">                    this.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L1069">                    this.set(Calendar.MILLISECOND, 0);</span>
+<span class="fc" id="L1070">                    int hour = get(Calendar.HOUR_OF_DAY);</span>
+<span class="pc bpc" id="L1071" title="1 of 2 branches missed.">                    if (hour &lt; 12) {</span>
+<span class="fc" id="L1072">                        this.set(Calendar.HOUR_OF_DAY, 12);</span>
+                    } else {
+<span class="nc" id="L1074">                        this.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="nc" id="L1075">                        this.add(Calendar.DAY_OF_MONTH, 1);</span>
+                    }
+<span class="nc" id="L1077">                    break;</span>
+                case DailyRollingFileAppender.TOP_OF_DAY:
+<span class="fc" id="L1079">                    this.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="fc" id="L1080">                    this.set(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L1081">                    this.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L1082">                    this.set(Calendar.MILLISECOND, 0);</span>
+<span class="fc" id="L1083">                    this.add(Calendar.DATE, 1);</span>
+<span class="fc" id="L1084">                    break;</span>
+                case DailyRollingFileAppender.TOP_OF_WEEK:
+<span class="nc" id="L1086">                    this.set(Calendar.DAY_OF_WEEK, getFirstDayOfWeek());</span>
+<span class="nc" id="L1087">                    this.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="nc" id="L1088">                    this.set(Calendar.MINUTE, 0);</span>
+<span class="nc" id="L1089">                    this.set(Calendar.SECOND, 0);</span>
+<span class="nc" id="L1090">                    this.set(Calendar.MILLISECOND, 0);</span>
+<span class="nc" id="L1091">                    this.add(Calendar.WEEK_OF_YEAR, 1);</span>
+<span class="nc" id="L1092">                    break;</span>
+                case DailyRollingFileAppender.TOP_OF_MONTH:
+<span class="nc" id="L1094">                    this.set(Calendar.DATE, 1);</span>
+<span class="nc" id="L1095">                    this.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="nc" id="L1096">                    this.set(Calendar.MINUTE, 0);</span>
+<span class="nc" id="L1097">                    this.set(Calendar.SECOND, 0);</span>
+<span class="nc" id="L1098">                    this.set(Calendar.MILLISECOND, 0);</span>
+<span class="nc" id="L1099">                    this.add(Calendar.MONTH, 1);</span>
+<span class="nc" id="L1100">                    break;</span>
+                default:
+<span class="nc" id="L1102">                    throw new IllegalStateException(&quot;Unknown periodicity type.&quot;);</span>
+            }
+<span class="fc" id="L1104">            return getTime();</span>
+        }
+    }
+
+    public static class ConsoleAppender extends WriterAppender {
+
+<span class="fc" id="L1110">        protected String target = SYSTEM_OUT;</span>
+
+<span class="fc" id="L1112">        public ConsoleAppender() {</span>
+<span class="fc" id="L1113">        }</span>
+
+        public void setTarget(String value) {
+<span class="fc" id="L1116">            String v = value.trim();</span>
+
+<span class="pc bpc" id="L1118" title="1 of 2 branches missed.">            if (SYSTEM_OUT.equalsIgnoreCase(v)) {</span>
+<span class="fc" id="L1119">                target = SYSTEM_OUT;</span>
+<span class="nc bnc" id="L1120" title="All 2 branches missed.">            } else if (SYSTEM_ERR.equalsIgnoreCase(v)) {</span>
+<span class="nc" id="L1121">                target = SYSTEM_ERR;</span>
+            } else {
+<span class="nc" id="L1123">                targetWarn(value);</span>
+            }
+<span class="fc" id="L1125">        }</span>
+
+        public String getTarget() {
+<span class="fc" id="L1128">            return target;</span>
+        }
+
+        void targetWarn(String val) {
+<span class="nc" id="L1132">            SysLogger.warn(&quot;[&quot; + val + &quot;] should be System.out or System.err.&quot;);</span>
+<span class="nc" id="L1133">            SysLogger.warn(&quot;Using previously set target, System.out by default.&quot;);</span>
+<span class="nc" id="L1134">        }</span>
+
+        public void activateOptions() {
+<span class="pc bpc" id="L1137" title="1 of 2 branches missed.">            if (target.equals(SYSTEM_ERR)) {</span>
+<span class="nc" id="L1138">                setWriter(createWriter(System.err));</span>
+            } else {
+<span class="fc" id="L1140">                setWriter(createWriter(System.out));</span>
+            }
+<span class="fc" id="L1142">            super.activateOptions();</span>
+<span class="fc" id="L1143">        }</span>
+
+        protected final void closeWriter() {
+
+<span class="fc" id="L1147">        }</span>
+    }
+
+    public static LayoutBuilder newLayoutBuilder() {
+<span class="fc" id="L1151">        return new LayoutBuilder();</span>
+    }
+
+<span class="fc" id="L1154">    public static class LayoutBuilder {</span>
+
+        private Layout layout;
+
+        public LayoutBuilder withSimpleLayout() {
+<span class="fc" id="L1159">            layout = new SimpleLayout();</span>
+<span class="fc" id="L1160">            return this;</span>
+        }
+
+        public LayoutBuilder withDefaultLayout() {
+<span class="fc" id="L1164">            layout = new DefaultLayout();</span>
+<span class="fc" id="L1165">            return this;</span>
+        }
+
+        public Layout build() {
+<span class="pc bpc" id="L1169" title="1 of 2 branches missed.">            if (layout == null) {</span>
+<span class="nc" id="L1170">                layout = new SimpleLayout();</span>
+            }
+<span class="fc" id="L1172">            return layout;</span>
+        }
+    }
+
+<span class="fc" id="L1176">    public static class SimpleLayout extends Layout {</span>
+
+        @Override
+        public String format(LoggingEvent event) {
+
+<span class="fc" id="L1181">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L1182">            sb.append(event.getLevel().toString());</span>
+<span class="fc" id="L1183">            sb.append(&quot; - &quot;);</span>
+<span class="fc" id="L1184">            sb.append(event.getRenderedMessage());</span>
+<span class="fc" id="L1185">            sb.append(&quot;\r\n&quot;);</span>
+<span class="fc" id="L1186">            return sb.toString();</span>
+        }
+
+        @Override
+        public boolean ignoresThrowable() {
+<span class="nc" id="L1191">            return false;</span>
+        }
+    }
+
+
+    /**
+     * %d{yyy-MM-dd HH:mm:ss,SSS} %p %c{1}%L - %m%n
+     */
+<span class="fc" id="L1199">    public static class DefaultLayout extends Layout {</span>
+        @Override
+        public String format(LoggingEvent event) {
+
+<span class="fc" id="L1203">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L1204">            SimpleDateFormat simpleDateFormat = new SimpleDateFormat(&quot;yyyy-MM-dd HH:mm:ss,SSS&quot;);</span>
+<span class="fc" id="L1205">            String format = simpleDateFormat.format(new Date(event.timeStamp));</span>
+<span class="fc" id="L1206">            sb.append(format);</span>
+<span class="fc" id="L1207">            sb.append(&quot; &quot;);</span>
+<span class="fc" id="L1208">            sb.append(event.getLevel());</span>
+<span class="fc" id="L1209">            sb.append(&quot; &quot;);</span>
+<span class="fc" id="L1210">            sb.append(event.getLoggerName());</span>
+<span class="fc" id="L1211">            sb.append(&quot; - &quot;);</span>
+<span class="fc" id="L1212">            sb.append(event.getRenderedMessage());</span>
+<span class="fc" id="L1213">            String[] throwableStr = event.getThrowableStr();</span>
+<span class="fc bfc" id="L1214" title="All 2 branches covered.">            if (throwableStr != null) {</span>
+<span class="fc" id="L1215">                sb.append(&quot;\r\n&quot;);</span>
+<span class="fc bfc" id="L1216" title="All 2 branches covered.">                for (String s : throwableStr) {</span>
+<span class="fc" id="L1217">                    sb.append(s);</span>
+<span class="fc" id="L1218">                    sb.append(&quot;\r\n&quot;);</span>
+                }
+            }
+<span class="fc" id="L1221">            sb.append(&quot;\r\n&quot;);</span>
+<span class="fc" id="L1222">            return sb.toString();</span>
+        }
+
+        @Override
+        public boolean ignoresThrowable() {
+<span class="fc" id="L1227">            return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

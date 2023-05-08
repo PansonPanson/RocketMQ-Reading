@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumerData.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.heartbeat</a> &gt; <span class="el_source">ConsumerData.java</span></div><h1>ConsumerData.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * $Id: ConsumerData.java 1835 2013-05-16 02:00:50Z vintagewang@apache.org $
+ */
+package org.apache.rocketmq.common.protocol.heartbeat;
+
+import java.util.HashSet;
+import java.util.Set;
+import org.apache.rocketmq.common.consumer.ConsumeFromWhere;
+
+<span class="nc" id="L27">public class ConsumerData {</span>
+    private String groupName;
+    private ConsumeType consumeType;
+    private MessageModel messageModel;
+    private ConsumeFromWhere consumeFromWhere;
+<span class="nc" id="L32">    private Set&lt;SubscriptionData&gt; subscriptionDataSet = new HashSet&lt;SubscriptionData&gt;();</span>
+    private boolean unitMode;
+
+    public String getGroupName() {
+<span class="nc" id="L36">        return groupName;</span>
+    }
+
+    public void setGroupName(String groupName) {
+<span class="nc" id="L40">        this.groupName = groupName;</span>
+<span class="nc" id="L41">    }</span>
+
+    public ConsumeType getConsumeType() {
+<span class="nc" id="L44">        return consumeType;</span>
+    }
+
+    public void setConsumeType(ConsumeType consumeType) {
+<span class="nc" id="L48">        this.consumeType = consumeType;</span>
+<span class="nc" id="L49">    }</span>
+
+    public MessageModel getMessageModel() {
+<span class="nc" id="L52">        return messageModel;</span>
+    }
+
+    public void setMessageModel(MessageModel messageModel) {
+<span class="nc" id="L56">        this.messageModel = messageModel;</span>
+<span class="nc" id="L57">    }</span>
+
+    public ConsumeFromWhere getConsumeFromWhere() {
+<span class="nc" id="L60">        return consumeFromWhere;</span>
+    }
+
+    public void setConsumeFromWhere(ConsumeFromWhere consumeFromWhere) {
+<span class="nc" id="L64">        this.consumeFromWhere = consumeFromWhere;</span>
+<span class="nc" id="L65">    }</span>
+
+    public Set&lt;SubscriptionData&gt; getSubscriptionDataSet() {
+<span class="nc" id="L68">        return subscriptionDataSet;</span>
+    }
+
+    public void setSubscriptionDataSet(Set&lt;SubscriptionData&gt; subscriptionDataSet) {
+<span class="nc" id="L72">        this.subscriptionDataSet = subscriptionDataSet;</span>
+<span class="nc" id="L73">    }</span>
+
+    public boolean isUnitMode() {
+<span class="nc" id="L76">        return unitMode;</span>
+    }
+
+    public void setUnitMode(boolean isUnitMode) {
+<span class="nc" id="L80">        this.unitMode = isUnitMode;</span>
+<span class="nc" id="L81">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L85">        return &quot;ConsumerData [groupName=&quot; + groupName + &quot;, consumeType=&quot; + consumeType + &quot;, messageModel=&quot;</span>
+            + messageModel + &quot;, consumeFromWhere=&quot; + consumeFromWhere + &quot;, unitMode=&quot; + unitMode
+            + &quot;, subscriptionDataSet=&quot; + subscriptionDataSet + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

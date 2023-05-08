@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumeStatus.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.body</a> &gt; <span class="el_source">ConsumeStatus.java</span></div><h1>ConsumeStatus.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.protocol.body;
+
+<span class="fc" id="L20">public class ConsumeStatus {</span>
+    private double pullRT;
+    private double pullTPS;
+    private double consumeRT;
+    private double consumeOKTPS;
+    private double consumeFailedTPS;
+
+    private long consumeFailedMsgs;
+
+    public double getPullRT() {
+<span class="fc" id="L30">        return pullRT;</span>
+    }
+
+    public void setPullRT(double pullRT) {
+<span class="fc" id="L34">        this.pullRT = pullRT;</span>
+<span class="fc" id="L35">    }</span>
+
+    public double getPullTPS() {
+<span class="fc" id="L38">        return pullTPS;</span>
+    }
+
+    public void setPullTPS(double pullTPS) {
+<span class="fc" id="L42">        this.pullTPS = pullTPS;</span>
+<span class="fc" id="L43">    }</span>
+
+    public double getConsumeRT() {
+<span class="fc" id="L46">        return consumeRT;</span>
+    }
+
+    public void setConsumeRT(double consumeRT) {
+<span class="fc" id="L50">        this.consumeRT = consumeRT;</span>
+<span class="fc" id="L51">    }</span>
+
+    public double getConsumeOKTPS() {
+<span class="fc" id="L54">        return consumeOKTPS;</span>
+    }
+
+    public void setConsumeOKTPS(double consumeOKTPS) {
+<span class="fc" id="L58">        this.consumeOKTPS = consumeOKTPS;</span>
+<span class="fc" id="L59">    }</span>
+
+    public double getConsumeFailedTPS() {
+<span class="fc" id="L62">        return consumeFailedTPS;</span>
+    }
+
+    public void setConsumeFailedTPS(double consumeFailedTPS) {
+<span class="fc" id="L66">        this.consumeFailedTPS = consumeFailedTPS;</span>
+<span class="fc" id="L67">    }</span>
+
+    public long getConsumeFailedMsgs() {
+<span class="fc" id="L70">        return consumeFailedMsgs;</span>
+    }
+
+    public void setConsumeFailedMsgs(long consumeFailedMsgs) {
+<span class="fc" id="L74">        this.consumeFailedMsgs = consumeFailedMsgs;</span>
+<span class="fc" id="L75">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

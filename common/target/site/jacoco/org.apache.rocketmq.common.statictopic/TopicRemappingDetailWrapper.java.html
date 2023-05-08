@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TopicRemappingDetailWrapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.statictopic</a> &gt; <span class="el_source">TopicRemappingDetailWrapper.java</span></div><h1>TopicRemappingDetailWrapper.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.statictopic;
+
+import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+public class TopicRemappingDetailWrapper extends RemotingSerializable {
+    public static final String TYPE_CREATE_OR_UPDATE = &quot;CREATE_OR_UPDATE&quot;;
+    public static final String TYPE_REMAPPING = &quot;REMAPPING&quot;;
+
+    public static final String SUFFIX_BEFORE = &quot;.before&quot;;
+    public static final String SUFFIX_AFTER = &quot;.after&quot;;
+
+
+    private String topic;
+    private String type;
+    private long epoch;
+
+<span class="pc" id="L38">    private Map&lt;String, TopicConfigAndQueueMapping&gt; brokerConfigMap = new HashMap&lt;String, TopicConfigAndQueueMapping&gt;();</span>
+
+<span class="pc" id="L40">    private Set&lt;String&gt; brokerToMapIn = new HashSet&lt;String&gt;();</span>
+
+<span class="pc" id="L42">    private Set&lt;String&gt; brokerToMapOut = new HashSet&lt;String&gt;();</span>
+
+<span class="nc" id="L44">    public TopicRemappingDetailWrapper() {</span>
+
+<span class="nc" id="L46">    }</span>
+
+<span class="fc" id="L48">    public TopicRemappingDetailWrapper(String topic, String type, long epoch, Map&lt;String, TopicConfigAndQueueMapping&gt; brokerConfigMap, Set&lt;String&gt; brokerToMapIn, Set&lt;String&gt; brokerToMapOut) {</span>
+<span class="fc" id="L49">        this.topic = topic;</span>
+<span class="fc" id="L50">        this.type = type;</span>
+<span class="fc" id="L51">        this.epoch = epoch;</span>
+<span class="fc" id="L52">        this.brokerConfigMap = brokerConfigMap;</span>
+<span class="fc" id="L53">        this.brokerToMapIn = brokerToMapIn;</span>
+<span class="fc" id="L54">        this.brokerToMapOut = brokerToMapOut;</span>
+<span class="fc" id="L55">    }</span>
+
+    public String getTopic() {
+<span class="nc" id="L58">        return topic;</span>
+    }
+
+    public String getType() {
+<span class="nc" id="L62">        return type;</span>
+    }
+
+    public long getEpoch() {
+<span class="nc" id="L66">        return epoch;</span>
+    }
+
+    public Map&lt;String, TopicConfigAndQueueMapping&gt; getBrokerConfigMap() {
+<span class="fc" id="L70">        return brokerConfigMap;</span>
+    }
+
+    public Set&lt;String&gt; getBrokerToMapIn() {
+<span class="fc" id="L74">        return brokerToMapIn;</span>
+    }
+
+    public Set&lt;String&gt; getBrokerToMapOut() {
+<span class="fc" id="L78">        return brokerToMapOut;</span>
+    }
+
+    public void setBrokerConfigMap(Map&lt;String, TopicConfigAndQueueMapping&gt; brokerConfigMap) {
+<span class="nc" id="L82">        this.brokerConfigMap = brokerConfigMap;</span>
+<span class="nc" id="L83">    }</span>
+
+    public void setBrokerToMapIn(Set&lt;String&gt; brokerToMapIn) {
+<span class="nc" id="L86">        this.brokerToMapIn = brokerToMapIn;</span>
+<span class="nc" id="L87">    }</span>
+
+    public void setBrokerToMapOut(Set&lt;String&gt; brokerToMapOut) {
+<span class="nc" id="L90">        this.brokerToMapOut = brokerToMapOut;</span>
+<span class="nc" id="L91">    }</span>
+
+    public void setTopic(String topic) {
+<span class="nc" id="L94">        this.topic = topic;</span>
+<span class="nc" id="L95">    }</span>
+
+    public void setType(String type) {
+<span class="nc" id="L98">        this.type = type;</span>
+<span class="nc" id="L99">    }</span>
+
+    public void setEpoch(long epoch) {
+<span class="nc" id="L102">        this.epoch = epoch;</span>
+<span class="nc" id="L103">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

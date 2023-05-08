@@ -1,0 +1,13 @@
+2022-05-22 22:10:19 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@2b71e916
+2022-05-22 22:10:20 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@d86a6f
+2022-05-22 22:10:20 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@3646a422
+2022-05-22 22:10:20 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@750e2b97
+2022-05-22 22:10:20 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@3e27aa33
+2022-05-22 22:10:20 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@31d0e481
+2022-05-22 22:10:20 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@241e8ea6
+2022-05-22 22:10:20 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@542e560f
+2022-05-22 22:10:20 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@626c44e7
+2022-05-22 22:10:21 INFO main - Looking for a resource file of name [META-INF/service/org.apache.rocketmq.remoting.RPCHook] ...
+2022-05-22 22:10:21 WARN main - No resource file with name [META-INF/service/org.apache.rocketmq.remoting.RPCHook] found.
+2022-05-22 22:10:21 WARN main - Unknown channel option 'SO_KEEPALIVE' for channel '[id: 0x848b8bbe]'
+2022-05-22 22:10:21 WARN main - Unknown channel option 'SO_KEEPALIVE' for channel '[id: 0x67a2ace5]'

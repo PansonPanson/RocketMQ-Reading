@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Configuration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common</a> &gt; <span class="el_source">Configuration.java</span></div><h1>Configuration.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common;
+
+import org.apache.rocketmq.logging.InternalLogger;
+
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+<span class="nc bnc" id="L32" title="All 2 branches missed.">public class Configuration {</span>
+
+    private final InternalLogger log;
+
+<span class="nc" id="L36">    private List&lt;Object&gt; configObjectList = new ArrayList&lt;Object&gt;(4);</span>
+    private String storePath;
+<span class="nc" id="L38">    private boolean storePathFromConfig = false;</span>
+    private Object storePathObject;
+    private Field storePathField;
+<span class="nc" id="L41">    private DataVersion dataVersion = new DataVersion();</span>
+<span class="nc" id="L42">    private ReadWriteLock readWriteLock = new ReentrantReadWriteLock();</span>
+    /**
+     * All properties include configs in object and extend properties.
+     */
+<span class="nc" id="L46">    private Properties allConfigs = new Properties();</span>
+
+<span class="nc" id="L48">    public Configuration(InternalLogger log) {</span>
+<span class="nc" id="L49">        this.log = log;</span>
+<span class="nc" id="L50">    }</span>
+
+<span class="nc" id="L52">    public Configuration(InternalLogger log, Object... configObjects) {</span>
+<span class="nc" id="L53">        this.log = log;</span>
+<span class="nc bnc" id="L54" title="All 4 branches missed.">        if (configObjects == null || configObjects.length == 0) {</span>
+<span class="nc" id="L55">            return;</span>
+        }
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        for (Object configObject : configObjects) {</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            if (configObject == null) {</span>
+<span class="nc" id="L59">                continue;</span>
+            }
+<span class="nc" id="L61">            registerConfig(configObject);</span>
+        }
+<span class="nc" id="L63">    }</span>
+
+    public Configuration(InternalLogger log, String storePath, Object... configObjects) {
+<span class="nc" id="L66">        this(log, configObjects);</span>
+<span class="nc" id="L67">        this.storePath = storePath;</span>
+<span class="nc" id="L68">    }</span>
+
+    /**
+     * register config object
+     *
+     * @return the current Configuration object
+     */
+    public Configuration registerConfig(Object configObject) {
+        try {
+<span class="nc" id="L77">            readWriteLock.writeLock().lockInterruptibly();</span>
+
+            try {
+
+<span class="nc" id="L81">                Properties registerProps = MixAll.object2Properties(configObject);</span>
+
+<span class="nc" id="L83">                merge(registerProps, this.allConfigs);</span>
+
+<span class="nc" id="L85">                configObjectList.add(configObject);</span>
+            } finally {
+<span class="nc" id="L87">                readWriteLock.writeLock().unlock();</span>
+            }
+<span class="nc" id="L89">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L90">            log.error(&quot;registerConfig lock error&quot;);</span>
+<span class="nc" id="L91">        }</span>
+<span class="nc" id="L92">        return this;</span>
+    }
+
+    /**
+     * register config properties
+     *
+     * @return the current Configuration object
+     */
+    public Configuration registerConfig(Properties extProperties) {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (extProperties == null) {</span>
+<span class="nc" id="L102">            return this;</span>
+        }
+
+        try {
+<span class="nc" id="L106">            readWriteLock.writeLock().lockInterruptibly();</span>
+
+            try {
+<span class="nc" id="L109">                merge(extProperties, this.allConfigs);</span>
+            } finally {
+<span class="nc" id="L111">                readWriteLock.writeLock().unlock();</span>
+            }
+<span class="nc" id="L113">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L114">            log.error(&quot;register lock error. {}&quot; + extProperties);</span>
+<span class="nc" id="L115">        }</span>
+
+<span class="nc" id="L117">        return this;</span>
+    }
+
+    /**
+     * The store path will be gotten from the field of object.
+     *
+     * @throws java.lang.RuntimeException if the field of object is not exist.
+     */
+    public void setStorePathFromConfig(Object object, String fieldName) {
+<span class="nc bnc" id="L126" title="All 4 branches missed.">        assert object != null;</span>
+
+        try {
+<span class="nc" id="L129">            readWriteLock.writeLock().lockInterruptibly();</span>
+
+            try {
+<span class="nc" id="L132">                this.storePathFromConfig = true;</span>
+<span class="nc" id="L133">                this.storePathObject = object;</span>
+                // check
+<span class="nc" id="L135">                this.storePathField = object.getClass().getDeclaredField(fieldName);</span>
+<span class="nc bnc" id="L136" title="All 4 branches missed.">                assert this.storePathField != null</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">                    &amp;&amp; !Modifier.isStatic(this.storePathField.getModifiers());</span>
+<span class="nc" id="L138">                this.storePathField.setAccessible(true);</span>
+<span class="nc" id="L139">            } catch (NoSuchFieldException e) {</span>
+<span class="nc" id="L140">                throw new RuntimeException(e);</span>
+            } finally {
+<span class="nc" id="L142">                readWriteLock.writeLock().unlock();</span>
+            }
+<span class="nc" id="L144">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L145">            log.error(&quot;setStorePathFromConfig lock error&quot;);</span>
+<span class="nc" id="L146">        }</span>
+<span class="nc" id="L147">    }</span>
+
+    private String getStorePath() {
+<span class="nc" id="L150">        String realStorePath = null;</span>
+        try {
+<span class="nc" id="L152">            readWriteLock.readLock().lockInterruptibly();</span>
+
+            try {
+<span class="nc" id="L155">                realStorePath = this.storePath;</span>
+
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                if (this.storePathFromConfig) {</span>
+                    try {
+<span class="nc" id="L159">                        realStorePath = (String) storePathField.get(this.storePathObject);</span>
+<span class="nc" id="L160">                    } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L161">                        log.error(&quot;getStorePath error, &quot;, e);</span>
+<span class="nc" id="L162">                    }</span>
+                }
+            } finally {
+<span class="nc" id="L165">                readWriteLock.readLock().unlock();</span>
+            }
+<span class="nc" id="L167">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L168">            log.error(&quot;getStorePath lock error&quot;);</span>
+<span class="nc" id="L169">        }</span>
+
+<span class="nc" id="L171">        return realStorePath;</span>
+    }
+
+    public void setStorePath(final String storePath) {
+<span class="nc" id="L175">        this.storePath = storePath;</span>
+<span class="nc" id="L176">    }</span>
+
+    public void update(Properties properties) {
+        try {
+<span class="nc" id="L180">            readWriteLock.writeLock().lockInterruptibly();</span>
+
+            try {
+                // the property must be exist when update
+<span class="nc" id="L184">                mergeIfExist(properties, this.allConfigs);</span>
+
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                for (Object configObject : configObjectList) {</span>
+                    // not allConfigs to update...
+<span class="nc" id="L188">                    MixAll.properties2Object(properties, configObject);</span>
+<span class="nc" id="L189">                }</span>
+
+<span class="nc" id="L191">                this.dataVersion.nextVersion();</span>
+
+            } finally {
+<span class="nc" id="L194">                readWriteLock.writeLock().unlock();</span>
+            }
+<span class="nc" id="L196">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L197">            log.error(&quot;update lock error, {}&quot;, properties);</span>
+<span class="nc" id="L198">            return;</span>
+<span class="nc" id="L199">        }</span>
+
+<span class="nc" id="L201">        persist();</span>
+<span class="nc" id="L202">    }</span>
+
+    public void persist() {
+        try {
+<span class="nc" id="L206">            readWriteLock.readLock().lockInterruptibly();</span>
+
+            try {
+<span class="nc" id="L209">                String allConfigs = getAllConfigsInternal();</span>
+
+<span class="nc" id="L211">                MixAll.string2File(allConfigs, getStorePath());</span>
+<span class="nc" id="L212">            } catch (IOException e) {</span>
+<span class="nc" id="L213">                log.error(&quot;persist string2File error, &quot;, e);</span>
+            } finally {
+<span class="nc" id="L215">                readWriteLock.readLock().unlock();</span>
+            }
+<span class="nc" id="L217">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L218">            log.error(&quot;persist lock error&quot;);</span>
+<span class="nc" id="L219">        }</span>
+<span class="nc" id="L220">    }</span>
+
+    public String getAllConfigsFormatString() {
+        try {
+<span class="nc" id="L224">            readWriteLock.readLock().lockInterruptibly();</span>
+
+            try {
+
+<span class="nc" id="L228">                return getAllConfigsInternal();</span>
+
+            } finally {
+<span class="nc" id="L231">                readWriteLock.readLock().unlock();</span>
+            }
+<span class="nc" id="L233">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L234">            log.error(&quot;getAllConfigsFormatString lock error&quot;);</span>
+        }
+
+<span class="nc" id="L237">        return null;</span>
+    }
+
+    public String getClientConfigsFormatString(List&lt;String&gt; clientKeys) {
+        try {
+<span class="nc" id="L242">            readWriteLock.readLock().lockInterruptibly();</span>
+
+            try {
+
+<span class="nc" id="L246">                return getClientConfigsInternal(clientKeys);</span>
+
+            } finally {
+<span class="nc" id="L249">                readWriteLock.readLock().unlock();</span>
+            }
+<span class="nc" id="L251">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L252">            log.error(&quot;getAllConfigsFormatString lock error&quot;);</span>
+        }
+
+<span class="nc" id="L255">        return null;</span>
+    }
+
+    public String getDataVersionJson() {
+<span class="nc" id="L259">        return this.dataVersion.toJson();</span>
+    }
+
+    public Properties getAllConfigs() {
+        try {
+<span class="nc" id="L264">            readWriteLock.readLock().lockInterruptibly();</span>
+
+            try {
+
+<span class="nc" id="L268">                return this.allConfigs;</span>
+
+            } finally {
+<span class="nc" id="L271">                readWriteLock.readLock().unlock();</span>
+            }
+<span class="nc" id="L273">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L274">            log.error(&quot;getAllConfigs lock error&quot;);</span>
+        }
+
+<span class="nc" id="L277">        return null;</span>
+    }
+
+    private String getAllConfigsInternal() {
+<span class="nc" id="L281">        StringBuilder stringBuilder = new StringBuilder();</span>
+
+        // reload from config object ?
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        for (Object configObject : this.configObjectList) {</span>
+<span class="nc" id="L285">            Properties properties = MixAll.object2Properties(configObject);</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            if (properties != null) {</span>
+<span class="nc" id="L287">                merge(properties, this.allConfigs);</span>
+            } else {
+<span class="nc" id="L289">                log.warn(&quot;getAllConfigsInternal object2Properties is null, {}&quot;, configObject.getClass());</span>
+            }
+<span class="nc" id="L291">        }</span>
+
+        {
+<span class="nc" id="L294">            stringBuilder.append(MixAll.properties2String(this.allConfigs));</span>
+        }
+
+<span class="nc" id="L297">        return stringBuilder.toString();</span>
+    }
+
+    private String getClientConfigsInternal(List&lt;String&gt; clientConigKeys) {
+<span class="nc" id="L301">        StringBuilder stringBuilder = new StringBuilder();</span>
+<span class="nc" id="L302">        Properties clientProperties = new Properties();</span>
+
+        // reload from config object ?
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        for (Object configObject : this.configObjectList) {</span>
+<span class="nc" id="L306">            Properties properties = MixAll.object2Properties(configObject);</span>
+
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            for (String nameNow : clientConigKeys) {</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">                if (properties.containsKey(nameNow)) {</span>
+<span class="nc" id="L310">                    clientProperties.put(nameNow, properties.get(nameNow));</span>
+                }
+<span class="nc" id="L312">            }</span>
+
+<span class="nc" id="L314">        }</span>
+<span class="nc" id="L315">        stringBuilder.append(MixAll.properties2String(clientProperties));</span>
+
+<span class="nc" id="L317">        return stringBuilder.toString();</span>
+    }
+
+    private void merge(Properties from, Properties to) {
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        for (Entry&lt;Object, Object&gt; next : from.entrySet()) {</span>
+<span class="nc" id="L322">            Object fromObj = next.getValue(), toObj = to.get(next.getKey());</span>
+<span class="nc bnc" id="L323" title="All 4 branches missed.">            if (toObj != null &amp;&amp; !toObj.equals(fromObj)) {</span>
+<span class="nc" id="L324">                log.info(&quot;Replace, key: {}, value: {} -&gt; {}&quot;, next.getKey(), toObj, fromObj);</span>
+            }
+<span class="nc" id="L326">            to.put(next.getKey(), fromObj);</span>
+<span class="nc" id="L327">        }</span>
+<span class="nc" id="L328">    }</span>
+
+    private void mergeIfExist(Properties from, Properties to) {
+<span class="nc bnc" id="L331" title="All 2 branches missed.">        for (Entry&lt;Object, Object&gt; next : from.entrySet()) {</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">            if (!to.containsKey(next.getKey())) {</span>
+<span class="nc" id="L333">                continue;</span>
+            }
+
+<span class="nc" id="L336">            Object fromObj = next.getValue(), toObj = to.get(next.getKey());</span>
+<span class="nc bnc" id="L337" title="All 4 branches missed.">            if (toObj != null &amp;&amp; !toObj.equals(fromObj)) {</span>
+<span class="nc" id="L338">                log.info(&quot;Replace, key: {}, value: {} -&gt; {}&quot;, next.getKey(), toObj, fromObj);</span>
+            }
+<span class="nc" id="L340">            to.put(next.getKey(), fromObj);</span>
+<span class="nc" id="L341">        }</span>
+<span class="nc" id="L342">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

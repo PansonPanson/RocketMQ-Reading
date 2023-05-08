@@ -1,0 +1,10 @@
+/Users/panson/Documents/project/github/rocketmq/namesrv/src/main/java/org/apache/rocketmq/namesrv/kvconfig/KVConfigSerializeWrapper.java
+/Users/panson/Documents/project/github/rocketmq/namesrv/src/main/java/org/apache/rocketmq/namesrv/processor/ClientRequestProcessor.java
+/Users/panson/Documents/project/github/rocketmq/namesrv/src/main/java/org/apache/rocketmq/namesrv/processor/DefaultRequestProcessor.java
+/Users/panson/Documents/project/github/rocketmq/namesrv/src/main/java/org/apache/rocketmq/namesrv/NamesrvStartup.java
+/Users/panson/Documents/project/github/rocketmq/namesrv/src/main/java/org/apache/rocketmq/namesrv/routeinfo/RouteInfoManager.java
+/Users/panson/Documents/project/github/rocketmq/namesrv/src/main/java/org/apache/rocketmq/namesrv/NamesrvController.java
+/Users/panson/Documents/project/github/rocketmq/namesrv/src/main/java/org/apache/rocketmq/namesrv/kvconfig/KVConfigManager.java
+/Users/panson/Documents/project/github/rocketmq/namesrv/src/main/java/org/apache/rocketmq/namesrv/processor/ClusterTestRequestProcessor.java
+/Users/panson/Documents/project/github/rocketmq/namesrv/src/main/java/org/apache/rocketmq/namesrv/routeinfo/BrokerHousekeepingService.java
+/Users/panson/Documents/project/github/rocketmq/namesrv/src/main/java/org/apache/rocketmq/namesrv/routeinfo/BatchUnRegisterService.java

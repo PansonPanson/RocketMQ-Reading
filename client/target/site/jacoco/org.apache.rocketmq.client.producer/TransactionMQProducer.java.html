@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransactionMQProducer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.producer</a> &gt; <span class="el_source">TransactionMQProducer.java</span></div><h1>TransactionMQProducer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.producer;
+
+import java.util.concurrent.ExecutorService;
+import org.apache.rocketmq.client.exception.MQClientException;
+import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.common.protocol.NamespaceUtil;
+import org.apache.rocketmq.remoting.RPCHook;
+
+public class TransactionMQProducer extends DefaultMQProducer {
+    private TransactionCheckListener transactionCheckListener;
+<span class="pc" id="L27">    private int checkThreadPoolMinSize = 1;</span>
+<span class="pc" id="L28">    private int checkThreadPoolMaxSize = 1;</span>
+<span class="pc" id="L29">    private int checkRequestHoldMax = 2000;</span>
+
+    private ExecutorService executorService;
+
+    private TransactionListener transactionListener;
+
+<span class="nc" id="L35">    public TransactionMQProducer() {</span>
+<span class="nc" id="L36">    }</span>
+
+    public TransactionMQProducer(final String producerGroup) {
+<span class="fc" id="L39">        this(null, producerGroup, null);</span>
+<span class="fc" id="L40">    }</span>
+
+    public TransactionMQProducer(final String namespace, final String producerGroup) {
+<span class="nc" id="L43">        this(namespace, producerGroup, null);</span>
+<span class="nc" id="L44">    }</span>
+
+    public TransactionMQProducer(final String producerGroup, RPCHook rpcHook) {
+<span class="nc" id="L47">        this(null, producerGroup, rpcHook);</span>
+<span class="nc" id="L48">    }</span>
+
+    public TransactionMQProducer(final String namespace, final String producerGroup, RPCHook rpcHook) {
+<span class="fc" id="L51">        super(namespace, producerGroup, rpcHook);</span>
+<span class="fc" id="L52">    }</span>
+
+    public TransactionMQProducer(final String namespace, final String producerGroup, RPCHook rpcHook, boolean enableMsgTrace, final String customizedTraceTopic) {
+<span class="fc" id="L55">        super(namespace, producerGroup, rpcHook, enableMsgTrace, customizedTraceTopic);</span>
+<span class="fc" id="L56">    }</span>
+
+    @Override
+    public void start() throws MQClientException {
+<span class="fc" id="L60">        this.defaultMQProducerImpl.initTransactionEnv();</span>
+<span class="fc" id="L61">        super.start();</span>
+<span class="fc" id="L62">    }</span>
+
+    @Override
+    public void shutdown() {
+<span class="fc" id="L66">        super.shutdown();</span>
+<span class="fc" id="L67">        this.defaultMQProducerImpl.destroyTransactionEnv();</span>
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * This method will be removed in the version 5.0.0, method &lt;code&gt;sendMessageInTransaction(Message,Object)&lt;/code&gt;}
+     * is recommended.
+     */
+    @Override
+    @Deprecated
+    public TransactionSendResult sendMessageInTransaction(final Message msg,
+        final LocalTransactionExecuter tranExecuter, final Object arg) throws MQClientException {
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (null == this.transactionCheckListener) {</span>
+<span class="nc" id="L79">            throw new MQClientException(&quot;localTransactionBranchCheckListener is null&quot;, null);</span>
+        }
+
+<span class="nc" id="L82">        msg.setTopic(NamespaceUtil.wrapNamespace(this.getNamespace(), msg.getTopic()));</span>
+<span class="nc" id="L83">        return this.defaultMQProducerImpl.sendMessageInTransaction(msg, tranExecuter, arg);</span>
+    }
+
+    @Override
+    public TransactionSendResult sendMessageInTransaction(final Message msg,
+        final Object arg) throws MQClientException {
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (null == this.transactionListener) {</span>
+<span class="nc" id="L90">            throw new MQClientException(&quot;TransactionListener is null&quot;, null);</span>
+        }
+
+<span class="fc" id="L93">        msg.setTopic(NamespaceUtil.wrapNamespace(this.getNamespace(), msg.getTopic()));</span>
+<span class="fc" id="L94">        return this.defaultMQProducerImpl.sendMessageInTransaction(msg, null, arg);</span>
+    }
+
+    public TransactionCheckListener getTransactionCheckListener() {
+<span class="nc" id="L98">        return transactionCheckListener;</span>
+    }
+
+    /**
+     * This method will be removed in the version 5.0.0 and set a custom thread pool is recommended.
+     */
+    @Deprecated
+    public void setTransactionCheckListener(TransactionCheckListener transactionCheckListener) {
+<span class="nc" id="L106">        this.transactionCheckListener = transactionCheckListener;</span>
+<span class="nc" id="L107">    }</span>
+
+    public int getCheckThreadPoolMinSize() {
+<span class="fc" id="L110">        return checkThreadPoolMinSize;</span>
+    }
+
+    /**
+     * This method will be removed in the version 5.0.0 and set a custom thread pool is recommended.
+     */
+    @Deprecated
+    public void setCheckThreadPoolMinSize(int checkThreadPoolMinSize) {
+<span class="nc" id="L118">        this.checkThreadPoolMinSize = checkThreadPoolMinSize;</span>
+<span class="nc" id="L119">    }</span>
+
+    public int getCheckThreadPoolMaxSize() {
+<span class="fc" id="L122">        return checkThreadPoolMaxSize;</span>
+    }
+
+    /**
+     * This method will be removed in the version 5.0.0 and set a custom thread pool is recommended.
+     */
+    @Deprecated
+    public void setCheckThreadPoolMaxSize(int checkThreadPoolMaxSize) {
+<span class="nc" id="L130">        this.checkThreadPoolMaxSize = checkThreadPoolMaxSize;</span>
+<span class="nc" id="L131">    }</span>
+
+    public int getCheckRequestHoldMax() {
+<span class="fc" id="L134">        return checkRequestHoldMax;</span>
+    }
+
+    /**
+     * This method will be removed in the version 5.0.0 and set a custom thread pool is recommended.
+     */
+    @Deprecated
+    public void setCheckRequestHoldMax(int checkRequestHoldMax) {
+<span class="nc" id="L142">        this.checkRequestHoldMax = checkRequestHoldMax;</span>
+<span class="nc" id="L143">    }</span>
+
+    public ExecutorService getExecutorService() {
+<span class="fc" id="L146">        return executorService;</span>
+    }
+
+    public void setExecutorService(ExecutorService executorService) {
+<span class="nc" id="L150">        this.executorService = executorService;</span>
+<span class="nc" id="L151">    }</span>
+
+    public TransactionListener getTransactionListener() {
+<span class="fc" id="L154">        return transactionListener;</span>
+    }
+
+    public void setTransactionListener(TransactionListener transactionListener) {
+<span class="fc" id="L158">        this.transactionListener = transactionListener;</span>
+<span class="fc" id="L159">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

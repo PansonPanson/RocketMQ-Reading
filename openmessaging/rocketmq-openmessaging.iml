@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module version="4">
+  <component name="SonarLintModuleSettings">
+    <option name="idePathPrefix" value="openmessaging/src/test/java/io/openmessaging/rocketmq/utils" />
+    <option name="sqPathPrefix" value="evo-wes-common/evo-wes-common-core/src/test/java/com/kc/evo/wes/common/util" />
+  </component>
+</module>

@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ThreadUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.utils</a> &gt; <span class="el_source">ThreadUtils.java</span></div><h1>ThreadUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.utils;
+
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+
+public final class ThreadUtils {
+<span class="nc" id="L33">    private static final InternalLogger LOGGER = InternalLoggerFactory.getLogger(LoggerName.TOOLS_LOGGER_NAME);</span>
+
+    public static ExecutorService newThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime,
+        TimeUnit unit, BlockingQueue&lt;Runnable&gt; workQueue, String processName, boolean isDaemon) {
+<span class="nc" id="L37">        return new ThreadPoolExecutor(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue, newThreadFactory(processName, isDaemon));</span>
+    }
+
+    public static ExecutorService newSingleThreadExecutor(String processName, boolean isDaemon) {
+<span class="nc" id="L41">        return Executors.newSingleThreadExecutor(newThreadFactory(processName, isDaemon));</span>
+    }
+
+    public static ScheduledExecutorService newSingleThreadScheduledExecutor(String processName, boolean isDaemon) {
+<span class="nc" id="L45">        return Executors.newSingleThreadScheduledExecutor(newThreadFactory(processName, isDaemon));</span>
+    }
+
+    public static ScheduledExecutorService newFixedThreadScheduledPool(int nThreads, String processName,
+        boolean isDaemon) {
+<span class="nc" id="L50">        return Executors.newScheduledThreadPool(nThreads, newThreadFactory(processName, isDaemon));</span>
+    }
+
+    public static ThreadFactory newThreadFactory(String processName, boolean isDaemon) {
+<span class="nc" id="L54">        return newGenericThreadFactory(&quot;Remoting-&quot; + processName, isDaemon);</span>
+    }
+
+    public static ThreadFactory newGenericThreadFactory(String processName) {
+<span class="nc" id="L58">        return newGenericThreadFactory(processName, false);</span>
+    }
+
+    public static ThreadFactory newGenericThreadFactory(String processName, int threads) {
+<span class="nc" id="L62">        return newGenericThreadFactory(processName, threads, false);</span>
+    }
+
+    public static ThreadFactory newGenericThreadFactory(final String processName, final boolean isDaemon) {
+<span class="nc" id="L66">        return new ThreadFactory() {</span>
+<span class="nc" id="L67">            private AtomicInteger threadIndex = new AtomicInteger(0);</span>
+
+            @Override
+            public Thread newThread(Runnable r) {
+<span class="nc" id="L71">                Thread thread = new Thread(r, String.format(&quot;%s_%d&quot;, processName, this.threadIndex.incrementAndGet()));</span>
+<span class="nc" id="L72">                thread.setDaemon(isDaemon);</span>
+<span class="nc" id="L73">                return thread;</span>
+            }
+        };
+    }
+
+    public static ThreadFactory newGenericThreadFactory(final String processName, final int threads,
+        final boolean isDaemon) {
+<span class="nc" id="L80">        return new ThreadFactory() {</span>
+<span class="nc" id="L81">            private AtomicInteger threadIndex = new AtomicInteger(0);</span>
+
+            @Override
+            public Thread newThread(Runnable r) {
+<span class="nc" id="L85">                Thread thread = new Thread(r, String.format(&quot;%s_%d_%d&quot;, processName, threads, this.threadIndex.incrementAndGet()));</span>
+<span class="nc" id="L86">                thread.setDaemon(isDaemon);</span>
+<span class="nc" id="L87">                return thread;</span>
+            }
+        };
+    }
+
+    /**
+     * Create a new thread
+     *
+     * @param name The name of the thread
+     * @param runnable The work for the thread to do
+     * @param daemon Should the thread block JVM stop?
+     * @return The unstarted thread
+     */
+    public static Thread newThread(String name, Runnable runnable, boolean daemon) {
+<span class="nc" id="L101">        Thread thread = new Thread(runnable, name);</span>
+<span class="nc" id="L102">        thread.setDaemon(daemon);</span>
+<span class="nc" id="L103">        thread.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {</span>
+            public void uncaughtException(Thread t, Throwable e) {
+<span class="nc" id="L105">                LOGGER.error(&quot;Uncaught exception in thread '&quot; + t.getName() + &quot;':&quot;, e);</span>
+<span class="nc" id="L106">            }</span>
+        });
+<span class="nc" id="L108">        return thread;</span>
+    }
+
+    /**
+     * Shutdown passed thread using isAlive and join.
+     *
+     * @param t Thread to stop
+     */
+    public static void shutdownGracefully(final Thread t) {
+<span class="nc" id="L117">        shutdownGracefully(t, 0);</span>
+<span class="nc" id="L118">    }</span>
+
+    /**
+     * Shutdown passed thread using isAlive and join.
+     *
+     * @param millis Pass 0 if we're to wait forever.
+     * @param t Thread to stop
+     */
+    public static void shutdownGracefully(final Thread t, final long millis) {
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (t == null)</span>
+<span class="nc" id="L128">            return;</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        while (t.isAlive()) {</span>
+            try {
+<span class="nc" id="L131">                t.interrupt();</span>
+<span class="nc" id="L132">                t.join(millis);</span>
+<span class="nc" id="L133">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L134">                Thread.currentThread().interrupt();</span>
+<span class="nc" id="L135">            }</span>
+        }
+<span class="nc" id="L137">    }</span>
+
+    /**
+     * An implementation of the graceful stop sequence recommended by
+     * {@link ExecutorService}.
+     *
+     * @param executor executor
+     * @param timeout timeout
+     * @param timeUnit timeUnit
+     */
+    public static void shutdownGracefully(ExecutorService executor, long timeout, TimeUnit timeUnit) {
+        // Disable new tasks from being submitted.
+<span class="nc" id="L149">        executor.shutdown();</span>
+        try {
+            // Wait a while for existing tasks to terminate.
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (!executor.awaitTermination(timeout, timeUnit)) {</span>
+<span class="nc" id="L153">                executor.shutdownNow();</span>
+                // Wait a while for tasks to respond to being cancelled.
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                if (!executor.awaitTermination(timeout, timeUnit)) {</span>
+<span class="nc" id="L156">                    LOGGER.warn(String.format(&quot;%s didn't terminate!&quot;, executor));</span>
+                }
+            }
+<span class="nc" id="L159">        } catch (InterruptedException ie) {</span>
+            // (Re-)Cancel if current thread also interrupted.
+<span class="nc" id="L161">            executor.shutdownNow();</span>
+            // Preserve interrupt status.
+<span class="nc" id="L163">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L164">        }</span>
+<span class="nc" id="L165">    }</span>
+
+    /**
+     * Shutdown the specific ExecutorService
+     *
+     * @param executorService the executor
+     */
+    public static void shutdown(ExecutorService executorService) {
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (executorService != null) {</span>
+<span class="nc" id="L174">            executorService.shutdown();</span>
+        }
+<span class="nc" id="L176">    }</span>
+
+    /**
+     * A constructor to stop this class being constructed.
+     */
+    private ThreadUtils() {
+        // Unused
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

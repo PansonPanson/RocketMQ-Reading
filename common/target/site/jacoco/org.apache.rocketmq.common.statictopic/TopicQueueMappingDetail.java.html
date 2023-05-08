@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TopicQueueMappingDetail.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.statictopic</a> &gt; <span class="el_source">TopicQueueMappingDetail.java</span></div><h1>TopicQueueMappingDetail.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.statictopic;
+
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">public class TopicQueueMappingDetail extends TopicQueueMappingInfo {</span>
+
+    // the mapping info in current broker, do not register to nameserver
+    // make sure this value is not null
+<span class="fc" id="L31">    private ConcurrentMap&lt;Integer/*global id*/, List&lt;LogicQueueMappingItem&gt;&gt; hostedQueues = new ConcurrentHashMap&lt;Integer, List&lt;LogicQueueMappingItem&gt;&gt;();</span>
+
+    //make sure there is a default constructor
+<span class="fc" id="L34">    public TopicQueueMappingDetail() {</span>
+
+<span class="fc" id="L36">    }</span>
+
+    public TopicQueueMappingDetail(String topic, int totalQueues, String bname, long epoch) {
+<span class="fc" id="L39">        super(topic, totalQueues, bname, epoch);</span>
+<span class="fc" id="L40">    }</span>
+
+
+
+    public static boolean putMappingInfo(TopicQueueMappingDetail mappingDetail, Integer globalId, List&lt;LogicQueueMappingItem&gt; mappingInfo) {
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (mappingInfo.isEmpty()) {</span>
+<span class="nc" id="L46">            return true;</span>
+        }
+<span class="fc" id="L48">        mappingDetail.hostedQueues.put(globalId, mappingInfo);</span>
+<span class="fc" id="L49">        return true;</span>
+    }
+
+    public static List&lt;LogicQueueMappingItem&gt; getMappingInfo(TopicQueueMappingDetail mappingDetail, Integer globalId) {
+<span class="nc" id="L53">        return mappingDetail.hostedQueues.get(globalId);</span>
+    }
+
+    public static ConcurrentMap&lt;Integer, Integer&gt; buildIdMap(TopicQueueMappingDetail mappingDetail, int level) {
+        //level 0 means current leader in this broker
+        //level 1 means previous leader in this broker, reserved for
+<span class="nc bnc" id="L59" title="All 4 branches missed.">        assert level == LEVEL_0 ;</span>
+
+<span class="nc bnc" id="L61" title="All 4 branches missed.">        if (mappingDetail.hostedQueues == null || mappingDetail.hostedQueues.isEmpty()) {</span>
+<span class="nc" id="L62">            return new ConcurrentHashMap&lt;Integer, Integer&gt;();</span>
+        }
+<span class="nc" id="L64">        ConcurrentMap&lt;Integer, Integer&gt; tmpIdMap = new ConcurrentHashMap&lt;Integer, Integer&gt;();</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        for (Map.Entry&lt;Integer, List&lt;LogicQueueMappingItem&gt;&gt; entry: mappingDetail.hostedQueues.entrySet()) {</span>
+<span class="nc" id="L66">            Integer globalId =  entry.getKey();</span>
+<span class="nc" id="L67">            List&lt;LogicQueueMappingItem&gt; items = entry.getValue();</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">            if (level == LEVEL_0</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                    &amp;&amp; items.size() &gt;= 1) {</span>
+<span class="nc" id="L70">                LogicQueueMappingItem curr = items.get(items.size() - 1);</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">                if (mappingDetail.bname.equals(curr.getBname())) {</span>
+<span class="nc" id="L72">                    tmpIdMap.put(globalId, curr.getQueueId());</span>
+                }
+            }
+<span class="nc" id="L75">        }</span>
+<span class="nc" id="L76">        return tmpIdMap;</span>
+    }
+
+
+    public static long computeMaxOffsetFromMapping(TopicQueueMappingDetail mappingDetail, Integer globalId) {
+<span class="nc" id="L81">        List&lt;LogicQueueMappingItem&gt; mappingItems = getMappingInfo(mappingDetail, globalId);</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (mappingItems == null</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                || mappingItems.isEmpty()) {</span>
+<span class="nc" id="L84">            return -1;</span>
+        }
+<span class="nc" id="L86">        LogicQueueMappingItem item =  mappingItems.get(mappingItems.size() - 1);</span>
+<span class="nc" id="L87">        return item.computeMaxStaticQueueOffset();</span>
+    }
+
+
+    public static TopicQueueMappingInfo cloneAsMappingInfo(TopicQueueMappingDetail mappingDetail) {
+<span class="nc" id="L92">        TopicQueueMappingInfo topicQueueMappingInfo = new TopicQueueMappingInfo(mappingDetail.topic, mappingDetail.totalQueues, mappingDetail.bname, mappingDetail.epoch);</span>
+<span class="nc" id="L93">        topicQueueMappingInfo.currIdMap = TopicQueueMappingDetail.buildIdMap(mappingDetail, LEVEL_0);</span>
+<span class="nc" id="L94">        return topicQueueMappingInfo;</span>
+    }
+
+    public static boolean checkIfAsPhysical(TopicQueueMappingDetail mappingDetail, Integer globalId) {
+<span class="nc" id="L98">        List&lt;LogicQueueMappingItem&gt; mappingItems = getMappingInfo(mappingDetail, globalId);</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        return mappingItems == null</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                || (mappingItems.size() == 1</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                &amp;&amp;  mappingItems.get(0).getLogicOffset() == 0);</span>
+    }
+
+    public ConcurrentMap&lt;Integer, List&lt;LogicQueueMappingItem&gt;&gt; getHostedQueues() {
+<span class="fc" id="L105">        return hostedQueues;</span>
+    }
+
+    public void setHostedQueues(ConcurrentMap&lt;Integer, List&lt;LogicQueueMappingItem&gt;&gt; hostedQueues) {
+<span class="fc" id="L109">        this.hostedQueues = hostedQueues;</span>
+<span class="fc" id="L110">    }</span>
+
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (this == o) return true;</span>
+
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (!(o instanceof TopicQueueMappingDetail)) return false;</span>
+
+<span class="nc" id="L118">        TopicQueueMappingDetail that = (TopicQueueMappingDetail) o;</span>
+
+<span class="nc" id="L120">        return new EqualsBuilder()</span>
+<span class="nc" id="L121">                .append(hostedQueues, that.hostedQueues)</span>
+<span class="nc" id="L122">                .isEquals();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L127">        return new HashCodeBuilder(17, 37)</span>
+<span class="nc" id="L128">                .append(hostedQueues)</span>
+<span class="nc" id="L129">                .toHashCode();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L134">        return &quot;TopicQueueMappingDetail{&quot; +</span>
+                &quot;hostedQueues=&quot; + hostedQueues +
+                &quot;, topic='&quot; + topic + '\'' +
+                &quot;, totalQueues=&quot; + totalQueues +
+                &quot;, bname='&quot; + bname + '\'' +
+                &quot;, epoch=&quot; + epoch +
+                &quot;, dirty=&quot; + dirty +
+                &quot;, currIdMap=&quot; + currIdMap +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

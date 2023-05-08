@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NamespaceUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol</a> &gt; <span class="el_source">NamespaceUtil.java</span></div><h1>NamespaceUtil.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.protocol;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.topic.TopicValidator;
+
+<span class="nc" id="L23">public class NamespaceUtil {</span>
+    public static final char NAMESPACE_SEPARATOR = '%';
+    public static final String STRING_BLANK = &quot;&quot;;
+<span class="fc" id="L26">    public static final int RETRY_PREFIX_LENGTH = MixAll.RETRY_GROUP_TOPIC_PREFIX.length();</span>
+<span class="fc" id="L27">    public static final int DLQ_PREFIX_LENGTH = MixAll.DLQ_GROUP_TOPIC_PREFIX.length();</span>
+
+    /**
+     * Unpack namespace from resource, just like:
+     * (1) MQ_INST_XX%Topic_XXX --&gt; Topic_XXX
+     * (2) %RETRY%MQ_INST_XX%GID_XXX --&gt; %RETRY%GID_XXX
+     *
+     * @param resourceWithNamespace, topic/groupId with namespace.
+     * @return topic/groupId without namespace.
+     */
+    public static String withoutNamespace(String resourceWithNamespace) {
+<span class="pc bpc" id="L38" title="2 of 4 branches missed.">        if (StringUtils.isEmpty(resourceWithNamespace) || isSystemResource(resourceWithNamespace)) {</span>
+<span class="nc" id="L39">            return resourceWithNamespace;</span>
+        }
+
+<span class="fc" id="L42">        StringBuilder stringBuilder = new StringBuilder();</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (isRetryTopic(resourceWithNamespace)) {</span>
+<span class="fc" id="L44">            stringBuilder.append(MixAll.RETRY_GROUP_TOPIC_PREFIX);</span>
+        }
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (isDLQTopic(resourceWithNamespace)) {</span>
+<span class="nc" id="L47">            stringBuilder.append(MixAll.DLQ_GROUP_TOPIC_PREFIX);</span>
+        }
+
+<span class="fc" id="L50">        String resourceWithoutRetryAndDLQ = withOutRetryAndDLQ(resourceWithNamespace);</span>
+<span class="fc" id="L51">        int index = resourceWithoutRetryAndDLQ.indexOf(NAMESPACE_SEPARATOR);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (index &gt; 0) {</span>
+<span class="fc" id="L53">            String resourceWithoutNamespace = resourceWithoutRetryAndDLQ.substring(index + 1);</span>
+<span class="fc" id="L54">            return stringBuilder.append(resourceWithoutNamespace).toString();</span>
+        }
+
+<span class="nc" id="L57">        return resourceWithNamespace;</span>
+    }
+
+    /**
+     * If resource contains the namespace, unpack namespace from resource, just like:
+     * (1) (MQ_INST_XX1%Topic_XXX1, MQ_INST_XX1) --&gt; Topic_XXX1
+     * (2) (MQ_INST_XX2%Topic_XXX2, NULL) --&gt; MQ_INST_XX2%Topic_XXX2
+     * (3) (%RETRY%MQ_INST_XX1%GID_XXX1, MQ_INST_XX1) --&gt; %RETRY%GID_XXX1
+     * (4) (%RETRY%MQ_INST_XX2%GID_XXX2, MQ_INST_XX3) --&gt; %RETRY%MQ_INST_XX2%GID_XXX2
+     *
+     * @param resourceWithNamespace, topic/groupId with namespace.
+     * @param namespace, namespace to be unpacked.
+     * @return topic/groupId without namespace.
+     */
+    public static String withoutNamespace(String resourceWithNamespace, String namespace) {
+<span class="pc bpc" id="L72" title="2 of 4 branches missed.">        if (StringUtils.isEmpty(resourceWithNamespace) || StringUtils.isEmpty(namespace)) {</span>
+<span class="nc" id="L73">            return resourceWithNamespace;</span>
+        }
+
+<span class="fc" id="L76">        String resourceWithoutRetryAndDLQ = withOutRetryAndDLQ(resourceWithNamespace);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (resourceWithoutRetryAndDLQ.startsWith(namespace + NAMESPACE_SEPARATOR)) {</span>
+<span class="fc" id="L78">            return withoutNamespace(resourceWithNamespace);</span>
+        }
+
+<span class="fc" id="L81">        return resourceWithNamespace;</span>
+    }
+
+    public static String wrapNamespace(String namespace, String resourceWithOutNamespace) {
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">        if (StringUtils.isEmpty(namespace) || StringUtils.isEmpty(resourceWithOutNamespace)) {</span>
+<span class="nc" id="L86">            return resourceWithOutNamespace;</span>
+        }
+
+<span class="fc bfc" id="L89" title="All 4 branches covered.">        if (isSystemResource(resourceWithOutNamespace) || isAlreadyWithNamespace(resourceWithOutNamespace, namespace)) {</span>
+<span class="fc" id="L90">            return resourceWithOutNamespace;</span>
+        }
+
+<span class="fc" id="L93">        String resourceWithoutRetryAndDLQ = withOutRetryAndDLQ(resourceWithOutNamespace);</span>
+<span class="fc" id="L94">        StringBuilder stringBuilder = new StringBuilder();</span>
+
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (isRetryTopic(resourceWithOutNamespace)) {</span>
+<span class="fc" id="L97">            stringBuilder.append(MixAll.RETRY_GROUP_TOPIC_PREFIX);</span>
+        }
+
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (isDLQTopic(resourceWithOutNamespace)) {</span>
+<span class="fc" id="L101">            stringBuilder.append(MixAll.DLQ_GROUP_TOPIC_PREFIX);</span>
+        }
+
+<span class="fc" id="L104">        return stringBuilder.append(namespace).append(NAMESPACE_SEPARATOR).append(resourceWithoutRetryAndDLQ).toString();</span>
+
+    }
+
+    public static boolean isAlreadyWithNamespace(String resource, String namespace) {
+<span class="pc bpc" id="L109" title="3 of 6 branches missed.">        if (StringUtils.isEmpty(namespace) || StringUtils.isEmpty(resource) || isSystemResource(resource)) {</span>
+<span class="nc" id="L110">            return false;</span>
+        }
+
+<span class="fc" id="L113">        String resourceWithoutRetryAndDLQ = withOutRetryAndDLQ(resource);</span>
+
+<span class="fc" id="L115">        return resourceWithoutRetryAndDLQ.startsWith(namespace + NAMESPACE_SEPARATOR);</span>
+    }
+
+    public static String wrapNamespaceAndRetry(String namespace, String consumerGroup) {
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        if (StringUtils.isEmpty(consumerGroup)) {</span>
+<span class="nc" id="L120">            return null;</span>
+        }
+
+<span class="nc" id="L123">        return new StringBuilder()</span>
+<span class="nc" id="L124">            .append(MixAll.RETRY_GROUP_TOPIC_PREFIX)</span>
+<span class="nc" id="L125">            .append(wrapNamespace(namespace, consumerGroup))</span>
+<span class="nc" id="L126">            .toString();</span>
+    }
+
+    public static String getNamespaceFromResource(String resource) {
+<span class="pc bpc" id="L130" title="2 of 4 branches missed.">        if (StringUtils.isEmpty(resource) || isSystemResource(resource)) {</span>
+<span class="nc" id="L131">            return STRING_BLANK;</span>
+        }
+<span class="fc" id="L133">        String resourceWithoutRetryAndDLQ = withOutRetryAndDLQ(resource);</span>
+<span class="fc" id="L134">        int index = resourceWithoutRetryAndDLQ.indexOf(NAMESPACE_SEPARATOR);</span>
+
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        return index &gt; 0 ? resourceWithoutRetryAndDLQ.substring(0, index) : STRING_BLANK;</span>
+    }
+
+    private static String withOutRetryAndDLQ(String originalResource) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (StringUtils.isEmpty(originalResource)) {</span>
+<span class="nc" id="L141">            return STRING_BLANK;</span>
+        }
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (isRetryTopic(originalResource)) {</span>
+<span class="fc" id="L144">            return originalResource.substring(RETRY_PREFIX_LENGTH);</span>
+        }
+
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (isDLQTopic(originalResource)) {</span>
+<span class="fc" id="L148">            return originalResource.substring(DLQ_PREFIX_LENGTH);</span>
+        }
+
+<span class="fc" id="L151">        return originalResource;</span>
+    }
+
+    private static boolean isSystemResource(String resource) {
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (StringUtils.isEmpty(resource)) {</span>
+<span class="nc" id="L156">            return false;</span>
+        }
+
+<span class="pc bpc" id="L159" title="1 of 4 branches missed.">        if (TopicValidator.isSystemTopic(resource) || MixAll.isSysConsumerGroup(resource)) {</span>
+<span class="fc" id="L160">            return true;</span>
+        }
+
+<span class="fc" id="L163">        return false;</span>
+    }
+
+    public static boolean isRetryTopic(String resource) {
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        return StringUtils.isNotBlank(resource) &amp;&amp; resource.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX);</span>
+    }
+
+    public static boolean isDLQTopic(String resource) {
+<span class="pc bpc" id="L171" title="1 of 4 branches missed.">        return StringUtils.isNotBlank(resource) &amp;&amp; resource.startsWith(MixAll.DLQ_GROUP_TOPIC_PREFIX);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

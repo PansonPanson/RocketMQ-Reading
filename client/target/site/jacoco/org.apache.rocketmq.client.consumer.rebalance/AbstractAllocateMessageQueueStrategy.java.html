@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractAllocateMessageQueueStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.consumer.rebalance</a> &gt; <span class="el_source">AbstractAllocateMessageQueueStrategy.java</span></div><h1>AbstractAllocateMessageQueueStrategy.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.client.consumer.rebalance;
+
+import java.util.List;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.rocketmq.client.consumer.AllocateMessageQueueStrategy;
+import org.apache.rocketmq.client.log.ClientLogger;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.logging.InternalLogger;
+
+<span class="fc" id="L28">public abstract class AbstractAllocateMessageQueueStrategy implements AllocateMessageQueueStrategy {</span>
+
+<span class="fc" id="L30">    protected InternalLogger log = ClientLogger.getLog();</span>
+
+    public boolean check(String consumerGroup, String currentCID, List&lt;MessageQueue&gt; mqAll,
+        List&lt;String&gt; cidAll) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (StringUtils.isEmpty(currentCID)) {</span>
+<span class="fc" id="L35">            throw new IllegalArgumentException(&quot;currentCID is empty&quot;);</span>
+        }
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (CollectionUtils.isEmpty(mqAll)) {</span>
+<span class="fc" id="L38">            throw new IllegalArgumentException(&quot;mqAll is null or mqAll empty&quot;);</span>
+        }
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (CollectionUtils.isEmpty(cidAll)) {</span>
+<span class="fc" id="L41">            throw new IllegalArgumentException(&quot;cidAll is null or cidAll empty&quot;);</span>
+        }
+
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (!cidAll.contains(currentCID)) {</span>
+<span class="fc" id="L45">            log.info(&quot;[BUG] ConsumerGroup: {} The consumerId: {} not in cidAll: {}&quot;,</span>
+                consumerGroup,
+                currentCID,
+                cidAll);
+<span class="fc" id="L49">            return false;</span>
+        }
+
+<span class="fc" id="L52">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

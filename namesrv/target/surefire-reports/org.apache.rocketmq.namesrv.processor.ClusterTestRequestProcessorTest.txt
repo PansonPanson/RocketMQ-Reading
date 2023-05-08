@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.apache.rocketmq.namesrv.processor.ClusterTestRequestProcessorTest
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.83 sec - in org.apache.rocketmq.namesrv.processor.ClusterTestRequestProcessorTest

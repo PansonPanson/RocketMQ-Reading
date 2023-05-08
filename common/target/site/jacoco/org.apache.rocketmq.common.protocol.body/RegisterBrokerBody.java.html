@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RegisterBrokerBody.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.body</a> &gt; <span class="el_source">RegisterBrokerBody.java</span></div><h1>RegisterBrokerBody.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.protocol.body;
+
+import com.alibaba.fastjson.JSON;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterInputStream;
+import org.apache.rocketmq.common.DataVersion;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.TopicConfig;
+import org.apache.rocketmq.common.statictopic.TopicQueueMappingInfo;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
+
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">public class RegisterBrokerBody extends RemotingSerializable {</span>
+
+<span class="fc" id="L44">    private static final InternalLogger LOGGER = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);</span>
+<span class="fc" id="L45">    private TopicConfigAndMappingSerializeWrapper topicConfigSerializeWrapper = new TopicConfigAndMappingSerializeWrapper();</span>
+<span class="fc" id="L46">    private List&lt;String&gt; filterServerList = new ArrayList&lt;String&gt;();</span>
+
+    public byte[] encode(boolean compress) {
+
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (!compress) {</span>
+<span class="fc" id="L51">            return super.encode();</span>
+        }
+<span class="fc" id="L53">        long start = System.currentTimeMillis();</span>
+<span class="fc" id="L54">        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();</span>
+<span class="fc" id="L55">        DeflaterOutputStream outputStream = new DeflaterOutputStream(byteArrayOutputStream, new Deflater(Deflater.BEST_COMPRESSION));</span>
+<span class="fc" id="L56">        DataVersion dataVersion = topicConfigSerializeWrapper.getDataVersion();</span>
+<span class="fc" id="L57">        ConcurrentMap&lt;String, TopicConfig&gt; topicConfigTable = cloneTopicConfigTable(topicConfigSerializeWrapper.getTopicConfigTable());</span>
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">        assert topicConfigTable != null;</span>
+        try {
+<span class="fc" id="L60">            byte[] buffer = dataVersion.encode();</span>
+
+            // write data version
+<span class="fc" id="L63">            outputStream.write(convertIntToByteArray(buffer.length));</span>
+<span class="fc" id="L64">            outputStream.write(buffer);</span>
+
+<span class="fc" id="L66">            int topicNumber = topicConfigTable.size();</span>
+
+            // write number of topic configs
+<span class="fc" id="L69">            outputStream.write(convertIntToByteArray(topicNumber));</span>
+
+            // write topic config entry one by one.
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (ConcurrentMap.Entry&lt;String, TopicConfig&gt; next : topicConfigTable.entrySet()) {</span>
+<span class="fc" id="L73">                buffer = next.getValue().encode().getBytes(MixAll.DEFAULT_CHARSET);</span>
+<span class="fc" id="L74">                outputStream.write(convertIntToByteArray(buffer.length));</span>
+<span class="fc" id="L75">                outputStream.write(buffer);</span>
+<span class="fc" id="L76">            }</span>
+
+<span class="fc" id="L78">            buffer = JSON.toJSONString(filterServerList).getBytes(MixAll.DEFAULT_CHARSET);</span>
+
+            // write filter server list json length
+<span class="fc" id="L81">            outputStream.write(convertIntToByteArray(buffer.length));</span>
+
+            // write filter server list json
+<span class="fc" id="L84">            outputStream.write(buffer);</span>
+
+            //write the topic queue mapping
+<span class="fc" id="L87">            Map&lt;String, TopicQueueMappingInfo&gt; topicQueueMappingInfoMap = topicConfigSerializeWrapper.getTopicQueueMappingInfoMap();</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            if (topicQueueMappingInfoMap == null) {</span>
+                //as the place holder
+<span class="nc" id="L90">                topicQueueMappingInfoMap = new ConcurrentHashMap&lt;String, TopicQueueMappingInfo&gt;();</span>
+            }
+<span class="fc" id="L92">            outputStream.write(convertIntToByteArray(topicQueueMappingInfoMap.size()));</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            for (TopicQueueMappingInfo info: topicQueueMappingInfoMap.values()) {</span>
+<span class="nc" id="L94">                buffer = JSON.toJSONString(info).getBytes(MixAll.DEFAULT_CHARSET);</span>
+<span class="nc" id="L95">                outputStream.write(convertIntToByteArray(buffer.length));</span>
+                // write filter server list json
+<span class="nc" id="L97">                outputStream.write(buffer);</span>
+<span class="nc" id="L98">            }</span>
+
+<span class="fc" id="L100">            outputStream.finish();</span>
+<span class="fc" id="L101">            long interval = System.currentTimeMillis() - start;</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (interval &gt; 50) {</span>
+<span class="fc" id="L103">                LOGGER.info(&quot;Compressing takes {}ms&quot;, interval);</span>
+            }
+<span class="fc" id="L105">            return byteArrayOutputStream.toByteArray();</span>
+<span class="nc" id="L106">        } catch (IOException e) {</span>
+<span class="nc" id="L107">            LOGGER.error(&quot;Failed to compress RegisterBrokerBody object&quot;, e);</span>
+        }
+
+<span class="nc" id="L110">        return null;</span>
+    }
+
+    public static RegisterBrokerBody decode(byte[] data, boolean compressed) throws IOException {
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (!compressed) {</span>
+<span class="nc" id="L115">            return RegisterBrokerBody.decode(data, RegisterBrokerBody.class);</span>
+        }
+<span class="fc" id="L117">        long start = System.currentTimeMillis();</span>
+<span class="fc" id="L118">        InflaterInputStream inflaterInputStream = new InflaterInputStream(new ByteArrayInputStream(data));</span>
+<span class="fc" id="L119">        int dataVersionLength = readInt(inflaterInputStream);</span>
+<span class="fc" id="L120">        byte[] dataVersionBytes = readBytes(inflaterInputStream, dataVersionLength);</span>
+<span class="fc" id="L121">        DataVersion dataVersion = DataVersion.decode(dataVersionBytes, DataVersion.class);</span>
+
+<span class="fc" id="L123">        RegisterBrokerBody registerBrokerBody = new RegisterBrokerBody();</span>
+<span class="fc" id="L124">        registerBrokerBody.getTopicConfigSerializeWrapper().setDataVersion(dataVersion);</span>
+<span class="fc" id="L125">        ConcurrentMap&lt;String, TopicConfig&gt; topicConfigTable = registerBrokerBody.getTopicConfigSerializeWrapper().getTopicConfigTable();</span>
+
+<span class="fc" id="L127">        int topicConfigNumber = readInt(inflaterInputStream);</span>
+<span class="fc" id="L128">        LOGGER.debug(&quot;{} topic configs to extract&quot;, topicConfigNumber);</span>
+
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (int i = 0; i &lt; topicConfigNumber; i++) {</span>
+<span class="fc" id="L131">            int topicConfigJsonLength = readInt(inflaterInputStream);</span>
+
+<span class="fc" id="L133">            byte[] buffer = readBytes(inflaterInputStream, topicConfigJsonLength);</span>
+<span class="fc" id="L134">            TopicConfig topicConfig = new TopicConfig();</span>
+<span class="fc" id="L135">            String topicConfigJson = new String(buffer, MixAll.DEFAULT_CHARSET);</span>
+<span class="fc" id="L136">            topicConfig.decode(topicConfigJson);</span>
+<span class="fc" id="L137">            topicConfigTable.put(topicConfig.getTopicName(), topicConfig);</span>
+        }
+
+<span class="fc" id="L140">        int filterServerListJsonLength = readInt(inflaterInputStream);</span>
+
+<span class="fc" id="L142">        byte[] filterServerListBuffer = readBytes(inflaterInputStream, filterServerListJsonLength);</span>
+<span class="fc" id="L143">        String filterServerListJson = new String(filterServerListBuffer, MixAll.DEFAULT_CHARSET);</span>
+<span class="fc" id="L144">        List&lt;String&gt; filterServerList = new ArrayList&lt;String&gt;();</span>
+        try {
+<span class="fc" id="L146">            filterServerList = JSON.parseArray(filterServerListJson, String.class);</span>
+<span class="nc" id="L147">        } catch (Exception e) {</span>
+<span class="nc" id="L148">            LOGGER.error(&quot;Decompressing occur Exception {}&quot;, filterServerListJson);</span>
+<span class="fc" id="L149">        }</span>
+
+<span class="fc" id="L151">        registerBrokerBody.setFilterServerList(filterServerList);</span>
+
+<span class="fc" id="L153">        int topicQueueMappingNum =  readInt(inflaterInputStream);</span>
+<span class="fc" id="L154">        Map&lt;String/* topic */, TopicQueueMappingInfo&gt; topicQueueMappingInfoMap = new ConcurrentHashMap&lt;String, TopicQueueMappingInfo&gt;();</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        for (int i = 0; i &lt; topicQueueMappingNum; i++) {</span>
+<span class="nc" id="L156">            int mappingJsonLen = readInt(inflaterInputStream);</span>
+<span class="nc" id="L157">            byte[] buffer = readBytes(inflaterInputStream, mappingJsonLen);</span>
+<span class="nc" id="L158">            TopicQueueMappingInfo info = TopicQueueMappingInfo.decode(buffer, TopicQueueMappingInfo.class);</span>
+<span class="nc" id="L159">            topicQueueMappingInfoMap.put(info.getTopic(), info);</span>
+        }
+<span class="fc" id="L161">        registerBrokerBody.getTopicConfigSerializeWrapper().setTopicQueueMappingInfoMap(topicQueueMappingInfoMap);</span>
+
+<span class="fc" id="L163">        long interval = System.currentTimeMillis() - start;</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (interval &gt; 50) {</span>
+<span class="fc" id="L165">            LOGGER.info(&quot;Decompressing takes {}ms&quot;, interval);</span>
+        }
+<span class="fc" id="L167">        return registerBrokerBody;</span>
+    }
+
+    private static byte[] convertIntToByteArray(int n) {
+<span class="fc" id="L171">        ByteBuffer byteBuffer = ByteBuffer.allocate(4);</span>
+<span class="fc" id="L172">        byteBuffer.putInt(n);</span>
+<span class="fc" id="L173">        return byteBuffer.array();</span>
+    }
+
+    private static byte[] readBytes(InflaterInputStream inflaterInputStream, int length) throws IOException {
+<span class="fc" id="L177">        byte[] buffer = new byte[length];</span>
+<span class="fc" id="L178">        int bytesRead = 0;</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        while (bytesRead &lt; length) {</span>
+<span class="fc" id="L180">            int len = inflaterInputStream.read(buffer, bytesRead, length - bytesRead);</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (len == -1) {</span>
+<span class="nc" id="L182">                throw new IOException(&quot;End of compressed data has reached&quot;);</span>
+            } else {
+<span class="fc" id="L184">                bytesRead += len;</span>
+            }
+<span class="fc" id="L186">        }</span>
+<span class="fc" id="L187">        return buffer;</span>
+    }
+
+    private static int readInt(InflaterInputStream inflaterInputStream) throws IOException {
+<span class="fc" id="L191">        byte[] buffer = readBytes(inflaterInputStream, 4);</span>
+<span class="fc" id="L192">        ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);</span>
+<span class="fc" id="L193">        return byteBuffer.getInt();</span>
+    }
+
+    public TopicConfigAndMappingSerializeWrapper getTopicConfigSerializeWrapper() {
+<span class="fc" id="L197">        return topicConfigSerializeWrapper;</span>
+    }
+
+    public void setTopicConfigSerializeWrapper(TopicConfigAndMappingSerializeWrapper topicConfigSerializeWrapper) {
+<span class="fc" id="L201">        this.topicConfigSerializeWrapper = topicConfigSerializeWrapper;</span>
+<span class="fc" id="L202">    }</span>
+
+    public List&lt;String&gt; getFilterServerList() {
+<span class="fc" id="L205">        return filterServerList;</span>
+    }
+
+    public void setFilterServerList(List&lt;String&gt; filterServerList) {
+<span class="fc" id="L209">        this.filterServerList = filterServerList;</span>
+<span class="fc" id="L210">    }</span>
+
+    public static ConcurrentMap&lt;String, TopicConfig&gt; cloneTopicConfigTable(
+        ConcurrentMap&lt;String, TopicConfig&gt; topicConfigConcurrentMap) {
+<span class="fc" id="L214">        ConcurrentHashMap&lt;String, TopicConfig&gt; result = new ConcurrentHashMap&lt;String, TopicConfig&gt;();</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (topicConfigConcurrentMap != null) {</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            for (Map.Entry&lt;String, TopicConfig&gt; entry : topicConfigConcurrentMap.entrySet()) {</span>
+<span class="fc" id="L217">                result.put(entry.getKey(), entry.getValue());</span>
+<span class="fc" id="L218">            }</span>
+        }
+<span class="fc" id="L220">        return result;</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

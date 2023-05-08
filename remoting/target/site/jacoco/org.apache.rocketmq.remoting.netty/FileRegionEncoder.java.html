@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileRegionEncoder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-remoting 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.remoting.netty</a> &gt; <span class="el_source">FileRegionEncoder.java</span></div><h1>FileRegionEncoder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.remoting.netty;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.FileRegion;
+import io.netty.handler.codec.MessageToByteEncoder;
+
+import io.netty.handler.ssl.SslHandler;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.WritableByteChannel;
+
+/**
+ * &lt;p&gt;
+ *     By default, file region are directly transferred to socket channel which is known as zero copy. In case we need
+ *     to encrypt transmission, data being sent should go through the {@link SslHandler}. This encoder ensures this
+ *     process.
+ * &lt;/p&gt;
+ */
+<span class="fc" id="L37">public class FileRegionEncoder extends MessageToByteEncoder&lt;FileRegion&gt; {</span>
+
+    /**
+     * Encode a message into a {@link io.netty.buffer.ByteBuf}. This method will be called for each written message that
+     * can be handled by this encoder.
+     *
+     * @param ctx the {@link io.netty.channel.ChannelHandlerContext} which this {@link
+     * io.netty.handler.codec.MessageToByteEncoder} belongs to
+     * @param msg the message to encode
+     * @param out the {@link io.netty.buffer.ByteBuf} into which the encoded message will be written
+     * @throws Exception is thrown if an error occurs
+     */
+    @Override
+    protected void encode(ChannelHandlerContext ctx, FileRegion msg, final ByteBuf out) throws Exception {
+<span class="fc" id="L51">        WritableByteChannel writableByteChannel = new WritableByteChannel() {</span>
+            @Override
+            public int write(ByteBuffer src) throws IOException {
+<span class="fc" id="L54">                out.writeBytes(src);</span>
+<span class="fc" id="L55">                return out.capacity();</span>
+            }
+
+            @Override
+            public boolean isOpen() {
+<span class="fc" id="L60">                return true;</span>
+            }
+
+            @Override
+            public void close() throws IOException {
+<span class="nc" id="L65">            }</span>
+        };
+
+<span class="fc" id="L68">        long toTransfer = msg.count();</span>
+
+        while (true) {
+<span class="fc" id="L71">            long transferred = msg.transfered();</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (toTransfer - transferred &lt;= 0) {</span>
+<span class="fc" id="L73">                break;</span>
+            }
+<span class="fc" id="L75">            msg.transferTo(writableByteChannel, transferred);</span>
+<span class="fc" id="L76">        }</span>
+<span class="fc" id="L77">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

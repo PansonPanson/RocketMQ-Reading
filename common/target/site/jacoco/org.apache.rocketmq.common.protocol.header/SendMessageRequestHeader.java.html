@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SendMessageRequestHeader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.header</a> &gt; <span class="el_source">SendMessageRequestHeader.java</span></div><h1>SendMessageRequestHeader.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * $Id: SendMessageRequestHeader.java 1835 2013-05-16 02:00:50Z vintagewang@apache.org $
+ */
+package org.apache.rocketmq.common.protocol.header;
+
+import com.google.common.base.MoreObjects;
+import java.util.HashMap;
+import org.apache.rocketmq.common.protocol.RequestCode;
+import org.apache.rocketmq.common.rpc.TopicQueueRequestHeader;
+import org.apache.rocketmq.remoting.annotation.CFNotNull;
+import org.apache.rocketmq.remoting.annotation.CFNullable;
+import org.apache.rocketmq.remoting.exception.RemotingCommandException;
+import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+
+<span class="nc" id="L32">public class SendMessageRequestHeader extends TopicQueueRequestHeader {</span>
+    @CFNotNull
+    private String producerGroup;
+    @CFNotNull
+    private String topic;
+    @CFNotNull
+    private String defaultTopic;
+    @CFNotNull
+    private Integer defaultTopicQueueNums;
+    @CFNotNull
+    private Integer queueId;
+    @CFNotNull
+    private Integer sysFlag;
+    @CFNotNull
+    private Long bornTimestamp;
+    @CFNotNull
+    private Integer flag;
+    @CFNullable
+    private String properties;
+    @CFNullable
+    private Integer reconsumeTimes;
+<span class="nc" id="L53">    @CFNullable</span>
+    private boolean unitMode = false;
+<span class="nc" id="L55">    @CFNullable</span>
+    private boolean batch = false;
+    private Integer maxReconsumeTimes;
+
+    @Override
+    public void checkFields() throws RemotingCommandException {
+<span class="nc" id="L61">    }</span>
+
+    public String getProducerGroup() {
+<span class="nc" id="L64">        return producerGroup;</span>
+    }
+
+    public void setProducerGroup(String producerGroup) {
+<span class="nc" id="L68">        this.producerGroup = producerGroup;</span>
+<span class="nc" id="L69">    }</span>
+
+    @Override
+    public String getTopic() {
+<span class="nc" id="L73">        return topic;</span>
+    }
+
+    @Override
+    public void setTopic(String topic) {
+<span class="nc" id="L78">        this.topic = topic;</span>
+<span class="nc" id="L79">    }</span>
+
+    public String getDefaultTopic() {
+<span class="nc" id="L82">        return defaultTopic;</span>
+    }
+
+    public void setDefaultTopic(String defaultTopic) {
+<span class="nc" id="L86">        this.defaultTopic = defaultTopic;</span>
+<span class="nc" id="L87">    }</span>
+
+    public Integer getDefaultTopicQueueNums() {
+<span class="nc" id="L90">        return defaultTopicQueueNums;</span>
+    }
+
+    public void setDefaultTopicQueueNums(Integer defaultTopicQueueNums) {
+<span class="nc" id="L94">        this.defaultTopicQueueNums = defaultTopicQueueNums;</span>
+<span class="nc" id="L95">    }</span>
+
+    @Override
+    public Integer getQueueId() {
+<span class="nc" id="L99">        return queueId;</span>
+    }
+
+    @Override
+    public void setQueueId(Integer queueId) {
+<span class="nc" id="L104">        this.queueId = queueId;</span>
+<span class="nc" id="L105">    }</span>
+
+    public Integer getSysFlag() {
+<span class="nc" id="L108">        return sysFlag;</span>
+    }
+
+    public void setSysFlag(Integer sysFlag) {
+<span class="nc" id="L112">        this.sysFlag = sysFlag;</span>
+<span class="nc" id="L113">    }</span>
+
+    public Long getBornTimestamp() {
+<span class="nc" id="L116">        return bornTimestamp;</span>
+    }
+
+    public void setBornTimestamp(Long bornTimestamp) {
+<span class="nc" id="L120">        this.bornTimestamp = bornTimestamp;</span>
+<span class="nc" id="L121">    }</span>
+
+    public Integer getFlag() {
+<span class="nc" id="L124">        return flag;</span>
+    }
+
+    public void setFlag(Integer flag) {
+<span class="nc" id="L128">        this.flag = flag;</span>
+<span class="nc" id="L129">    }</span>
+
+    public String getProperties() {
+<span class="nc" id="L132">        return properties;</span>
+    }
+
+    public void setProperties(String properties) {
+<span class="nc" id="L136">        this.properties = properties;</span>
+<span class="nc" id="L137">    }</span>
+
+    public Integer getReconsumeTimes() {
+<span class="nc" id="L140">        return reconsumeTimes;</span>
+    }
+
+    public void setReconsumeTimes(Integer reconsumeTimes) {
+<span class="nc" id="L144">        this.reconsumeTimes = reconsumeTimes;</span>
+<span class="nc" id="L145">    }</span>
+
+    public boolean isUnitMode() {
+<span class="nc" id="L148">        return unitMode;</span>
+    }
+
+    public void setUnitMode(boolean isUnitMode) {
+<span class="nc" id="L152">        this.unitMode = isUnitMode;</span>
+<span class="nc" id="L153">    }</span>
+
+    public Integer getMaxReconsumeTimes() {
+<span class="nc" id="L156">        return maxReconsumeTimes;</span>
+    }
+
+    public void setMaxReconsumeTimes(final Integer maxReconsumeTimes) {
+<span class="nc" id="L160">        this.maxReconsumeTimes = maxReconsumeTimes;</span>
+<span class="nc" id="L161">    }</span>
+
+    public boolean isBatch() {
+<span class="nc" id="L164">        return batch;</span>
+    }
+
+    public void setBatch(boolean batch) {
+<span class="nc" id="L168">        this.batch = batch;</span>
+<span class="nc" id="L169">    }</span>
+
+    public static SendMessageRequestHeader parseRequestHeader(RemotingCommand request) throws RemotingCommandException {
+<span class="nc" id="L172">        SendMessageRequestHeaderV2 requestHeaderV2 = null;</span>
+<span class="nc" id="L173">        SendMessageRequestHeader requestHeader = null;</span>
+<span class="nc bnc" id="L174" title="All 3 branches missed.">        switch (request.getCode()) {</span>
+            case RequestCode.SEND_BATCH_MESSAGE:
+            case RequestCode.SEND_MESSAGE_V2:
+<span class="nc" id="L177">                requestHeaderV2 =</span>
+                    (SendMessageRequestHeaderV2) request
+<span class="nc" id="L179">                        .decodeCommandCustomHeader(SendMessageRequestHeaderV2.class);</span>
+            case RequestCode.SEND_MESSAGE:
+<span class="nc bnc" id="L181" title="All 2 branches missed.">                if (null == requestHeaderV2) {</span>
+<span class="nc" id="L182">                    requestHeader =</span>
+                        (SendMessageRequestHeader) request
+<span class="nc" id="L184">                            .decodeCommandCustomHeader(SendMessageRequestHeader.class);</span>
+                } else {
+<span class="nc" id="L186">                    requestHeader = SendMessageRequestHeaderV2.createSendMessageRequestHeaderV1(requestHeaderV2);</span>
+                }
+            default:
+                break;
+        }
+<span class="nc" id="L191">        return requestHeader;</span>
+    }
+
+    public static SendMessageRequestHeaderV2 decodeSendMessageHeaderV2(RemotingCommand request)
+        throws RemotingCommandException {
+<span class="nc" id="L196">        SendMessageRequestHeaderV2 r = new SendMessageRequestHeaderV2();</span>
+<span class="nc" id="L197">        HashMap&lt;String, String&gt; fields = request.getExtFields();</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        if (fields == null) {</span>
+<span class="nc" id="L199">            throw new RemotingCommandException(&quot;the ext fields is null&quot;);</span>
+        }
+
+<span class="nc" id="L202">        String s = fields.get(&quot;a&quot;);</span>
+<span class="nc" id="L203">        checkNotNull(s, &quot;the custom field &lt;a&gt; is null&quot;);</span>
+<span class="nc" id="L204">        r.setA(s);</span>
+
+<span class="nc" id="L206">        s = fields.get(&quot;b&quot;);</span>
+<span class="nc" id="L207">        checkNotNull(s, &quot;the custom field &lt;b&gt; is null&quot;);</span>
+<span class="nc" id="L208">        r.setB(s);</span>
+
+<span class="nc" id="L210">        s = fields.get(&quot;c&quot;);</span>
+<span class="nc" id="L211">        checkNotNull(s, &quot;the custom field &lt;c&gt; is null&quot;);</span>
+<span class="nc" id="L212">        r.setC(s);</span>
+
+<span class="nc" id="L214">        s = fields.get(&quot;d&quot;);</span>
+<span class="nc" id="L215">        checkNotNull(s, &quot;the custom field &lt;d&gt; is null&quot;);</span>
+<span class="nc" id="L216">        r.setD(Integer.parseInt(s));</span>
+
+<span class="nc" id="L218">        s = fields.get(&quot;e&quot;);</span>
+<span class="nc" id="L219">        checkNotNull(s, &quot;the custom field &lt;e&gt; is null&quot;);</span>
+<span class="nc" id="L220">        r.setE(Integer.parseInt(s));</span>
+
+<span class="nc" id="L222">        s = fields.get(&quot;f&quot;);</span>
+<span class="nc" id="L223">        checkNotNull(s, &quot;the custom field &lt;f&gt; is null&quot;);</span>
+<span class="nc" id="L224">        r.setF(Integer.parseInt(s));</span>
+
+<span class="nc" id="L226">        s = fields.get(&quot;g&quot;);</span>
+<span class="nc" id="L227">        checkNotNull(s, &quot;the custom field &lt;g&gt; is null&quot;);</span>
+<span class="nc" id="L228">        r.setG(Long.parseLong(s));</span>
+
+<span class="nc" id="L230">        s = fields.get(&quot;h&quot;);</span>
+<span class="nc" id="L231">        checkNotNull(s, &quot;the custom field &lt;h&gt; is null&quot;);</span>
+<span class="nc" id="L232">        r.setH(Integer.parseInt(s));</span>
+
+<span class="nc" id="L234">        s = fields.get(&quot;i&quot;);</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (s != null) {</span>
+<span class="nc" id="L236">            r.setI(s);</span>
+        }
+
+<span class="nc" id="L239">        s = fields.get(&quot;j&quot;);</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (s != null) {</span>
+<span class="nc" id="L241">            r.setJ(Integer.parseInt(s));</span>
+        }
+
+<span class="nc" id="L244">        s = fields.get(&quot;k&quot;);</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        if (s != null) {</span>
+<span class="nc" id="L246">            r.setK(Boolean.parseBoolean(s));</span>
+        }
+
+<span class="nc" id="L249">        s = fields.get(&quot;l&quot;);</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">        if (s != null) {</span>
+<span class="nc" id="L251">            r.setL(Integer.parseInt(s));</span>
+        }
+
+<span class="nc" id="L254">        s = fields.get(&quot;m&quot;);</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        if (s != null) {</span>
+<span class="nc" id="L256">            r.setM(Boolean.parseBoolean(s));</span>
+        }
+<span class="nc" id="L258">        return r;</span>
+    }
+
+    private static void checkNotNull(String s, String msg) throws RemotingCommandException {
+<span class="nc bnc" id="L262" title="All 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L263">            throw new RemotingCommandException(msg);</span>
+        }
+<span class="nc" id="L265">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L269">        return MoreObjects.toStringHelper(this)</span>
+<span class="nc" id="L270">            .add(&quot;producerGroup&quot;, producerGroup)</span>
+<span class="nc" id="L271">            .add(&quot;topic&quot;, topic)</span>
+<span class="nc" id="L272">            .add(&quot;defaultTopic&quot;, defaultTopic)</span>
+<span class="nc" id="L273">            .add(&quot;defaultTopicQueueNums&quot;, defaultTopicQueueNums)</span>
+<span class="nc" id="L274">            .add(&quot;queueId&quot;, queueId)</span>
+<span class="nc" id="L275">            .add(&quot;sysFlag&quot;, sysFlag)</span>
+<span class="nc" id="L276">            .add(&quot;bornTimestamp&quot;, bornTimestamp)</span>
+<span class="nc" id="L277">            .add(&quot;flag&quot;, flag)</span>
+<span class="nc" id="L278">            .add(&quot;properties&quot;, properties)</span>
+<span class="nc" id="L279">            .add(&quot;reconsumeTimes&quot;, reconsumeTimes)</span>
+<span class="nc" id="L280">            .add(&quot;unitMode&quot;, unitMode)</span>
+<span class="nc" id="L281">            .add(&quot;batch&quot;, batch)</span>
+<span class="nc" id="L282">            .add(&quot;maxReconsumeTimes&quot;, maxReconsumeTimes)</span>
+<span class="nc" id="L283">            .toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

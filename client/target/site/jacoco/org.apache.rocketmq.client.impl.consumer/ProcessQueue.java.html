@@ -1,0 +1,443 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProcessQueue.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.impl.consumer</a> &gt; <span class="el_source">ProcessQueue.java</span></div><h1>ProcessQueue.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.impl.consumer;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import org.apache.commons.lang3.StringUtils;
+
+import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
+import org.apache.rocketmq.client.log.ClientLogger;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.common.message.MessageAccessor;
+import org.apache.rocketmq.common.message.MessageConst;
+import org.apache.rocketmq.common.message.MessageExt;
+import org.apache.rocketmq.common.protocol.body.ProcessQueueInfo;
+
+/**
+ * Queue consumption snapshot
+ */
+<span class="fc" id="L43">public class ProcessQueue {</span>
+<span class="fc" id="L44">    public final static long REBALANCE_LOCK_MAX_LIVE_TIME =</span>
+<span class="fc" id="L45">        Long.parseLong(System.getProperty(&quot;rocketmq.client.rebalance.lockMaxLiveTime&quot;, &quot;30000&quot;));</span>
+<span class="fc" id="L46">    public final static long REBALANCE_LOCK_INTERVAL = Long.parseLong(System.getProperty(&quot;rocketmq.client.rebalance.lockInterval&quot;, &quot;20000&quot;));</span>
+<span class="fc" id="L47">    private final static long PULL_MAX_IDLE_TIME = Long.parseLong(System.getProperty(&quot;rocketmq.client.pull.pullMaxIdleTime&quot;, &quot;120000&quot;));</span>
+<span class="fc" id="L48">    private final InternalLogger log = ClientLogger.getLog();</span>
+<span class="fc" id="L49">    private final ReadWriteLock treeMapLock = new ReentrantReadWriteLock();</span>
+<span class="fc" id="L50">    private final TreeMap&lt;Long, MessageExt&gt; msgTreeMap = new TreeMap&lt;Long, MessageExt&gt;();</span>
+<span class="fc" id="L51">    private final AtomicLong msgCount = new AtomicLong();</span>
+<span class="fc" id="L52">    private final AtomicLong msgSize = new AtomicLong();</span>
+<span class="fc" id="L53">    private final Lock consumeLock = new ReentrantLock();</span>
+    /**
+     * A subset of msgTreeMap, will only be used when orderly consume
+     */
+<span class="fc" id="L57">    private final TreeMap&lt;Long, MessageExt&gt; consumingMsgOrderlyTreeMap = new TreeMap&lt;Long, MessageExt&gt;();</span>
+<span class="fc" id="L58">    private final AtomicLong tryUnlockTimes = new AtomicLong(0);</span>
+<span class="fc" id="L59">    private volatile long queueOffsetMax = 0L;</span>
+<span class="fc" id="L60">    private volatile boolean dropped = false;</span>
+<span class="fc" id="L61">    private volatile long lastPullTimestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L62">    private volatile long lastConsumeTimestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L63">    private volatile boolean locked = false;</span>
+<span class="fc" id="L64">    private volatile long lastLockTimestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L65">    private volatile boolean consuming = false;</span>
+<span class="fc" id="L66">    private volatile long msgAccCnt = 0;</span>
+
+    public boolean isLockExpired() {
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        return (System.currentTimeMillis() - this.lastLockTimestamp) &gt; REBALANCE_LOCK_MAX_LIVE_TIME;</span>
+    }
+
+    public boolean isPullExpired() {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        return (System.currentTimeMillis() - this.lastPullTimestamp) &gt; PULL_MAX_IDLE_TIME;</span>
+    }
+
+    /**
+     * @param pushConsumer
+     */
+    public void cleanExpiredMsg(DefaultMQPushConsumer pushConsumer) {
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (pushConsumer.getDefaultMQPushConsumerImpl().isConsumeOrderly()) {</span>
+<span class="nc" id="L81">            return;</span>
+        }
+
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        int loop = msgTreeMap.size() &lt; 16 ? msgTreeMap.size() : 16;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        for (int i = 0; i &lt; loop; i++) {</span>
+<span class="nc" id="L86">            MessageExt msg = null;</span>
+            try {
+<span class="nc" id="L88">                this.treeMapLock.readLock().lockInterruptibly();</span>
+                try {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                    if (!msgTreeMap.isEmpty()) {</span>
+<span class="nc" id="L91">                        String consumeStartTimeStamp = MessageAccessor.getConsumeStartTimeStamp(msgTreeMap.firstEntry().getValue());</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">                        if (StringUtils.isNotEmpty(consumeStartTimeStamp) &amp;&amp; System.currentTimeMillis() - Long.parseLong(consumeStartTimeStamp) &gt; pushConsumer.getConsumeTimeout() * 60 * 1000) {</span>
+<span class="nc" id="L93">                            msg = msgTreeMap.firstEntry().getValue();</span>
+                        } else {
+                            break;
+                        }
+<span class="nc" id="L97">                    } else {</span>
+                        break;
+                    }
+                } finally {
+<span class="nc" id="L101">                    this.treeMapLock.readLock().unlock();</span>
+                }
+<span class="nc" id="L103">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L104">                log.error(&quot;getExpiredMsg exception&quot;, e);</span>
+<span class="nc" id="L105">            }</span>
+
+            try {
+
+<span class="nc" id="L109">                pushConsumer.sendMessageBack(msg, 3);</span>
+<span class="nc" id="L110">                log.info(&quot;send expire msg back. topic={}, msgId={}, storeHost={}, queueId={}, queueOffset={}&quot;, msg.getTopic(), msg.getMsgId(), msg.getStoreHost(), msg.getQueueId(), msg.getQueueOffset());</span>
+                try {
+<span class="nc" id="L112">                    this.treeMapLock.writeLock().lockInterruptibly();</span>
+                    try {
+<span class="nc bnc" id="L114" title="All 4 branches missed.">                        if (!msgTreeMap.isEmpty() &amp;&amp; msg.getQueueOffset() == msgTreeMap.firstKey()) {</span>
+                            try {
+<span class="nc" id="L116">                                removeMessage(Collections.singletonList(msg));</span>
+<span class="nc" id="L117">                            } catch (Exception e) {</span>
+<span class="nc" id="L118">                                log.error(&quot;send expired msg exception&quot;, e);</span>
+<span class="nc" id="L119">                            }</span>
+                        }
+                    } finally {
+<span class="nc" id="L122">                        this.treeMapLock.writeLock().unlock();</span>
+                    }
+<span class="nc" id="L124">                } catch (InterruptedException e) {</span>
+<span class="nc" id="L125">                    log.error(&quot;getExpiredMsg exception&quot;, e);</span>
+<span class="nc" id="L126">                }</span>
+<span class="nc" id="L127">            } catch (Exception e) {</span>
+<span class="nc" id="L128">                log.error(&quot;send expired msg exception&quot;, e);</span>
+<span class="nc" id="L129">            }</span>
+        }
+<span class="nc" id="L131">    }</span>
+
+    public boolean putMessage(final List&lt;MessageExt&gt; msgs) {
+<span class="fc" id="L134">        boolean dispatchToConsume = false;</span>
+        try {
+<span class="fc" id="L136">            this.treeMapLock.writeLock().lockInterruptibly();</span>
+            try {
+<span class="fc" id="L138">                int validMsgCnt = 0;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                for (MessageExt msg : msgs) {</span>
+<span class="fc" id="L140">                    MessageExt old = msgTreeMap.put(msg.getQueueOffset(), msg);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                    if (null == old) {</span>
+<span class="fc" id="L142">                        validMsgCnt++;</span>
+<span class="fc" id="L143">                        this.queueOffsetMax = msg.getQueueOffset();</span>
+<span class="fc" id="L144">                        msgSize.addAndGet(msg.getBody().length);</span>
+                    }
+<span class="fc" id="L146">                }</span>
+<span class="fc" id="L147">                msgCount.addAndGet(validMsgCnt);</span>
+
+<span class="pc bpc" id="L149" title="1 of 4 branches missed.">                if (!msgTreeMap.isEmpty() &amp;&amp; !this.consuming) {</span>
+<span class="fc" id="L150">                    dispatchToConsume = true;</span>
+<span class="fc" id="L151">                    this.consuming = true;</span>
+                }
+
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                if (!msgs.isEmpty()) {</span>
+<span class="fc" id="L155">                    MessageExt messageExt = msgs.get(msgs.size() - 1);</span>
+<span class="fc" id="L156">                    String property = messageExt.getProperty(MessageConst.PROPERTY_MAX_OFFSET);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                    if (property != null) {</span>
+<span class="fc" id="L158">                        long accTotal = Long.parseLong(property) - messageExt.getQueueOffset();</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                        if (accTotal &gt; 0) {</span>
+<span class="fc" id="L160">                            this.msgAccCnt = accTotal;</span>
+                        }
+                    }
+                }
+            } finally {
+<span class="fc" id="L165">                this.treeMapLock.writeLock().unlock();</span>
+            }
+<span class="nc" id="L167">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L168">            log.error(&quot;putMessage exception&quot;, e);</span>
+<span class="fc" id="L169">        }</span>
+
+<span class="fc" id="L171">        return dispatchToConsume;</span>
+    }
+
+    public long getMaxSpan() {
+        try {
+<span class="fc" id="L176">            this.treeMapLock.readLock().lockInterruptibly();</span>
+            try {
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                if (!this.msgTreeMap.isEmpty()) {</span>
+<span class="fc" id="L179">                    return this.msgTreeMap.lastKey() - this.msgTreeMap.firstKey();</span>
+                }
+            } finally {
+<span class="fc" id="L182">                this.treeMapLock.readLock().unlock();</span>
+            }
+<span class="nc" id="L184">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L185">            log.error(&quot;getMaxSpan exception&quot;, e);</span>
+<span class="fc" id="L186">        }</span>
+
+<span class="fc" id="L188">        return 0;</span>
+    }
+
+    public long removeMessage(final List&lt;MessageExt&gt; msgs) {
+<span class="fc" id="L192">        long result = -1;</span>
+<span class="fc" id="L193">        final long now = System.currentTimeMillis();</span>
+        try {
+<span class="fc" id="L195">            this.treeMapLock.writeLock().lockInterruptibly();</span>
+<span class="fc" id="L196">            this.lastConsumeTimestamp = now;</span>
+            try {
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                if (!msgTreeMap.isEmpty()) {</span>
+<span class="fc" id="L199">                    result = this.queueOffsetMax + 1;</span>
+<span class="fc" id="L200">                    int removedCnt = 0;</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">                    for (MessageExt msg : msgs) {</span>
+<span class="fc" id="L202">                        MessageExt prev = msgTreeMap.remove(msg.getQueueOffset());</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                        if (prev != null) {</span>
+<span class="fc" id="L204">                            removedCnt--;</span>
+<span class="fc" id="L205">                            msgSize.addAndGet(0 - msg.getBody().length);</span>
+                        }
+<span class="fc" id="L207">                    }</span>
+<span class="fc" id="L208">                    msgCount.addAndGet(removedCnt);</span>
+
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                    if (!msgTreeMap.isEmpty()) {</span>
+<span class="fc" id="L211">                        result = msgTreeMap.firstKey();</span>
+                    }
+                }
+            } finally {
+<span class="fc" id="L215">                this.treeMapLock.writeLock().unlock();</span>
+            }
+<span class="fc" id="L217">        } catch (Throwable t) {</span>
+<span class="fc" id="L218">            log.error(&quot;removeMessage exception&quot;, t);</span>
+<span class="fc" id="L219">        }</span>
+
+<span class="fc" id="L221">        return result;</span>
+    }
+
+    public TreeMap&lt;Long, MessageExt&gt; getMsgTreeMap() {
+<span class="fc" id="L225">        return msgTreeMap;</span>
+    }
+
+    public AtomicLong getMsgCount() {
+<span class="fc" id="L229">        return msgCount;</span>
+    }
+
+    public AtomicLong getMsgSize() {
+<span class="fc" id="L233">        return msgSize;</span>
+    }
+
+    public boolean isDropped() {
+<span class="fc" id="L237">        return dropped;</span>
+    }
+
+    public void setDropped(boolean dropped) {
+<span class="fc" id="L241">        this.dropped = dropped;</span>
+<span class="fc" id="L242">    }</span>
+
+    public boolean isLocked() {
+<span class="fc" id="L245">        return locked;</span>
+    }
+
+    public void setLocked(boolean locked) {
+<span class="fc" id="L249">        this.locked = locked;</span>
+<span class="fc" id="L250">    }</span>
+
+    public void rollback() {
+        try {
+<span class="nc" id="L254">            this.treeMapLock.writeLock().lockInterruptibly();</span>
+            try {
+<span class="nc" id="L256">                this.msgTreeMap.putAll(this.consumingMsgOrderlyTreeMap);</span>
+<span class="nc" id="L257">                this.consumingMsgOrderlyTreeMap.clear();</span>
+            } finally {
+<span class="nc" id="L259">                this.treeMapLock.writeLock().unlock();</span>
+            }
+<span class="nc" id="L261">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L262">            log.error(&quot;rollback exception&quot;, e);</span>
+<span class="nc" id="L263">        }</span>
+<span class="nc" id="L264">    }</span>
+
+    public long commit() {
+        try {
+<span class="fc" id="L268">            this.treeMapLock.writeLock().lockInterruptibly();</span>
+            try {
+<span class="fc" id="L270">                Long offset = this.consumingMsgOrderlyTreeMap.lastKey();</span>
+<span class="fc" id="L271">                msgCount.addAndGet(0 - this.consumingMsgOrderlyTreeMap.size());</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                for (MessageExt msg : this.consumingMsgOrderlyTreeMap.values()) {</span>
+<span class="fc" id="L273">                    msgSize.addAndGet(0 - msg.getBody().length);</span>
+<span class="fc" id="L274">                }</span>
+<span class="fc" id="L275">                this.consumingMsgOrderlyTreeMap.clear();</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                if (offset != null) {</span>
+<span class="fc" id="L277">                    return offset + 1;</span>
+                }
+            } finally {
+<span class="fc" id="L280">                this.treeMapLock.writeLock().unlock();</span>
+            }
+<span class="nc" id="L282">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L283">            log.error(&quot;commit exception&quot;, e);</span>
+<span class="nc" id="L284">        }</span>
+
+<span class="nc" id="L286">        return -1;</span>
+    }
+
+    public void makeMessageToConsumeAgain(List&lt;MessageExt&gt; msgs) {
+        try {
+<span class="fc" id="L291">            this.treeMapLock.writeLock().lockInterruptibly();</span>
+            try {
+<span class="fc bfc" id="L293" title="All 2 branches covered.">                for (MessageExt msg : msgs) {</span>
+<span class="fc" id="L294">                    this.consumingMsgOrderlyTreeMap.remove(msg.getQueueOffset());</span>
+<span class="fc" id="L295">                    this.msgTreeMap.put(msg.getQueueOffset(), msg);</span>
+<span class="fc" id="L296">                }</span>
+            } finally {
+<span class="fc" id="L298">                this.treeMapLock.writeLock().unlock();</span>
+            }
+<span class="nc" id="L300">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L301">            log.error(&quot;makeMessageToCosumeAgain exception&quot;, e);</span>
+<span class="fc" id="L302">        }</span>
+<span class="fc" id="L303">    }</span>
+
+    public List&lt;MessageExt&gt; takeMessages(final int batchSize) {
+<span class="fc" id="L306">        List&lt;MessageExt&gt; result = new ArrayList&lt;MessageExt&gt;(batchSize);</span>
+<span class="fc" id="L307">        final long now = System.currentTimeMillis();</span>
+        try {
+<span class="fc" id="L309">            this.treeMapLock.writeLock().lockInterruptibly();</span>
+<span class="fc" id="L310">            this.lastConsumeTimestamp = now;</span>
+            try {
+<span class="fc bfc" id="L312" title="All 2 branches covered.">                if (!this.msgTreeMap.isEmpty()) {</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">                    for (int i = 0; i &lt; batchSize; i++) {</span>
+<span class="fc" id="L314">                        Map.Entry&lt;Long, MessageExt&gt; entry = this.msgTreeMap.pollFirstEntry();</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">                        if (entry != null) {</span>
+<span class="fc" id="L316">                            result.add(entry.getValue());</span>
+<span class="fc" id="L317">                            consumingMsgOrderlyTreeMap.put(entry.getKey(), entry.getValue());</span>
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+<span class="fc bfc" id="L324" title="All 2 branches covered.">                if (result.isEmpty()) {</span>
+<span class="fc" id="L325">                    consuming = false;</span>
+                }
+            } finally {
+<span class="fc" id="L328">                this.treeMapLock.writeLock().unlock();</span>
+            }
+<span class="nc" id="L330">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L331">            log.error(&quot;take Messages exception&quot;, e);</span>
+<span class="fc" id="L332">        }</span>
+
+<span class="fc" id="L334">        return result;</span>
+    }
+
+    public boolean hasTempMessage() {
+        try {
+<span class="nc" id="L339">            this.treeMapLock.readLock().lockInterruptibly();</span>
+            try {
+<span class="nc bnc" id="L341" title="All 2 branches missed.">                return !this.msgTreeMap.isEmpty();</span>
+            } finally {
+<span class="nc" id="L343">                this.treeMapLock.readLock().unlock();</span>
+            }
+<span class="nc" id="L345">        } catch (InterruptedException e) {</span>
+        }
+
+<span class="nc" id="L348">        return true;</span>
+    }
+
+    public void clear() {
+        try {
+<span class="fc" id="L353">            this.treeMapLock.writeLock().lockInterruptibly();</span>
+            try {
+<span class="fc" id="L355">                this.msgTreeMap.clear();</span>
+<span class="fc" id="L356">                this.consumingMsgOrderlyTreeMap.clear();</span>
+<span class="fc" id="L357">                this.msgCount.set(0);</span>
+<span class="fc" id="L358">                this.msgSize.set(0);</span>
+<span class="fc" id="L359">                this.queueOffsetMax = 0L;</span>
+            } finally {
+<span class="fc" id="L361">                this.treeMapLock.writeLock().unlock();</span>
+            }
+<span class="nc" id="L363">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L364">            log.error(&quot;rollback exception&quot;, e);</span>
+<span class="fc" id="L365">        }</span>
+<span class="fc" id="L366">    }</span>
+
+    public long getLastLockTimestamp() {
+<span class="nc" id="L369">        return lastLockTimestamp;</span>
+    }
+
+    public void setLastLockTimestamp(long lastLockTimestamp) {
+<span class="fc" id="L373">        this.lastLockTimestamp = lastLockTimestamp;</span>
+<span class="fc" id="L374">    }</span>
+
+    public Lock getConsumeLock() {
+<span class="fc" id="L377">        return consumeLock;</span>
+    }
+
+    public long getLastPullTimestamp() {
+<span class="nc" id="L381">        return lastPullTimestamp;</span>
+    }
+
+    public void setLastPullTimestamp(long lastPullTimestamp) {
+<span class="fc" id="L385">        this.lastPullTimestamp = lastPullTimestamp;</span>
+<span class="fc" id="L386">    }</span>
+
+    public long getMsgAccCnt() {
+<span class="nc" id="L389">        return msgAccCnt;</span>
+    }
+
+    public void setMsgAccCnt(long msgAccCnt) {
+<span class="nc" id="L393">        this.msgAccCnt = msgAccCnt;</span>
+<span class="nc" id="L394">    }</span>
+
+    public long getTryUnlockTimes() {
+<span class="nc" id="L397">        return this.tryUnlockTimes.get();</span>
+    }
+
+    public void incTryUnlockTimes() {
+<span class="nc" id="L401">        this.tryUnlockTimes.incrementAndGet();</span>
+<span class="nc" id="L402">    }</span>
+
+    public void fillProcessQueueInfo(final ProcessQueueInfo info) {
+        try {
+<span class="fc" id="L406">            this.treeMapLock.readLock().lockInterruptibly();</span>
+
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">            if (!this.msgTreeMap.isEmpty()) {</span>
+<span class="fc" id="L409">                info.setCachedMsgMinOffset(this.msgTreeMap.firstKey());</span>
+<span class="fc" id="L410">                info.setCachedMsgMaxOffset(this.msgTreeMap.lastKey());</span>
+<span class="fc" id="L411">                info.setCachedMsgCount(this.msgTreeMap.size());</span>
+<span class="fc" id="L412">                info.setCachedMsgSizeInMiB((int) (this.msgSize.get() / (1024 * 1024)));</span>
+            }
+
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">            if (!this.consumingMsgOrderlyTreeMap.isEmpty()) {</span>
+<span class="nc" id="L416">                info.setTransactionMsgMinOffset(this.consumingMsgOrderlyTreeMap.firstKey());</span>
+<span class="nc" id="L417">                info.setTransactionMsgMaxOffset(this.consumingMsgOrderlyTreeMap.lastKey());</span>
+<span class="nc" id="L418">                info.setTransactionMsgCount(this.consumingMsgOrderlyTreeMap.size());</span>
+            }
+
+<span class="fc" id="L421">            info.setLocked(this.locked);</span>
+<span class="fc" id="L422">            info.setTryUnlockTimes(this.tryUnlockTimes.get());</span>
+<span class="fc" id="L423">            info.setLastLockTimestamp(this.lastLockTimestamp);</span>
+
+<span class="fc" id="L425">            info.setDroped(this.dropped);</span>
+<span class="fc" id="L426">            info.setLastPullTimestamp(this.lastPullTimestamp);</span>
+<span class="fc" id="L427">            info.setLastConsumeTimestamp(this.lastConsumeTimestamp);</span>
+<span class="nc" id="L428">        } catch (Exception e) {</span>
+        } finally {
+<span class="fc" id="L430">            this.treeMapLock.readLock().unlock();</span>
+        }
+<span class="fc" id="L432">    }</span>
+
+    public long getLastConsumeTimestamp() {
+<span class="nc" id="L435">        return lastConsumeTimestamp;</span>
+    }
+
+    public void setLastConsumeTimestamp(long lastConsumeTimestamp) {
+<span class="nc" id="L439">        this.lastConsumeTimestamp = lastConsumeTimestamp;</span>
+<span class="nc" id="L440">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

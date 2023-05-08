@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubscriptionGroupConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.subscription</a> &gt; <span class="el_source">SubscriptionGroupConfig.java</span></div><h1>SubscriptionGroupConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.subscription;
+
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.rocketmq.common.MixAll;
+
+<span class="fc" id="L23">public class SubscriptionGroupConfig {</span>
+
+    private String groupName;
+
+<span class="fc" id="L27">    private boolean consumeEnable = true;</span>
+<span class="fc" id="L28">    private boolean consumeFromMinEnable = true;</span>
+<span class="fc" id="L29">    private boolean consumeBroadcastEnable = true;</span>
+<span class="fc" id="L30">    private boolean consumeMessageOrderly = false;</span>
+
+<span class="fc" id="L32">    private int retryQueueNums = 1;</span>
+
+<span class="fc" id="L34">    private int retryMaxTimes = 16;</span>
+<span class="fc" id="L35">    private GroupRetryPolicy groupRetryPolicy = new GroupRetryPolicy();</span>
+
+<span class="fc" id="L37">    private long brokerId = MixAll.MASTER_ID;</span>
+
+<span class="fc" id="L39">    private long whichBrokerWhenConsumeSlowly = 1;</span>
+
+<span class="fc" id="L41">    private boolean notifyConsumerIdsChangedEnable = true;</span>
+
+<span class="fc" id="L43">    private int groupSysFlag = 0;</span>
+
+    // Only valid for push consumer
+<span class="fc" id="L46">    private int consumeTimeoutMinute = 15;</span>
+
+    public String getGroupName() {
+<span class="fc" id="L49">        return groupName;</span>
+    }
+
+    public void setGroupName(String groupName) {
+<span class="fc" id="L53">        this.groupName = groupName;</span>
+<span class="fc" id="L54">    }</span>
+
+    public boolean isConsumeEnable() {
+<span class="fc" id="L57">        return consumeEnable;</span>
+    }
+
+    public void setConsumeEnable(boolean consumeEnable) {
+<span class="fc" id="L61">        this.consumeEnable = consumeEnable;</span>
+<span class="fc" id="L62">    }</span>
+
+    public boolean isConsumeFromMinEnable() {
+<span class="fc" id="L65">        return consumeFromMinEnable;</span>
+    }
+
+    public void setConsumeFromMinEnable(boolean consumeFromMinEnable) {
+<span class="fc" id="L69">        this.consumeFromMinEnable = consumeFromMinEnable;</span>
+<span class="fc" id="L70">    }</span>
+
+    public boolean isConsumeBroadcastEnable() {
+<span class="fc" id="L73">        return consumeBroadcastEnable;</span>
+    }
+
+    public void setConsumeBroadcastEnable(boolean consumeBroadcastEnable) {
+<span class="fc" id="L77">        this.consumeBroadcastEnable = consumeBroadcastEnable;</span>
+<span class="fc" id="L78">    }</span>
+
+    public boolean isConsumeMessageOrderly() {
+<span class="fc" id="L81">        return consumeMessageOrderly;</span>
+    }
+
+    public void setConsumeMessageOrderly(boolean consumeMessageOrderly) {
+<span class="fc" id="L85">        this.consumeMessageOrderly = consumeMessageOrderly;</span>
+<span class="fc" id="L86">    }</span>
+
+    public int getRetryQueueNums() {
+<span class="fc" id="L89">        return retryQueueNums;</span>
+    }
+
+    public void setRetryQueueNums(int retryQueueNums) {
+<span class="fc" id="L93">        this.retryQueueNums = retryQueueNums;</span>
+<span class="fc" id="L94">    }</span>
+
+    public int getRetryMaxTimes() {
+<span class="fc" id="L97">        return retryMaxTimes;</span>
+    }
+
+    public void setRetryMaxTimes(int retryMaxTimes) {
+<span class="fc" id="L101">        this.retryMaxTimes = retryMaxTimes;</span>
+<span class="fc" id="L102">    }</span>
+
+    public GroupRetryPolicy getGroupRetryPolicy() {
+<span class="fc" id="L105">        return groupRetryPolicy;</span>
+    }
+
+    public void setGroupRetryPolicy(GroupRetryPolicy groupRetryPolicy) {
+<span class="fc" id="L109">        this.groupRetryPolicy = groupRetryPolicy;</span>
+<span class="fc" id="L110">    }</span>
+
+    public long getBrokerId() {
+<span class="fc" id="L113">        return brokerId;</span>
+    }
+
+    public void setBrokerId(long brokerId) {
+<span class="fc" id="L117">        this.brokerId = brokerId;</span>
+<span class="fc" id="L118">    }</span>
+
+    public long getWhichBrokerWhenConsumeSlowly() {
+<span class="fc" id="L121">        return whichBrokerWhenConsumeSlowly;</span>
+    }
+
+    public void setWhichBrokerWhenConsumeSlowly(long whichBrokerWhenConsumeSlowly) {
+<span class="fc" id="L125">        this.whichBrokerWhenConsumeSlowly = whichBrokerWhenConsumeSlowly;</span>
+<span class="fc" id="L126">    }</span>
+
+    public boolean isNotifyConsumerIdsChangedEnable() {
+<span class="fc" id="L129">        return notifyConsumerIdsChangedEnable;</span>
+    }
+
+    public void setNotifyConsumerIdsChangedEnable(final boolean notifyConsumerIdsChangedEnable) {
+<span class="fc" id="L133">        this.notifyConsumerIdsChangedEnable = notifyConsumerIdsChangedEnable;</span>
+<span class="fc" id="L134">    }</span>
+
+    public int getGroupSysFlag() {
+<span class="fc" id="L137">        return groupSysFlag;</span>
+    }
+
+    public void setGroupSysFlag(int groupSysFlag) {
+<span class="fc" id="L141">        this.groupSysFlag = groupSysFlag;</span>
+<span class="fc" id="L142">    }</span>
+
+    public int getConsumeTimeoutMinute() {
+<span class="fc" id="L145">        return consumeTimeoutMinute;</span>
+    }
+
+    public void setConsumeTimeoutMinute(int consumeTimeoutMinute) {
+<span class="fc" id="L149">        this.consumeTimeoutMinute = consumeTimeoutMinute;</span>
+<span class="fc" id="L150">    }</span>
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L154">        final int prime = 31;</span>
+<span class="nc" id="L155">        int result = 1;</span>
+<span class="nc" id="L156">        result = prime * result + (int) (brokerId ^ (brokerId &gt;&gt;&gt; 32));</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        result = prime * result + (consumeBroadcastEnable ? 1231 : 1237);</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        result = prime * result + (consumeEnable ? 1231 : 1237);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        result = prime * result + (consumeFromMinEnable ? 1231 : 1237);</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        result = prime * result + (notifyConsumerIdsChangedEnable ? 1231 : 1237);</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        result = prime * result + ((groupName == null) ? 0 : groupName.hashCode());</span>
+<span class="nc" id="L162">        result = prime * result + retryMaxTimes;</span>
+<span class="nc" id="L163">        result = prime * result + retryQueueNums;</span>
+<span class="nc" id="L164">        result =</span>
+            prime * result + (int) (whichBrokerWhenConsumeSlowly ^ (whichBrokerWhenConsumeSlowly &gt;&gt;&gt; 32));
+<span class="nc" id="L166">        return result;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (this == obj)</span>
+<span class="nc" id="L172">            return true;</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (obj == null)</span>
+<span class="nc" id="L174">            return false;</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        if (getClass() != obj.getClass())</span>
+<span class="nc" id="L176">            return false;</span>
+<span class="nc" id="L177">        SubscriptionGroupConfig other = (SubscriptionGroupConfig) obj;</span>
+<span class="nc" id="L178">        return new EqualsBuilder()</span>
+<span class="nc" id="L179">            .append(groupName, other.groupName)</span>
+<span class="nc" id="L180">            .append(consumeEnable, other.consumeEnable)</span>
+<span class="nc" id="L181">            .append(consumeFromMinEnable, other.consumeFromMinEnable)</span>
+<span class="nc" id="L182">            .append(consumeBroadcastEnable, other.consumeBroadcastEnable)</span>
+<span class="nc" id="L183">            .append(retryQueueNums, other.retryQueueNums)</span>
+<span class="nc" id="L184">            .append(retryMaxTimes, other.retryMaxTimes)</span>
+<span class="nc" id="L185">            .append(brokerId, other.brokerId)</span>
+<span class="nc" id="L186">            .append(whichBrokerWhenConsumeSlowly, other.whichBrokerWhenConsumeSlowly)</span>
+<span class="nc" id="L187">            .append(notifyConsumerIdsChangedEnable, other.notifyConsumerIdsChangedEnable)</span>
+<span class="nc" id="L188">            .append(groupSysFlag, other.groupSysFlag)</span>
+<span class="nc" id="L189">            .isEquals();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L194">        return &quot;SubscriptionGroupConfig{&quot; +</span>
+            &quot;groupName='&quot; + groupName + '\'' +
+            &quot;, consumeEnable=&quot; + consumeEnable +
+            &quot;, consumeFromMinEnable=&quot; + consumeFromMinEnable +
+            &quot;, consumeBroadcastEnable=&quot; + consumeBroadcastEnable +
+            &quot;, consumeMessageOrderly=&quot; + consumeMessageOrderly +
+            &quot;, retryQueueNums=&quot; + retryQueueNums +
+            &quot;, retryMaxTimes=&quot; + retryMaxTimes +
+            &quot;, groupRetryPolicy=&quot; + groupRetryPolicy +
+            &quot;, brokerId=&quot; + brokerId +
+            &quot;, whichBrokerWhenConsumeSlowly=&quot; + whichBrokerWhenConsumeSlowly +
+            &quot;, notifyConsumerIdsChangedEnable=&quot; + notifyConsumerIdsChangedEnable +
+            &quot;, groupSysFlag=&quot; + groupSysFlag +
+            '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

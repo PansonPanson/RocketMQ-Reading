@@ -1,0 +1,668 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultRequestProcessor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-namesrv 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.namesrv.processor</a> &gt; <span class="el_source">DefaultRequestProcessor.java</span></div><h1>DefaultRequestProcessor.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.namesrv.processor;
+
+import io.netty.channel.ChannelHandlerContext;
+import java.io.UnsupportedEncodingException;
+import java.util.Properties;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.rocketmq.common.DataVersion;
+import org.apache.rocketmq.common.MQVersion;
+import org.apache.rocketmq.common.MQVersion.Version;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.common.protocol.body.BrokerMemberGroup;
+import org.apache.rocketmq.common.protocol.body.GetBrokerMemberGroupResponseBody;
+import org.apache.rocketmq.common.protocol.body.GetRemoteClientConfigBody;
+import org.apache.rocketmq.common.protocol.body.TopicList;
+import org.apache.rocketmq.common.protocol.header.GetBrokerMemberGroupRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.AddWritePermOfBrokerRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.AddWritePermOfBrokerResponseHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.BrokerHeartbeatRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.RegisterTopicRequestHeader;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+import org.apache.rocketmq.common.namesrv.NamesrvUtil;
+import org.apache.rocketmq.common.namesrv.RegisterBrokerResult;
+import org.apache.rocketmq.common.protocol.RequestCode;
+import org.apache.rocketmq.common.protocol.ResponseCode;
+import org.apache.rocketmq.common.protocol.body.RegisterBrokerBody;
+import org.apache.rocketmq.common.protocol.body.TopicConfigSerializeWrapper;
+import org.apache.rocketmq.common.protocol.header.GetTopicsByClusterRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.DeleteKVConfigRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.DeleteTopicFromNamesrvRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.GetKVConfigRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.GetKVConfigResponseHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.GetKVListByNamespaceRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.PutKVConfigRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.QueryDataVersionRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.QueryDataVersionResponseHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.RegisterBrokerRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.RegisterBrokerResponseHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.UnRegisterBrokerRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.WipeWritePermOfBrokerRequestHeader;
+import org.apache.rocketmq.common.protocol.header.namesrv.WipeWritePermOfBrokerResponseHeader;
+import org.apache.rocketmq.common.protocol.route.TopicRouteData;
+import org.apache.rocketmq.namesrv.NamesrvController;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
+import org.apache.rocketmq.remoting.exception.RemotingCommandException;
+import org.apache.rocketmq.remoting.netty.NettyRequestProcessor;
+import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+import org.apache.rocketmq.remoting.protocol.RemotingSysResponseCode;
+
+public class DefaultRequestProcessor implements NettyRequestProcessor {
+<span class="fc" id="L71">    private static InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);</span>
+
+    protected final NamesrvController namesrvController;
+
+<span class="fc" id="L75">    public DefaultRequestProcessor(NamesrvController namesrvController) {</span>
+<span class="fc" id="L76">        this.namesrvController = namesrvController;</span>
+<span class="fc" id="L77">    }</span>
+
+    @Override
+    public RemotingCommand processRequest(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (ctx != null) {</span>
+<span class="fc" id="L84">            log.debug(&quot;receive request, {} {} {}&quot;,</span>
+<span class="fc" id="L85">                request.getCode(),</span>
+<span class="fc" id="L86">                RemotingHelper.parseChannelRemoteAddr(ctx.channel()),</span>
+                request);
+        }
+
+<span class="pc bpc" id="L90" title="6 of 24 branches missed.">        switch (request.getCode()) {</span>
+            case RequestCode.PUT_KV_CONFIG:
+<span class="fc" id="L92">                return this.putKVConfig(ctx, request);</span>
+            case RequestCode.GET_KV_CONFIG:
+<span class="fc" id="L94">                return this.getKVConfig(ctx, request);</span>
+            case RequestCode.DELETE_KV_CONFIG:
+<span class="fc" id="L96">                return this.deleteKVConfig(ctx, request);</span>
+            case RequestCode.QUERY_DATA_VERSION:
+<span class="nc" id="L98">                return this.queryBrokerTopicConfig(ctx, request);</span>
+            case RequestCode.REGISTER_BROKER:
+<span class="fc" id="L100">                return this.registerBroker(ctx, request);</span>
+            case RequestCode.UNREGISTER_BROKER:
+<span class="fc" id="L102">                return this.unregisterBroker(ctx, request);</span>
+            case RequestCode.BROKER_HEARTBEAT:
+<span class="nc" id="L104">                return this.brokerHeartbeat(ctx, request);</span>
+            case RequestCode.GET_BROKER_MEMBER_GROUP:
+<span class="nc" id="L106">                return this.getBrokerMemberGroup(ctx, request);</span>
+            case RequestCode.GET_BROKER_CLUSTER_INFO:
+<span class="fc" id="L108">                return this.getBrokerClusterInfo(ctx, request);</span>
+            case RequestCode.WIPE_WRITE_PERM_OF_BROKER:
+<span class="fc" id="L110">                return this.wipeWritePermOfBroker(ctx, request);</span>
+            case RequestCode.ADD_WRITE_PERM_OF_BROKER:
+<span class="nc" id="L112">                return this.addWritePermOfBroker(ctx, request);</span>
+            case RequestCode.GET_ALL_TOPIC_LIST_FROM_NAMESERVER:
+<span class="fc" id="L114">                return this.getAllTopicListFromNameserver(ctx, request);</span>
+            case RequestCode.DELETE_TOPIC_IN_NAMESRV:
+<span class="fc" id="L116">                return this.deleteTopicInNamesrv(ctx, request);</span>
+            case RequestCode.REGISTER_TOPIC_IN_NAMESRV:
+<span class="nc" id="L118">                return this.registerTopicToNamesrv(ctx, request);</span>
+            case RequestCode.GET_KVLIST_BY_NAMESPACE:
+<span class="fc" id="L120">                return this.getKVListByNamespace(ctx, request);</span>
+            case RequestCode.GET_TOPICS_BY_CLUSTER:
+<span class="fc" id="L122">                return this.getTopicsByCluster(ctx, request);</span>
+            case RequestCode.GET_SYSTEM_TOPIC_LIST_FROM_NS:
+<span class="fc" id="L124">                return this.getSystemTopicListFromNs(ctx, request);</span>
+            case RequestCode.GET_UNIT_TOPIC_LIST:
+<span class="fc" id="L126">                return this.getUnitTopicList(ctx, request);</span>
+            case RequestCode.GET_HAS_UNIT_SUB_TOPIC_LIST:
+<span class="fc" id="L128">                return this.getHasUnitSubTopicList(ctx, request);</span>
+            case RequestCode.GET_HAS_UNIT_SUB_UNUNIT_TOPIC_LIST:
+<span class="fc" id="L130">                return this.getHasUnitSubUnUnitTopicList(ctx, request);</span>
+            case RequestCode.UPDATE_NAMESRV_CONFIG:
+<span class="fc" id="L132">                return this.updateConfig(ctx, request);</span>
+            case RequestCode.GET_NAMESRV_CONFIG:
+<span class="fc" id="L134">                return this.getConfig(ctx, request);</span>
+            case RequestCode.GET_CLIENT_CONFIG:
+<span class="nc" id="L136">                return this.getClientConfigs(ctx, request);</span>
+            default:
+<span class="fc" id="L138">                String error = &quot; request type &quot; + request.getCode() + &quot; not supported&quot;;</span>
+<span class="fc" id="L139">                return RemotingCommand.createResponseCommand(RemotingSysResponseCode.REQUEST_CODE_NOT_SUPPORTED, error);</span>
+        }
+    }
+
+    @Override public boolean rejectRequest() {
+<span class="nc" id="L144">        return false;</span>
+    }
+
+    public RemotingCommand putKVConfig(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="fc" id="L149">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="fc" id="L150">        final PutKVConfigRequestHeader requestHeader =</span>
+<span class="fc" id="L151">            (PutKVConfigRequestHeader) request.decodeCommandCustomHeader(PutKVConfigRequestHeader.class);</span>
+
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">        if (requestHeader.getNamespace() == null || requestHeader.getKey() == null) {</span>
+<span class="nc" id="L154">            response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L155">            response.setRemark(&quot;namespace or key is null&quot;);</span>
+<span class="nc" id="L156">            return response;</span>
+        }
+<span class="fc" id="L158">        this.namesrvController.getKvConfigManager().putKVConfig(</span>
+<span class="fc" id="L159">            requestHeader.getNamespace(),</span>
+<span class="fc" id="L160">            requestHeader.getKey(),</span>
+<span class="fc" id="L161">            requestHeader.getValue()</span>
+        );
+
+<span class="fc" id="L164">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L165">        response.setRemark(null);</span>
+<span class="fc" id="L166">        return response;</span>
+    }
+
+    public RemotingCommand getKVConfig(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="fc" id="L171">        final RemotingCommand response = RemotingCommand.createResponseCommand(GetKVConfigResponseHeader.class);</span>
+<span class="fc" id="L172">        final GetKVConfigResponseHeader responseHeader = (GetKVConfigResponseHeader) response.readCustomHeader();</span>
+<span class="fc" id="L173">        final GetKVConfigRequestHeader requestHeader =</span>
+<span class="fc" id="L174">            (GetKVConfigRequestHeader) request.decodeCommandCustomHeader(GetKVConfigRequestHeader.class);</span>
+
+<span class="fc" id="L176">        String value = this.namesrvController.getKvConfigManager().getKVConfig(</span>
+<span class="fc" id="L177">            requestHeader.getNamespace(),</span>
+<span class="fc" id="L178">            requestHeader.getKey()</span>
+        );
+
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (value != null) {</span>
+<span class="fc" id="L182">            responseHeader.setValue(value);</span>
+<span class="fc" id="L183">            response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L184">            response.setRemark(null);</span>
+<span class="fc" id="L185">            return response;</span>
+        }
+
+<span class="fc" id="L188">        response.setCode(ResponseCode.QUERY_NOT_FOUND);</span>
+<span class="fc" id="L189">        response.setRemark(&quot;No config item, Namespace: &quot; + requestHeader.getNamespace() + &quot; Key: &quot; + requestHeader.getKey());</span>
+<span class="fc" id="L190">        return response;</span>
+    }
+
+    public RemotingCommand deleteKVConfig(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="fc" id="L195">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="fc" id="L196">        final DeleteKVConfigRequestHeader requestHeader =</span>
+<span class="fc" id="L197">            (DeleteKVConfigRequestHeader) request.decodeCommandCustomHeader(DeleteKVConfigRequestHeader.class);</span>
+
+<span class="fc" id="L199">        this.namesrvController.getKvConfigManager().deleteKVConfig(</span>
+<span class="fc" id="L200">            requestHeader.getNamespace(),</span>
+<span class="fc" id="L201">            requestHeader.getKey()</span>
+        );
+
+<span class="fc" id="L204">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L205">        response.setRemark(null);</span>
+<span class="fc" id="L206">        return response;</span>
+    }
+
+    public RemotingCommand registerBroker(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="fc" id="L211">        final RemotingCommand response = RemotingCommand.createResponseCommand(RegisterBrokerResponseHeader.class);</span>
+<span class="fc" id="L212">        final RegisterBrokerResponseHeader responseHeader = (RegisterBrokerResponseHeader) response.readCustomHeader();</span>
+<span class="fc" id="L213">        final RegisterBrokerRequestHeader requestHeader =</span>
+<span class="fc" id="L214">            (RegisterBrokerRequestHeader) request.decodeCommandCustomHeader(RegisterBrokerRequestHeader.class);</span>
+
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (!checksum(ctx, request, requestHeader)) {</span>
+<span class="nc" id="L217">            response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L218">            response.setRemark(&quot;crc32 not match&quot;);</span>
+<span class="nc" id="L219">            return response;</span>
+        }
+
+<span class="fc" id="L222">        TopicConfigSerializeWrapper topicConfigWrapper = null;</span>
+<span class="fc" id="L223">        List&lt;String&gt; filterServerList = null;</span>
+
+<span class="fc" id="L225">        Version brokerVersion = MQVersion.value2Version(request.getVersion());</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (brokerVersion.ordinal() &gt;= MQVersion.Version.V3_0_11.ordinal()) {</span>
+<span class="fc" id="L227">            final RegisterBrokerBody registerBrokerBody = extractRegisterBrokerBodyFromRequest(request, requestHeader);</span>
+<span class="fc" id="L228">            topicConfigWrapper = registerBrokerBody.getTopicConfigSerializeWrapper();</span>
+<span class="fc" id="L229">            filterServerList = registerBrokerBody.getFilterServerList();</span>
+<span class="fc" id="L230">        } else {</span>
+            // RegisterBrokerBody of old version only contains TopicConfig.
+<span class="nc" id="L232">            topicConfigWrapper = extractRegisterTopicConfigFromRequest(request);</span>
+        }
+
+<span class="fc" id="L235">        RegisterBrokerResult result = this.namesrvController.getRouteInfoManager().registerBroker(</span>
+<span class="fc" id="L236">            requestHeader.getClusterName(),</span>
+<span class="fc" id="L237">            requestHeader.getBrokerAddr(),</span>
+<span class="fc" id="L238">            requestHeader.getBrokerName(),</span>
+<span class="fc" id="L239">            requestHeader.getBrokerId(),</span>
+<span class="fc" id="L240">            requestHeader.getHaServerAddr(),</span>
+<span class="fc" id="L241">            requestHeader.getHeartbeatTimeoutMillis(),</span>
+<span class="fc" id="L242">            requestHeader.getEnableActingMaster(),</span>
+            topicConfigWrapper,
+            filterServerList,
+<span class="fc" id="L245">            ctx.channel()</span>
+        );
+
+<span class="fc" id="L248">        responseHeader.setHaServerAddr(result.getHaServerAddr());</span>
+<span class="fc" id="L249">        responseHeader.setMasterAddr(result.getMasterAddr());</span>
+
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (this.namesrvController.getNamesrvConfig().isReturnOrderTopicConfigToBroker()) {</span>
+<span class="fc" id="L252">            byte[] jsonValue = this.namesrvController.getKvConfigManager().getKVListByNamespace(NamesrvUtil.NAMESPACE_ORDER_TOPIC_CONFIG);</span>
+<span class="fc" id="L253">            response.setBody(jsonValue);</span>
+        }
+
+<span class="fc" id="L256">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L257">        response.setRemark(null);</span>
+<span class="fc" id="L258">        return response;</span>
+    }
+
+    private TopicConfigSerializeWrapper extractRegisterTopicConfigFromRequest(final RemotingCommand request) {
+        TopicConfigSerializeWrapper topicConfigWrapper;
+<span class="nc bnc" id="L263" title="All 2 branches missed.">        if (request.getBody() != null) {</span>
+<span class="nc" id="L264">            topicConfigWrapper = TopicConfigSerializeWrapper.decode(request.getBody(), TopicConfigSerializeWrapper.class);</span>
+        } else {
+<span class="nc" id="L266">            topicConfigWrapper = new TopicConfigSerializeWrapper();</span>
+<span class="nc" id="L267">            topicConfigWrapper.getDataVersion().setCounter(new AtomicLong(0));</span>
+<span class="nc" id="L268">            topicConfigWrapper.getDataVersion().setTimestamp(0L);</span>
+<span class="nc" id="L269">            topicConfigWrapper.getDataVersion().setStateVersion(0L);</span>
+        }
+<span class="nc" id="L271">        return topicConfigWrapper;</span>
+    }
+
+    private RegisterBrokerBody extractRegisterBrokerBodyFromRequest(RemotingCommand request,
+        RegisterBrokerRequestHeader requestHeader) throws RemotingCommandException {
+<span class="fc" id="L276">        RegisterBrokerBody registerBrokerBody = new RegisterBrokerBody();</span>
+
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        if (request.getBody() != null) {</span>
+            try {
+<span class="nc" id="L280">                registerBrokerBody = RegisterBrokerBody.decode(request.getBody(), requestHeader.isCompressed());</span>
+<span class="nc" id="L281">            } catch (Exception e) {</span>
+<span class="nc" id="L282">                throw new RemotingCommandException(&quot;Failed to decode RegisterBrokerBody&quot;, e);</span>
+<span class="nc" id="L283">            }</span>
+        } else {
+<span class="fc" id="L285">            registerBrokerBody.getTopicConfigSerializeWrapper().getDataVersion().setCounter(new AtomicLong(0));</span>
+<span class="fc" id="L286">            registerBrokerBody.getTopicConfigSerializeWrapper().getDataVersion().setTimestamp(0L);</span>
+<span class="fc" id="L287">            registerBrokerBody.getTopicConfigSerializeWrapper().getDataVersion().setStateVersion(0L);</span>
+        }
+<span class="fc" id="L289">        return registerBrokerBody;</span>
+    }
+
+    private RemotingCommand getBrokerMemberGroup(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="nc" id="L294">        GetBrokerMemberGroupRequestHeader requestHeader = (GetBrokerMemberGroupRequestHeader) request.decodeCommandCustomHeader(GetBrokerMemberGroupRequestHeader.class);</span>
+
+<span class="nc" id="L296">        BrokerMemberGroup memberGroup = this.namesrvController.getRouteInfoManager()</span>
+<span class="nc" id="L297">            .getBrokerMemberGroup(requestHeader.getClusterName(), requestHeader.getBrokerName());</span>
+
+<span class="nc" id="L299">        GetBrokerMemberGroupResponseBody responseBody = new GetBrokerMemberGroupResponseBody();</span>
+<span class="nc" id="L300">        responseBody.setBrokerMemberGroup(memberGroup);</span>
+
+<span class="nc" id="L302">        RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="nc" id="L303">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="nc" id="L304">        response.setBody(responseBody.encode());</span>
+<span class="nc" id="L305">        return response;</span>
+    }
+
+    private boolean checksum(ChannelHandlerContext ctx, RemotingCommand request,
+        RegisterBrokerRequestHeader requestHeader) {
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (requestHeader.getBodyCrc32() != 0) {</span>
+<span class="nc" id="L311">            final int crc32 = UtilAll.crc32(request.getBody());</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">            if (crc32 != requestHeader.getBodyCrc32()) {</span>
+<span class="nc" id="L313">                log.warn(String.format(&quot;receive registerBroker request,crc32 not match,from %s&quot;,</span>
+<span class="nc" id="L314">                    RemotingHelper.parseChannelRemoteAddr(ctx.channel())));</span>
+<span class="nc" id="L315">                return false;</span>
+            }
+        }
+<span class="fc" id="L318">        return true;</span>
+    }
+
+    public RemotingCommand queryBrokerTopicConfig(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="nc" id="L323">        final RemotingCommand response = RemotingCommand.createResponseCommand(QueryDataVersionResponseHeader.class);</span>
+<span class="nc" id="L324">        final QueryDataVersionResponseHeader responseHeader = (QueryDataVersionResponseHeader) response.readCustomHeader();</span>
+<span class="nc" id="L325">        final QueryDataVersionRequestHeader requestHeader =</span>
+<span class="nc" id="L326">            (QueryDataVersionRequestHeader) request.decodeCommandCustomHeader(QueryDataVersionRequestHeader.class);</span>
+<span class="nc" id="L327">        DataVersion dataVersion = DataVersion.decode(request.getBody(), DataVersion.class);</span>
+<span class="nc" id="L328">        String clusterName = requestHeader.getClusterName();</span>
+<span class="nc" id="L329">        String brokerAddr = requestHeader.getBrokerAddr();</span>
+
+<span class="nc" id="L331">        Boolean changed = this.namesrvController.getRouteInfoManager().isBrokerTopicConfigChanged(clusterName, brokerAddr, dataVersion);</span>
+<span class="nc" id="L332">        this.namesrvController.getRouteInfoManager().updateBrokerInfoUpdateTimestamp(clusterName, brokerAddr);</span>
+
+<span class="nc" id="L334">        DataVersion nameSeverDataVersion = this.namesrvController.getRouteInfoManager().queryBrokerTopicConfig(clusterName, brokerAddr);</span>
+<span class="nc" id="L335">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="nc" id="L336">        response.setRemark(null);</span>
+
+<span class="nc bnc" id="L338" title="All 2 branches missed.">        if (nameSeverDataVersion != null) {</span>
+<span class="nc" id="L339">            response.setBody(nameSeverDataVersion.encode());</span>
+        }
+<span class="nc" id="L341">        responseHeader.setChanged(changed);</span>
+<span class="nc" id="L342">        return response;</span>
+    }
+
+    public RemotingCommand unregisterBroker(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="fc" id="L347">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="fc" id="L348">        final UnRegisterBrokerRequestHeader requestHeader =</span>
+<span class="fc" id="L349">            (UnRegisterBrokerRequestHeader) request.decodeCommandCustomHeader(UnRegisterBrokerRequestHeader.class);</span>
+
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        if (!this.namesrvController.getRouteInfoManager().submitUnRegisterBrokerRequest(requestHeader)) {</span>
+<span class="nc" id="L352">            log.warn(&quot;Couldn't submit the unregister broker request to handler, broker info: {}&quot;, requestHeader);</span>
+        }
+
+<span class="fc" id="L355">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L356">        response.setRemark(null);</span>
+<span class="fc" id="L357">        return response;</span>
+    }
+
+    public RemotingCommand brokerHeartbeat(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="nc" id="L362">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="nc" id="L363">        final BrokerHeartbeatRequestHeader requestHeader =</span>
+<span class="nc" id="L364">            (BrokerHeartbeatRequestHeader) request.decodeCommandCustomHeader(BrokerHeartbeatRequestHeader.class);</span>
+
+<span class="nc" id="L366">        this.namesrvController.getRouteInfoManager().updateBrokerInfoUpdateTimestamp(requestHeader.getClusterName(), requestHeader.getBrokerAddr());</span>
+
+<span class="nc" id="L368">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="nc" id="L369">        response.setRemark(null);</span>
+<span class="nc" id="L370">        return response;</span>
+    }
+
+    private RemotingCommand getBrokerClusterInfo(ChannelHandlerContext ctx, RemotingCommand request) {
+<span class="fc" id="L374">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+
+<span class="fc" id="L376">        byte[] content = this.namesrvController.getRouteInfoManager().getAllClusterInfo().encode();</span>
+<span class="fc" id="L377">        response.setBody(content);</span>
+
+<span class="fc" id="L379">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L380">        response.setRemark(null);</span>
+<span class="fc" id="L381">        return response;</span>
+    }
+
+    private RemotingCommand wipeWritePermOfBroker(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="fc" id="L386">        final RemotingCommand response = RemotingCommand.createResponseCommand(WipeWritePermOfBrokerResponseHeader.class);</span>
+<span class="fc" id="L387">        final WipeWritePermOfBrokerResponseHeader responseHeader = (WipeWritePermOfBrokerResponseHeader) response.readCustomHeader();</span>
+<span class="fc" id="L388">        final WipeWritePermOfBrokerRequestHeader requestHeader =</span>
+<span class="fc" id="L389">            (WipeWritePermOfBrokerRequestHeader) request.decodeCommandCustomHeader(WipeWritePermOfBrokerRequestHeader.class);</span>
+
+<span class="fc" id="L391">        int wipeTopicCnt = this.namesrvController.getRouteInfoManager().wipeWritePermOfBrokerByLock(requestHeader.getBrokerName());</span>
+
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">        if (ctx != null) {</span>
+<span class="fc" id="L394">            log.info(&quot;wipe write perm of broker[{}], client: {}, {}&quot;,</span>
+<span class="fc" id="L395">                requestHeader.getBrokerName(),</span>
+<span class="fc" id="L396">                RemotingHelper.parseChannelRemoteAddr(ctx.channel()),</span>
+<span class="fc" id="L397">                wipeTopicCnt);</span>
+        }
+
+<span class="fc" id="L400">        responseHeader.setWipeTopicCount(wipeTopicCnt);</span>
+<span class="fc" id="L401">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L402">        response.setRemark(null);</span>
+<span class="fc" id="L403">        return response;</span>
+    }
+
+    private RemotingCommand addWritePermOfBroker(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="nc" id="L408">        final RemotingCommand response = RemotingCommand.createResponseCommand(AddWritePermOfBrokerResponseHeader.class);</span>
+<span class="nc" id="L409">        final AddWritePermOfBrokerResponseHeader responseHeader = (AddWritePermOfBrokerResponseHeader) response.readCustomHeader();</span>
+<span class="nc" id="L410">        final AddWritePermOfBrokerRequestHeader requestHeader = (AddWritePermOfBrokerRequestHeader) request.decodeCommandCustomHeader(AddWritePermOfBrokerRequestHeader.class);</span>
+
+<span class="nc" id="L412">        int addTopicCnt = this.namesrvController.getRouteInfoManager().addWritePermOfBrokerByLock(requestHeader.getBrokerName());</span>
+
+<span class="nc" id="L414">        log.info(&quot;add write perm of broker[{}], client: {}, {}&quot;,</span>
+<span class="nc" id="L415">            requestHeader.getBrokerName(),</span>
+<span class="nc" id="L416">            RemotingHelper.parseChannelRemoteAddr(ctx.channel()),</span>
+<span class="nc" id="L417">            addTopicCnt);</span>
+
+<span class="nc" id="L419">        responseHeader.setAddTopicCount(addTopicCnt);</span>
+<span class="nc" id="L420">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="nc" id="L421">        response.setRemark(null);</span>
+<span class="nc" id="L422">        return response;</span>
+    }
+
+    private RemotingCommand getAllTopicListFromNameserver(ChannelHandlerContext ctx, RemotingCommand request) {
+<span class="fc" id="L426">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="fc" id="L427">        boolean enableAllTopicList = namesrvController.getNamesrvConfig().isEnableAllTopicList();</span>
+<span class="fc" id="L428">        log.warn(&quot;getAllTopicListFromNameserver {} enable {}&quot;, ctx.channel().remoteAddress(), enableAllTopicList);</span>
+<span class="fc bfc" id="L429" title="All 2 branches covered.">        if (enableAllTopicList) {</span>
+<span class="fc" id="L430">            byte[] body = this.namesrvController.getRouteInfoManager().getAllTopicList().encode();</span>
+<span class="fc" id="L431">            response.setBody(body);</span>
+<span class="fc" id="L432">            response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L433">            response.setRemark(null);</span>
+<span class="fc" id="L434">        } else {</span>
+<span class="fc" id="L435">            response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="fc" id="L436">            response.setRemark(&quot;disable&quot;);</span>
+        }
+
+<span class="fc" id="L439">        return response;</span>
+    }
+
+    private RemotingCommand registerTopicToNamesrv(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="nc" id="L444">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+
+<span class="nc" id="L446">        final RegisterTopicRequestHeader requestHeader =</span>
+<span class="nc" id="L447">            (RegisterTopicRequestHeader) request.decodeCommandCustomHeader(RegisterTopicRequestHeader.class);</span>
+
+<span class="nc" id="L449">        TopicRouteData topicRouteData = TopicRouteData.decode(request.getBody(), TopicRouteData.class);</span>
+<span class="nc bnc" id="L450" title="All 6 branches missed.">        if (topicRouteData != null &amp;&amp; topicRouteData.getQueueDatas() != null &amp;&amp; !topicRouteData.getQueueDatas().isEmpty()) {</span>
+<span class="nc" id="L451">            this.namesrvController.getRouteInfoManager().registerTopic(requestHeader.getTopic(), topicRouteData.getQueueDatas());</span>
+        }
+
+<span class="nc" id="L454">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="nc" id="L455">        response.setRemark(null);</span>
+<span class="nc" id="L456">        return response;</span>
+    }
+
+    private RemotingCommand deleteTopicInNamesrv(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="fc" id="L461">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="fc" id="L462">        final DeleteTopicFromNamesrvRequestHeader requestHeader =</span>
+<span class="fc" id="L463">            (DeleteTopicFromNamesrvRequestHeader) request.decodeCommandCustomHeader(DeleteTopicFromNamesrvRequestHeader.class);</span>
+
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">        if (requestHeader.getClusterName() != null</span>
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">            &amp;&amp; !requestHeader.getClusterName().isEmpty()) {</span>
+<span class="fc" id="L467">            this.namesrvController.getRouteInfoManager().deleteTopic(requestHeader.getTopic(), requestHeader.getClusterName());</span>
+        } else {
+<span class="nc" id="L469">            this.namesrvController.getRouteInfoManager().deleteTopic(requestHeader.getTopic());</span>
+        }
+
+<span class="fc" id="L472">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L473">        response.setRemark(null);</span>
+<span class="fc" id="L474">        return response;</span>
+    }
+
+    private RemotingCommand getKVListByNamespace(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="fc" id="L479">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="fc" id="L480">        final GetKVListByNamespaceRequestHeader requestHeader =</span>
+<span class="fc" id="L481">            (GetKVListByNamespaceRequestHeader) request.decodeCommandCustomHeader(GetKVListByNamespaceRequestHeader.class);</span>
+
+<span class="fc" id="L483">        byte[] jsonValue = this.namesrvController.getKvConfigManager().getKVListByNamespace(</span>
+<span class="fc" id="L484">            requestHeader.getNamespace());</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">        if (null != jsonValue) {</span>
+<span class="fc" id="L486">            response.setBody(jsonValue);</span>
+<span class="fc" id="L487">            response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L488">            response.setRemark(null);</span>
+<span class="fc" id="L489">            return response;</span>
+        }
+
+<span class="fc" id="L492">        response.setCode(ResponseCode.QUERY_NOT_FOUND);</span>
+<span class="fc" id="L493">        response.setRemark(&quot;No config item, Namespace: &quot; + requestHeader.getNamespace());</span>
+<span class="fc" id="L494">        return response;</span>
+    }
+
+    private RemotingCommand getTopicsByCluster(ChannelHandlerContext ctx,
+        RemotingCommand request) throws RemotingCommandException {
+<span class="fc" id="L499">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="fc" id="L500">        final GetTopicsByClusterRequestHeader requestHeader =</span>
+<span class="fc" id="L501">            (GetTopicsByClusterRequestHeader) request.decodeCommandCustomHeader(GetTopicsByClusterRequestHeader.class);</span>
+
+<span class="fc" id="L503">        boolean enableTopicList = namesrvController.getNamesrvConfig().isEnableTopicList();</span>
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">        if (enableTopicList) {</span>
+<span class="fc" id="L505">            TopicList topicsByCluster = this.namesrvController.getRouteInfoManager().getTopicsByCluster(requestHeader.getCluster());</span>
+<span class="fc" id="L506">            byte[] body = topicsByCluster.encode();</span>
+
+<span class="fc" id="L508">            response.setBody(body);</span>
+<span class="fc" id="L509">            response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L510">            response.setRemark(null);</span>
+<span class="fc" id="L511">        } else {</span>
+<span class="nc" id="L512">            response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L513">            response.setRemark(&quot;disable&quot;);</span>
+        }
+
+<span class="fc" id="L516">        return response;</span>
+    }
+
+    private RemotingCommand getSystemTopicListFromNs(ChannelHandlerContext ctx,
+        RemotingCommand request) {
+<span class="fc" id="L521">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+
+<span class="fc" id="L523">        TopicList systemTopicList = this.namesrvController.getRouteInfoManager().getSystemTopicList();</span>
+<span class="fc" id="L524">        byte[] body = systemTopicList.encode();</span>
+
+<span class="fc" id="L526">        response.setBody(body);</span>
+<span class="fc" id="L527">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L528">        response.setRemark(null);</span>
+<span class="fc" id="L529">        return response;</span>
+    }
+
+    private RemotingCommand getUnitTopicList(ChannelHandlerContext ctx,
+        RemotingCommand request) {
+<span class="fc" id="L534">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+
+<span class="fc" id="L536">        boolean enableTopicList = namesrvController.getNamesrvConfig().isEnableTopicList();</span>
+
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">        if (enableTopicList) {</span>
+<span class="fc" id="L539">            TopicList unitTopicList = this.namesrvController.getRouteInfoManager().getUnitTopics();</span>
+<span class="fc" id="L540">            byte[] body = unitTopicList.encode();</span>
+<span class="fc" id="L541">            response.setBody(body);</span>
+<span class="fc" id="L542">            response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L543">            response.setRemark(null);</span>
+<span class="fc" id="L544">        } else {</span>
+<span class="nc" id="L545">            response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L546">            response.setRemark(&quot;disable&quot;);</span>
+        }
+
+<span class="fc" id="L549">        return response;</span>
+    }
+
+    private RemotingCommand getHasUnitSubTopicList(ChannelHandlerContext ctx,
+        RemotingCommand request) {
+<span class="fc" id="L554">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+
+<span class="fc" id="L556">        boolean enableTopicList = namesrvController.getNamesrvConfig().isEnableTopicList();</span>
+
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">        if (enableTopicList) {</span>
+<span class="fc" id="L559">            TopicList hasUnitSubTopicList = this.namesrvController.getRouteInfoManager().getHasUnitSubTopicList();</span>
+<span class="fc" id="L560">            byte[] body = hasUnitSubTopicList.encode();</span>
+<span class="fc" id="L561">            response.setBody(body);</span>
+<span class="fc" id="L562">            response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L563">            response.setRemark(null);</span>
+<span class="fc" id="L564">        } else {</span>
+<span class="nc" id="L565">            response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L566">            response.setRemark(&quot;disable&quot;);</span>
+        }
+
+<span class="fc" id="L569">        return response;</span>
+    }
+
+    private RemotingCommand getHasUnitSubUnUnitTopicList(ChannelHandlerContext ctx, RemotingCommand request) {
+<span class="fc" id="L573">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+
+<span class="fc" id="L575">        boolean enableTopicList = namesrvController.getNamesrvConfig().isEnableTopicList();</span>
+
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">        if (enableTopicList) {</span>
+<span class="fc" id="L578">            TopicList hasUnitSubUnUnitTopicList = this.namesrvController.getRouteInfoManager().getHasUnitSubUnUnitTopicList();</span>
+<span class="fc" id="L579">            byte[] body = hasUnitSubUnUnitTopicList.encode();</span>
+<span class="fc" id="L580">            response.setBody(body);</span>
+<span class="fc" id="L581">            response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L582">            response.setRemark(null);</span>
+<span class="fc" id="L583">        } else {</span>
+<span class="nc" id="L584">            response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L585">            response.setRemark(&quot;disable&quot;);</span>
+        }
+
+<span class="fc" id="L588">        return response;</span>
+    }
+
+    private RemotingCommand updateConfig(ChannelHandlerContext ctx, RemotingCommand request) {
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">        if (ctx != null) {</span>
+<span class="fc" id="L593">            log.info(&quot;updateConfig called by {}&quot;, RemotingHelper.parseChannelRemoteAddr(ctx.channel()));</span>
+        }
+
+<span class="fc" id="L596">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+
+<span class="fc" id="L598">        byte[] body = request.getBody();</span>
+<span class="pc bpc" id="L599" title="1 of 2 branches missed.">        if (body != null) {</span>
+            String bodyStr;
+            try {
+<span class="fc" id="L602">                bodyStr = new String(body, MixAll.DEFAULT_CHARSET);</span>
+<span class="nc" id="L603">            } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L604">                log.error(&quot;updateConfig byte array to string error: &quot;, e);</span>
+<span class="nc" id="L605">                response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L606">                response.setRemark(&quot;UnsupportedEncodingException &quot; + e);</span>
+<span class="nc" id="L607">                return response;</span>
+<span class="fc" id="L608">            }</span>
+
+<span class="fc" id="L610">            Properties properties = MixAll.string2Properties(bodyStr);</span>
+<span class="pc bpc" id="L611" title="1 of 2 branches missed.">            if (properties == null) {</span>
+<span class="nc" id="L612">                log.error(&quot;updateConfig MixAll.string2Properties error {}&quot;, bodyStr);</span>
+<span class="nc" id="L613">                response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L614">                response.setRemark(&quot;string2Properties error&quot;);</span>
+<span class="nc" id="L615">                return response;</span>
+            }
+
+<span class="fc" id="L618">            this.namesrvController.getConfiguration().update(properties);</span>
+        }
+
+<span class="fc" id="L621">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L622">        response.setRemark(null);</span>
+<span class="fc" id="L623">        return response;</span>
+    }
+
+    private RemotingCommand getConfig(ChannelHandlerContext ctx, RemotingCommand request) {
+<span class="fc" id="L627">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+
+<span class="fc" id="L629">        String content = this.namesrvController.getConfiguration().getAllConfigsFormatString();</span>
+<span class="pc bpc" id="L630" title="2 of 4 branches missed.">        if (content != null &amp;&amp; content.length() &gt; 0) {</span>
+            try {
+<span class="fc" id="L632">                response.setBody(content.getBytes(MixAll.DEFAULT_CHARSET));</span>
+<span class="nc" id="L633">            } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L634">                log.error(&quot;getConfig error, &quot;, e);</span>
+<span class="nc" id="L635">                response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L636">                response.setRemark(&quot;UnsupportedEncodingException &quot; + e);</span>
+<span class="nc" id="L637">                return response;</span>
+<span class="fc" id="L638">            }</span>
+        }
+
+<span class="fc" id="L641">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="fc" id="L642">        response.setRemark(null);</span>
+<span class="fc" id="L643">        return response;</span>
+    }
+
+    private RemotingCommand getClientConfigs(ChannelHandlerContext ctx, RemotingCommand request) {
+<span class="nc" id="L647">        final RemotingCommand response = RemotingCommand.createResponseCommand(null);</span>
+<span class="nc" id="L648">        final GetRemoteClientConfigBody body = GetRemoteClientConfigBody.decode(request.getBody(), GetRemoteClientConfigBody.class);</span>
+
+<span class="nc" id="L650">        String content = this.namesrvController.getConfiguration().getClientConfigsFormatString(body.getKeys());</span>
+<span class="nc bnc" id="L651" title="All 2 branches missed.">        if (StringUtils.isNotBlank(content)) {</span>
+            try {
+<span class="nc" id="L653">                response.setBody(content.getBytes(MixAll.DEFAULT_CHARSET));</span>
+<span class="nc" id="L654">            } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L655">                log.error(&quot;getConfig error, &quot;, e);</span>
+<span class="nc" id="L656">                response.setCode(ResponseCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L657">                response.setRemark(&quot;UnsupportedEncodingException &quot; + e);</span>
+<span class="nc" id="L658">                return response;</span>
+<span class="nc" id="L659">            }</span>
+        }
+
+<span class="nc" id="L662">        response.setCode(ResponseCode.SUCCESS);</span>
+<span class="nc" id="L663">        response.setRemark(null);</span>
+<span class="nc" id="L664">        return response;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

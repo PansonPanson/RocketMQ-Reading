@@ -1,0 +1,467 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumeMessageConcurrentlyService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.impl.consumer</a> &gt; <span class="el_source">ConsumeMessageConcurrentlyService.java</span></div><h1>ConsumeMessageConcurrentlyService.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.impl.consumer;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
+import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
+import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
+import org.apache.rocketmq.client.consumer.listener.ConsumeReturnType;
+import org.apache.rocketmq.client.consumer.listener.MessageListenerConcurrently;
+import org.apache.rocketmq.client.hook.ConsumeMessageContext;
+import org.apache.rocketmq.client.log.ClientLogger;
+import org.apache.rocketmq.client.stat.ConsumerStatsManager;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.ThreadFactoryImpl;
+import org.apache.rocketmq.common.message.MessageAccessor;
+import org.apache.rocketmq.common.message.MessageExt;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.protocol.body.CMResult;
+import org.apache.rocketmq.common.protocol.body.ConsumeMessageDirectlyResult;
+import org.apache.rocketmq.common.utils.ThreadUtils;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
+
+public class ConsumeMessageConcurrentlyService implements ConsumeMessageService {
+<span class="fc" id="L52">    private static final InternalLogger log = ClientLogger.getLog();</span>
+    private final DefaultMQPushConsumerImpl defaultMQPushConsumerImpl;
+    private final DefaultMQPushConsumer defaultMQPushConsumer;
+    private final MessageListenerConcurrently messageListener;
+    private final BlockingQueue&lt;Runnable&gt; consumeRequestQueue;
+    private final ThreadPoolExecutor consumeExecutor;
+    private final String consumerGroup;
+
+    private final ScheduledExecutorService scheduledExecutorService;
+    private final ScheduledExecutorService cleanExpireMsgExecutors;
+
+    public ConsumeMessageConcurrentlyService(DefaultMQPushConsumerImpl defaultMQPushConsumerImpl,
+<span class="fc" id="L64">        MessageListenerConcurrently messageListener) {</span>
+<span class="fc" id="L65">        this.defaultMQPushConsumerImpl = defaultMQPushConsumerImpl;</span>
+<span class="fc" id="L66">        this.messageListener = messageListener;</span>
+
+<span class="fc" id="L68">        this.defaultMQPushConsumer = this.defaultMQPushConsumerImpl.getDefaultMQPushConsumer();</span>
+<span class="fc" id="L69">        this.consumerGroup = this.defaultMQPushConsumer.getConsumerGroup();</span>
+<span class="fc" id="L70">        this.consumeRequestQueue = new LinkedBlockingQueue&lt;Runnable&gt;();</span>
+
+<span class="fc" id="L72">        String consumeThreadPrefix = null;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (consumerGroup.length() &gt; 100) {</span>
+<span class="fc" id="L74">            consumeThreadPrefix = new StringBuilder(&quot;ConsumeMessageThread_&quot;).append(consumerGroup, 0, 100).append(&quot;_&quot;).toString();</span>
+        } else {
+<span class="fc" id="L76">            consumeThreadPrefix = new StringBuilder(&quot;ConsumeMessageThread_&quot;).append(consumerGroup).append(&quot;_&quot;).toString();</span>
+        }
+<span class="fc" id="L78">        this.consumeExecutor = new ThreadPoolExecutor(</span>
+<span class="fc" id="L79">            this.defaultMQPushConsumer.getConsumeThreadMin(),</span>
+<span class="fc" id="L80">            this.defaultMQPushConsumer.getConsumeThreadMax(),</span>
+            1000 * 60,
+            TimeUnit.MILLISECONDS,
+            this.consumeRequestQueue,
+            new ThreadFactoryImpl(consumeThreadPrefix));
+
+<span class="fc" id="L86">        this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(&quot;ConsumeMessageScheduledThread_&quot;));</span>
+<span class="fc" id="L87">        this.cleanExpireMsgExecutors = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(&quot;CleanExpireMsgScheduledThread_&quot;));</span>
+<span class="fc" id="L88">    }</span>
+
+    public void start() {
+<span class="fc" id="L91">        this.cleanExpireMsgExecutors.scheduleAtFixedRate(new Runnable() {</span>
+
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L96">                    cleanExpireMsg();</span>
+<span class="nc" id="L97">                } catch (Throwable e) {</span>
+<span class="nc" id="L98">                    log.error(&quot;scheduleAtFixedRate cleanExpireMsg exception&quot;, e);</span>
+<span class="nc" id="L99">                }</span>
+<span class="nc" id="L100">            }</span>
+
+<span class="fc" id="L102">        }, this.defaultMQPushConsumer.getConsumeTimeout(), this.defaultMQPushConsumer.getConsumeTimeout(), TimeUnit.MINUTES);</span>
+<span class="fc" id="L103">    }</span>
+
+    public void shutdown(long awaitTerminateMillis) {
+<span class="fc" id="L106">        this.scheduledExecutorService.shutdown();</span>
+<span class="fc" id="L107">        ThreadUtils.shutdownGracefully(this.consumeExecutor, awaitTerminateMillis, TimeUnit.MILLISECONDS);</span>
+<span class="fc" id="L108">        this.cleanExpireMsgExecutors.shutdown();</span>
+<span class="fc" id="L109">    }</span>
+
+    @Override
+    public void updateCorePoolSize(int corePoolSize) {
+<span class="nc bnc" id="L113" title="All 4 branches missed.">        if (corePoolSize &gt; 0</span>
+            &amp;&amp; corePoolSize &lt;= Short.MAX_VALUE
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            &amp;&amp; corePoolSize &lt; this.defaultMQPushConsumer.getConsumeThreadMax()) {</span>
+<span class="nc" id="L116">            this.consumeExecutor.setCorePoolSize(corePoolSize);</span>
+        }
+<span class="nc" id="L118">    }</span>
+
+    @Override
+    public void incCorePoolSize() {
+
+<span class="nc" id="L123">    }</span>
+
+    @Override
+    public void decCorePoolSize() {
+
+<span class="fc" id="L128">    }</span>
+
+    @Override
+    public int getCorePoolSize() {
+<span class="fc" id="L132">        return this.consumeExecutor.getCorePoolSize();</span>
+    }
+
+    @Override
+    public ConsumeMessageDirectlyResult consumeMessageDirectly(MessageExt msg, String brokerName) {
+<span class="nc" id="L137">        ConsumeMessageDirectlyResult result = new ConsumeMessageDirectlyResult();</span>
+<span class="nc" id="L138">        result.setOrder(false);</span>
+<span class="nc" id="L139">        result.setAutoCommit(true);</span>
+
+<span class="nc" id="L141">        msg.setBrokerName(brokerName);</span>
+<span class="nc" id="L142">        List&lt;MessageExt&gt; msgs = new ArrayList&lt;MessageExt&gt;();</span>
+<span class="nc" id="L143">        msgs.add(msg);</span>
+<span class="nc" id="L144">        MessageQueue mq = new MessageQueue();</span>
+<span class="nc" id="L145">        mq.setBrokerName(brokerName);</span>
+<span class="nc" id="L146">        mq.setTopic(msg.getTopic());</span>
+<span class="nc" id="L147">        mq.setQueueId(msg.getQueueId());</span>
+
+<span class="nc" id="L149">        ConsumeConcurrentlyContext context = new ConsumeConcurrentlyContext(mq);</span>
+
+<span class="nc" id="L151">        this.defaultMQPushConsumerImpl.resetRetryAndNamespace(msgs, this.consumerGroup);</span>
+
+<span class="nc" id="L153">        final long beginTime = System.currentTimeMillis();</span>
+
+<span class="nc" id="L155">        log.info(&quot;consumeMessageDirectly receive new message: {}&quot;, msg);</span>
+
+        try {
+<span class="nc" id="L158">            ConsumeConcurrentlyStatus status = this.messageListener.consumeMessage(msgs, context);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            if (status != null) {</span>
+<span class="nc bnc" id="L160" title="All 3 branches missed.">                switch (status) {</span>
+                    case CONSUME_SUCCESS:
+<span class="nc" id="L162">                        result.setConsumeResult(CMResult.CR_SUCCESS);</span>
+<span class="nc" id="L163">                        break;</span>
+                    case RECONSUME_LATER:
+<span class="nc" id="L165">                        result.setConsumeResult(CMResult.CR_LATER);</span>
+<span class="nc" id="L166">                        break;</span>
+                    default:
+<span class="nc" id="L168">                        break;</span>
+                }
+            } else {
+<span class="nc" id="L171">                result.setConsumeResult(CMResult.CR_RETURN_NULL);</span>
+            }
+<span class="nc" id="L173">        } catch (Throwable e) {</span>
+<span class="nc" id="L174">            result.setConsumeResult(CMResult.CR_THROW_EXCEPTION);</span>
+<span class="nc" id="L175">            result.setRemark(RemotingHelper.exceptionSimpleDesc(e));</span>
+
+<span class="nc" id="L177">            log.warn(String.format(&quot;consumeMessageDirectly exception: %s Group: %s Msgs: %s MQ: %s&quot;,</span>
+<span class="nc" id="L178">                RemotingHelper.exceptionSimpleDesc(e),</span>
+                ConsumeMessageConcurrentlyService.this.consumerGroup,
+                msgs,
+                mq), e);
+<span class="nc" id="L182">        }</span>
+
+<span class="nc" id="L184">        result.setSpentTimeMills(System.currentTimeMillis() - beginTime);</span>
+
+<span class="nc" id="L186">        log.info(&quot;consumeMessageDirectly Result: {}&quot;, result);</span>
+
+<span class="nc" id="L188">        return result;</span>
+    }
+
+    @Override
+    public void submitConsumeRequest(
+        final List&lt;MessageExt&gt; msgs,
+        final ProcessQueue processQueue,
+        final MessageQueue messageQueue,
+        final boolean dispatchToConsume) {
+<span class="fc" id="L197">        final int consumeBatchSize = this.defaultMQPushConsumer.getConsumeMessageBatchMaxSize();</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (msgs.size() &lt;= consumeBatchSize) {</span>
+<span class="fc" id="L199">            ConsumeRequest consumeRequest = new ConsumeRequest(msgs, processQueue, messageQueue);</span>
+            try {
+<span class="fc" id="L201">                this.consumeExecutor.submit(consumeRequest);</span>
+<span class="nc" id="L202">            } catch (RejectedExecutionException e) {</span>
+<span class="nc" id="L203">                this.submitConsumeRequestLater(consumeRequest);</span>
+<span class="fc" id="L204">            }</span>
+<span class="fc" id="L205">        } else {</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            for (int total = 0; total &lt; msgs.size(); ) {</span>
+<span class="nc" id="L207">                List&lt;MessageExt&gt; msgThis = new ArrayList&lt;MessageExt&gt;(consumeBatchSize);</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                for (int i = 0; i &lt; consumeBatchSize; i++, total++) {</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">                    if (total &lt; msgs.size()) {</span>
+<span class="nc" id="L210">                        msgThis.add(msgs.get(total));</span>
+                    } else {
+                        break;
+                    }
+                }
+
+<span class="nc" id="L216">                ConsumeRequest consumeRequest = new ConsumeRequest(msgThis, processQueue, messageQueue);</span>
+                try {
+<span class="nc" id="L218">                    this.consumeExecutor.submit(consumeRequest);</span>
+<span class="nc" id="L219">                } catch (RejectedExecutionException e) {</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">                    for (; total &lt; msgs.size(); total++) {</span>
+<span class="nc" id="L221">                        msgThis.add(msgs.get(total));</span>
+                    }
+
+<span class="nc" id="L224">                    this.submitConsumeRequestLater(consumeRequest);</span>
+<span class="nc" id="L225">                }</span>
+<span class="nc" id="L226">            }</span>
+        }
+<span class="fc" id="L228">    }</span>
+
+    @Override
+    public void submitPopConsumeRequest(final List&lt;MessageExt&gt; msgs,
+        final PopProcessQueue processQueue,
+        final MessageQueue messageQueue) {
+<span class="nc" id="L234">        throw new UnsupportedOperationException();</span>
+    }
+
+    private void cleanExpireMsg() {
+<span class="nc" id="L238">        Iterator&lt;Map.Entry&lt;MessageQueue, ProcessQueue&gt;&gt; it =</span>
+<span class="nc" id="L239">            this.defaultMQPushConsumerImpl.getRebalanceImpl().getProcessQueueTable().entrySet().iterator();</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        while (it.hasNext()) {</span>
+<span class="nc" id="L241">            Map.Entry&lt;MessageQueue, ProcessQueue&gt; next = it.next();</span>
+<span class="nc" id="L242">            ProcessQueue pq = next.getValue();</span>
+<span class="nc" id="L243">            pq.cleanExpiredMsg(this.defaultMQPushConsumer);</span>
+<span class="nc" id="L244">        }</span>
+<span class="nc" id="L245">    }</span>
+
+    public void processConsumeResult(
+        final ConsumeConcurrentlyStatus status,
+        final ConsumeConcurrentlyContext context,
+        final ConsumeRequest consumeRequest
+    ) {
+<span class="fc" id="L252">        int ackIndex = context.getAckIndex();</span>
+
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        if (consumeRequest.getMsgs().isEmpty())</span>
+<span class="nc" id="L255">            return;</span>
+
+<span class="pc bpc" id="L257" title="1 of 3 branches missed.">        switch (status) {</span>
+            case CONSUME_SUCCESS:
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">                if (ackIndex &gt;= consumeRequest.getMsgs().size()) {</span>
+<span class="fc" id="L260">                    ackIndex = consumeRequest.getMsgs().size() - 1;</span>
+                }
+<span class="fc" id="L262">                int ok = ackIndex + 1;</span>
+<span class="fc" id="L263">                int failed = consumeRequest.getMsgs().size() - ok;</span>
+<span class="fc" id="L264">                this.getConsumerStatsManager().incConsumeOKTPS(consumerGroup, consumeRequest.getMessageQueue().getTopic(), ok);</span>
+<span class="fc" id="L265">                this.getConsumerStatsManager().incConsumeFailedTPS(consumerGroup, consumeRequest.getMessageQueue().getTopic(), failed);</span>
+<span class="fc" id="L266">                break;</span>
+            case RECONSUME_LATER:
+<span class="fc" id="L268">                ackIndex = -1;</span>
+<span class="fc" id="L269">                this.getConsumerStatsManager().incConsumeFailedTPS(consumerGroup, consumeRequest.getMessageQueue().getTopic(),</span>
+<span class="fc" id="L270">                    consumeRequest.getMsgs().size());</span>
+<span class="fc" id="L271">                break;</span>
+            default:
+                break;
+        }
+
+<span class="pc bpc" id="L276" title="2 of 3 branches missed.">        switch (this.defaultMQPushConsumer.getMessageModel()) {</span>
+            case BROADCASTING:
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                for (int i = ackIndex + 1; i &lt; consumeRequest.getMsgs().size(); i++) {</span>
+<span class="nc" id="L279">                    MessageExt msg = consumeRequest.getMsgs().get(i);</span>
+<span class="nc" id="L280">                    log.warn(&quot;BROADCASTING, the message consume failed, drop it, {}&quot;, msg.toString());</span>
+                }
+<span class="nc" id="L282">                break;</span>
+            case CLUSTERING:
+<span class="fc" id="L284">                List&lt;MessageExt&gt; msgBackFailed = new ArrayList&lt;MessageExt&gt;(consumeRequest.getMsgs().size());</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">                for (int i = ackIndex + 1; i &lt; consumeRequest.getMsgs().size(); i++) {</span>
+<span class="fc" id="L286">                    MessageExt msg = consumeRequest.getMsgs().get(i);</span>
+<span class="fc" id="L287">                    boolean result = this.sendMessageBack(msg, context);</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">                    if (!result) {</span>
+<span class="nc" id="L289">                        msg.setReconsumeTimes(msg.getReconsumeTimes() + 1);</span>
+<span class="nc" id="L290">                        msgBackFailed.add(msg);</span>
+                    }
+                }
+
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">                if (!msgBackFailed.isEmpty()) {</span>
+<span class="nc" id="L295">                    consumeRequest.getMsgs().removeAll(msgBackFailed);</span>
+
+<span class="nc" id="L297">                    this.submitConsumeRequestLater(msgBackFailed, consumeRequest.getProcessQueue(), consumeRequest.getMessageQueue());</span>
+                }
+                break;
+            default:
+                break;
+        }
+
+<span class="fc" id="L304">        long offset = consumeRequest.getProcessQueue().removeMessage(consumeRequest.getMsgs());</span>
+<span class="pc bpc" id="L305" title="1 of 4 branches missed.">        if (offset &gt;= 0 &amp;&amp; !consumeRequest.getProcessQueue().isDropped()) {</span>
+<span class="fc" id="L306">            this.defaultMQPushConsumerImpl.getOffsetStore().updateOffset(consumeRequest.getMessageQueue(), offset, true);</span>
+        }
+<span class="fc" id="L308">    }</span>
+
+    public ConsumerStatsManager getConsumerStatsManager() {
+<span class="fc" id="L311">        return this.defaultMQPushConsumerImpl.getConsumerStatsManager();</span>
+    }
+
+    public boolean sendMessageBack(final MessageExt msg, final ConsumeConcurrentlyContext context) {
+<span class="fc" id="L315">        int delayLevel = context.getDelayLevelWhenNextConsume();</span>
+
+        // Wrap topic with namespace before sending back message.
+<span class="fc" id="L318">        msg.setTopic(this.defaultMQPushConsumer.withNamespace(msg.getTopic()));</span>
+        try {
+<span class="fc" id="L320">            this.defaultMQPushConsumerImpl.sendMessageBack(msg, delayLevel, this.defaultMQPushConsumer.queueWithNamespace(context.getMessageQueue()));</span>
+<span class="fc" id="L321">            return true;</span>
+<span class="nc" id="L322">        } catch (Exception e) {</span>
+<span class="nc" id="L323">            log.error(&quot;sendMessageBack exception, group: &quot; + this.consumerGroup + &quot; msg: &quot; + msg, e);</span>
+        }
+
+<span class="nc" id="L326">        return false;</span>
+    }
+
+    private void submitConsumeRequestLater(
+        final List&lt;MessageExt&gt; msgs,
+        final ProcessQueue processQueue,
+        final MessageQueue messageQueue
+    ) {
+
+<span class="nc" id="L335">        this.scheduledExecutorService.schedule(new Runnable() {</span>
+
+            @Override
+            public void run() {
+<span class="nc" id="L339">                ConsumeMessageConcurrentlyService.this.submitConsumeRequest(msgs, processQueue, messageQueue, true);</span>
+<span class="nc" id="L340">            }</span>
+        }, 5000, TimeUnit.MILLISECONDS);
+<span class="nc" id="L342">    }</span>
+
+    private void submitConsumeRequestLater(final ConsumeRequest consumeRequest
+    ) {
+
+<span class="nc" id="L347">        this.scheduledExecutorService.schedule(new Runnable() {</span>
+
+            @Override
+            public void run() {
+<span class="nc" id="L351">                ConsumeMessageConcurrentlyService.this.consumeExecutor.submit(consumeRequest);</span>
+<span class="nc" id="L352">            }</span>
+        }, 5000, TimeUnit.MILLISECONDS);
+<span class="nc" id="L354">    }</span>
+
+    class ConsumeRequest implements Runnable {
+        private final List&lt;MessageExt&gt; msgs;
+        private final ProcessQueue processQueue;
+        private final MessageQueue messageQueue;
+
+<span class="fc" id="L361">        public ConsumeRequest(List&lt;MessageExt&gt; msgs, ProcessQueue processQueue, MessageQueue messageQueue) {</span>
+<span class="fc" id="L362">            this.msgs = msgs;</span>
+<span class="fc" id="L363">            this.processQueue = processQueue;</span>
+<span class="fc" id="L364">            this.messageQueue = messageQueue;</span>
+<span class="fc" id="L365">        }</span>
+
+        public List&lt;MessageExt&gt; getMsgs() {
+<span class="fc" id="L368">            return msgs;</span>
+        }
+
+        public ProcessQueue getProcessQueue() {
+<span class="fc" id="L372">            return processQueue;</span>
+        }
+
+        @Override
+        public void run() {
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">            if (this.processQueue.isDropped()) {</span>
+<span class="nc" id="L378">                log.info(&quot;the message queue not be able to consume, because it's dropped. group={} {}&quot;, ConsumeMessageConcurrentlyService.this.consumerGroup, this.messageQueue);</span>
+<span class="nc" id="L379">                return;</span>
+            }
+
+<span class="fc" id="L382">            MessageListenerConcurrently listener = ConsumeMessageConcurrentlyService.this.messageListener;</span>
+<span class="fc" id="L383">            ConsumeConcurrentlyContext context = new ConsumeConcurrentlyContext(messageQueue);</span>
+<span class="fc" id="L384">            ConsumeConcurrentlyStatus status = null;</span>
+<span class="fc" id="L385">            defaultMQPushConsumerImpl.tryResetPopRetryTopic(msgs, consumerGroup);</span>
+<span class="fc" id="L386">            defaultMQPushConsumerImpl.resetRetryAndNamespace(msgs, defaultMQPushConsumer.getConsumerGroup());</span>
+
+<span class="fc" id="L388">            ConsumeMessageContext consumeMessageContext = null;</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">            if (ConsumeMessageConcurrentlyService.this.defaultMQPushConsumerImpl.hasHook()) {</span>
+<span class="fc" id="L390">                consumeMessageContext = new ConsumeMessageContext();</span>
+<span class="fc" id="L391">                consumeMessageContext.setNamespace(defaultMQPushConsumer.getNamespace());</span>
+<span class="fc" id="L392">                consumeMessageContext.setConsumerGroup(defaultMQPushConsumer.getConsumerGroup());</span>
+<span class="fc" id="L393">                consumeMessageContext.setProps(new HashMap&lt;String, String&gt;());</span>
+<span class="fc" id="L394">                consumeMessageContext.setMq(messageQueue);</span>
+<span class="fc" id="L395">                consumeMessageContext.setMsgList(msgs);</span>
+<span class="fc" id="L396">                consumeMessageContext.setSuccess(false);</span>
+<span class="fc" id="L397">                ConsumeMessageConcurrentlyService.this.defaultMQPushConsumerImpl.executeHookBefore(consumeMessageContext);</span>
+            }
+
+<span class="fc" id="L400">            long beginTimestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L401">            boolean hasException = false;</span>
+<span class="fc" id="L402">            ConsumeReturnType returnType = ConsumeReturnType.SUCCESS;</span>
+            try {
+<span class="pc bpc" id="L404" title="2 of 4 branches missed.">                if (msgs != null &amp;&amp; !msgs.isEmpty()) {</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">                    for (MessageExt msg : msgs) {</span>
+<span class="fc" id="L406">                        MessageAccessor.setConsumeStartTimeStamp(msg, String.valueOf(System.currentTimeMillis()));</span>
+<span class="fc" id="L407">                    }</span>
+                }
+<span class="fc" id="L409">                status = listener.consumeMessage(Collections.unmodifiableList(msgs), context);</span>
+<span class="nc" id="L410">            } catch (Throwable e) {</span>
+<span class="nc" id="L411">                log.warn(String.format(&quot;consumeMessage exception: %s Group: %s Msgs: %s MQ: %s&quot;,</span>
+<span class="nc" id="L412">                    RemotingHelper.exceptionSimpleDesc(e),</span>
+<span class="nc" id="L413">                    ConsumeMessageConcurrentlyService.this.consumerGroup,</span>
+                    msgs,
+                    messageQueue), e);
+<span class="nc" id="L416">                hasException = true;</span>
+<span class="fc" id="L417">            }</span>
+<span class="fc" id="L418">            long consumeRT = System.currentTimeMillis() - beginTimestamp;</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">            if (null == status) {</span>
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">                if (hasException) {</span>
+<span class="nc" id="L421">                    returnType = ConsumeReturnType.EXCEPTION;</span>
+                } else {
+<span class="fc" id="L423">                    returnType = ConsumeReturnType.RETURNNULL;</span>
+                }
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">            } else if (consumeRT &gt;= defaultMQPushConsumer.getConsumeTimeout() * 60 * 1000) {</span>
+<span class="nc" id="L426">                returnType = ConsumeReturnType.TIME_OUT;</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">            } else if (ConsumeConcurrentlyStatus.RECONSUME_LATER == status) {</span>
+<span class="nc" id="L428">                returnType = ConsumeReturnType.FAILED;</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">            } else if (ConsumeConcurrentlyStatus.CONSUME_SUCCESS == status) {</span>
+<span class="fc" id="L430">                returnType = ConsumeReturnType.SUCCESS;</span>
+            }
+
+<span class="fc bfc" id="L433" title="All 2 branches covered.">            if (ConsumeMessageConcurrentlyService.this.defaultMQPushConsumerImpl.hasHook()) {</span>
+<span class="fc" id="L434">                consumeMessageContext.getProps().put(MixAll.CONSUME_CONTEXT_TYPE, returnType.name());</span>
+            }
+
+<span class="fc bfc" id="L437" title="All 2 branches covered.">            if (null == status) {</span>
+<span class="fc" id="L438">                log.warn(&quot;consumeMessage return null, Group: {} Msgs: {} MQ: {}&quot;,</span>
+<span class="fc" id="L439">                    ConsumeMessageConcurrentlyService.this.consumerGroup,</span>
+                    msgs,
+                    messageQueue);
+<span class="fc" id="L442">                status = ConsumeConcurrentlyStatus.RECONSUME_LATER;</span>
+            }
+
+<span class="fc bfc" id="L445" title="All 2 branches covered.">            if (ConsumeMessageConcurrentlyService.this.defaultMQPushConsumerImpl.hasHook()) {</span>
+<span class="fc" id="L446">                consumeMessageContext.setStatus(status.toString());</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">                consumeMessageContext.setSuccess(ConsumeConcurrentlyStatus.CONSUME_SUCCESS == status);</span>
+<span class="fc" id="L448">                ConsumeMessageConcurrentlyService.this.defaultMQPushConsumerImpl.executeHookAfter(consumeMessageContext);</span>
+            }
+
+<span class="fc" id="L451">            ConsumeMessageConcurrentlyService.this.getConsumerStatsManager()</span>
+<span class="fc" id="L452">                .incConsumeRT(ConsumeMessageConcurrentlyService.this.consumerGroup, messageQueue.getTopic(), consumeRT);</span>
+
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">            if (!processQueue.isDropped()) {</span>
+<span class="fc" id="L455">                ConsumeMessageConcurrentlyService.this.processConsumeResult(status, context, this);</span>
+            } else {
+<span class="nc" id="L457">                log.warn(&quot;processQueue is dropped without process consume result. messageQueue={}, msgs={}&quot;, messageQueue, msgs);</span>
+            }
+<span class="fc" id="L459">        }</span>
+
+        public MessageQueue getMessageQueue() {
+<span class="fc" id="L462">            return messageQueue;</span>
+        }
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

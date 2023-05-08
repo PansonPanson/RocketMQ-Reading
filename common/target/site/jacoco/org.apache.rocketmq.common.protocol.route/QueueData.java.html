@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>QueueData.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.route</a> &gt; <span class="el_source">QueueData.java</span></div><h1>QueueData.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * $Id: QueueData.java 1835 2013-05-16 02:00:50Z vintagewang@apache.org $
+ */
+package org.apache.rocketmq.common.protocol.route;
+
+public class QueueData implements Comparable&lt;QueueData&gt; {
+    private String brokerName;
+    private int readQueueNums;
+    private int writeQueueNums;
+    private int perm;
+    private int topicSysFlag;
+
+<span class="fc" id="L30">    public QueueData() {</span>
+
+<span class="fc" id="L32">    }</span>
+
+    // Deep copy QueueData
+<span class="nc" id="L35">    public QueueData(QueueData queueData) {</span>
+<span class="nc" id="L36">        this.brokerName = queueData.brokerName;</span>
+<span class="nc" id="L37">        this.readQueueNums = queueData.readQueueNums;</span>
+<span class="nc" id="L38">        this.writeQueueNums = queueData.writeQueueNums;</span>
+<span class="nc" id="L39">        this.perm = queueData.perm;</span>
+<span class="nc" id="L40">        this.topicSysFlag = queueData.topicSysFlag;</span>
+<span class="nc" id="L41">    }</span>
+
+    public int getReadQueueNums() {
+<span class="fc" id="L44">        return readQueueNums;</span>
+    }
+
+    public void setReadQueueNums(int readQueueNums) {
+<span class="fc" id="L48">        this.readQueueNums = readQueueNums;</span>
+<span class="fc" id="L49">    }</span>
+
+    public int getWriteQueueNums() {
+<span class="fc" id="L52">        return writeQueueNums;</span>
+    }
+
+    public void setWriteQueueNums(int writeQueueNums) {
+<span class="fc" id="L56">        this.writeQueueNums = writeQueueNums;</span>
+<span class="fc" id="L57">    }</span>
+
+    public int getPerm() {
+<span class="fc" id="L60">        return perm;</span>
+    }
+
+    public void setPerm(int perm) {
+<span class="fc" id="L64">        this.perm = perm;</span>
+<span class="fc" id="L65">    }</span>
+
+    public int getTopicSysFlag() {
+<span class="fc" id="L68">        return topicSysFlag;</span>
+    }
+
+    public void setTopicSysFlag(int topicSysFlag) {
+<span class="fc" id="L72">        this.topicSysFlag = topicSysFlag;</span>
+<span class="fc" id="L73">    }</span>
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L77">        final int prime = 31;</span>
+<span class="nc" id="L78">        int result = 1;</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        result = prime * result + ((brokerName == null) ? 0 : brokerName.hashCode());</span>
+<span class="nc" id="L80">        result = prime * result + perm;</span>
+<span class="nc" id="L81">        result = prime * result + readQueueNums;</span>
+<span class="nc" id="L82">        result = prime * result + writeQueueNums;</span>
+<span class="nc" id="L83">        result = prime * result + topicSysFlag;</span>
+<span class="nc" id="L84">        return result;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (this == obj)</span>
+<span class="fc" id="L90">            return true;</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (obj == null)</span>
+<span class="nc" id="L92">            return false;</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (getClass() != obj.getClass())</span>
+<span class="nc" id="L94">            return false;</span>
+<span class="fc" id="L95">        QueueData other = (QueueData) obj;</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (brokerName == null) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            if (other.brokerName != null)</span>
+<span class="nc" id="L98">                return false;</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        } else if (!brokerName.equals(other.brokerName))</span>
+<span class="nc" id="L100">            return false;</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (perm != other.perm)</span>
+<span class="nc" id="L102">            return false;</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (readQueueNums != other.readQueueNums)</span>
+<span class="nc" id="L104">            return false;</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (writeQueueNums != other.writeQueueNums)</span>
+<span class="nc" id="L106">            return false;</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (topicSysFlag != other.topicSysFlag)</span>
+<span class="nc" id="L108">            return false;</span>
+<span class="fc" id="L109">        return true;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L114">        return &quot;QueueData [brokerName=&quot; + brokerName + &quot;, readQueueNums=&quot; + readQueueNums</span>
+            + &quot;, writeQueueNums=&quot; + writeQueueNums + &quot;, perm=&quot; + perm + &quot;, topicSysFlag=&quot; + topicSysFlag
+            + &quot;]&quot;;
+    }
+
+    @Override
+    public int compareTo(QueueData o) {
+<span class="nc" id="L121">        return this.brokerName.compareTo(o.getBrokerName());</span>
+    }
+
+    public String getBrokerName() {
+<span class="fc" id="L125">        return brokerName;</span>
+    }
+
+    public void setBrokerName(String brokerName) {
+<span class="fc" id="L129">        this.brokerName = brokerName;</span>
+<span class="fc" id="L130">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

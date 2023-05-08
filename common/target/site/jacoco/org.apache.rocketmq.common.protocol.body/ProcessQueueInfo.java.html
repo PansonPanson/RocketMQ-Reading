@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProcessQueueInfo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.body</a> &gt; <span class="el_source">ProcessQueueInfo.java</span></div><h1>ProcessQueueInfo.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.protocol.body;
+
+import org.apache.rocketmq.common.UtilAll;
+
+<span class="fc" id="L22">public class ProcessQueueInfo {</span>
+    private long commitOffset;
+
+    private long cachedMsgMinOffset;
+    private long cachedMsgMaxOffset;
+    private int cachedMsgCount;
+    private int cachedMsgSizeInMiB;
+
+    private long transactionMsgMinOffset;
+    private long transactionMsgMaxOffset;
+    private int transactionMsgCount;
+
+    private boolean locked;
+    private long tryUnlockTimes;
+    private long lastLockTimestamp;
+
+    private boolean droped;
+    private long lastPullTimestamp;
+    private long lastConsumeTimestamp;
+
+    public long getCommitOffset() {
+<span class="fc" id="L43">        return commitOffset;</span>
+    }
+
+    public void setCommitOffset(long commitOffset) {
+<span class="fc" id="L47">        this.commitOffset = commitOffset;</span>
+<span class="fc" id="L48">    }</span>
+
+    public long getCachedMsgMinOffset() {
+<span class="fc" id="L51">        return cachedMsgMinOffset;</span>
+    }
+
+    public void setCachedMsgMinOffset(long cachedMsgMinOffset) {
+<span class="fc" id="L55">        this.cachedMsgMinOffset = cachedMsgMinOffset;</span>
+<span class="fc" id="L56">    }</span>
+
+    public long getCachedMsgMaxOffset() {
+<span class="fc" id="L59">        return cachedMsgMaxOffset;</span>
+    }
+
+    public void setCachedMsgMaxOffset(long cachedMsgMaxOffset) {
+<span class="fc" id="L63">        this.cachedMsgMaxOffset = cachedMsgMaxOffset;</span>
+<span class="fc" id="L64">    }</span>
+
+    public int getCachedMsgCount() {
+<span class="fc" id="L67">        return cachedMsgCount;</span>
+    }
+
+    public void setCachedMsgCount(int cachedMsgCount) {
+<span class="fc" id="L71">        this.cachedMsgCount = cachedMsgCount;</span>
+<span class="fc" id="L72">    }</span>
+
+    public long getTransactionMsgMinOffset() {
+<span class="fc" id="L75">        return transactionMsgMinOffset;</span>
+    }
+
+    public void setTransactionMsgMinOffset(long transactionMsgMinOffset) {
+<span class="fc" id="L79">        this.transactionMsgMinOffset = transactionMsgMinOffset;</span>
+<span class="fc" id="L80">    }</span>
+
+    public long getTransactionMsgMaxOffset() {
+<span class="fc" id="L83">        return transactionMsgMaxOffset;</span>
+    }
+
+    public void setTransactionMsgMaxOffset(long transactionMsgMaxOffset) {
+<span class="fc" id="L87">        this.transactionMsgMaxOffset = transactionMsgMaxOffset;</span>
+<span class="fc" id="L88">    }</span>
+
+    public int getTransactionMsgCount() {
+<span class="fc" id="L91">        return transactionMsgCount;</span>
+    }
+
+    public void setTransactionMsgCount(int transactionMsgCount) {
+<span class="fc" id="L95">        this.transactionMsgCount = transactionMsgCount;</span>
+<span class="fc" id="L96">    }</span>
+
+    public boolean isLocked() {
+<span class="fc" id="L99">        return locked;</span>
+    }
+
+    public void setLocked(boolean locked) {
+<span class="fc" id="L103">        this.locked = locked;</span>
+<span class="fc" id="L104">    }</span>
+
+    public long getTryUnlockTimes() {
+<span class="fc" id="L107">        return tryUnlockTimes;</span>
+    }
+
+    public void setTryUnlockTimes(long tryUnlockTimes) {
+<span class="fc" id="L111">        this.tryUnlockTimes = tryUnlockTimes;</span>
+<span class="fc" id="L112">    }</span>
+
+    public long getLastLockTimestamp() {
+<span class="fc" id="L115">        return lastLockTimestamp;</span>
+    }
+
+    public void setLastLockTimestamp(long lastLockTimestamp) {
+<span class="fc" id="L119">        this.lastLockTimestamp = lastLockTimestamp;</span>
+<span class="fc" id="L120">    }</span>
+
+    public boolean isDroped() {
+<span class="fc" id="L123">        return droped;</span>
+    }
+
+    public void setDroped(boolean droped) {
+<span class="fc" id="L127">        this.droped = droped;</span>
+<span class="fc" id="L128">    }</span>
+
+    public long getLastPullTimestamp() {
+<span class="fc" id="L131">        return lastPullTimestamp;</span>
+    }
+
+    public void setLastPullTimestamp(long lastPullTimestamp) {
+<span class="fc" id="L135">        this.lastPullTimestamp = lastPullTimestamp;</span>
+<span class="fc" id="L136">    }</span>
+
+    public long getLastConsumeTimestamp() {
+<span class="fc" id="L139">        return lastConsumeTimestamp;</span>
+    }
+
+    public void setLastConsumeTimestamp(long lastConsumeTimestamp) {
+<span class="fc" id="L143">        this.lastConsumeTimestamp = lastConsumeTimestamp;</span>
+<span class="fc" id="L144">    }</span>
+
+    public int getCachedMsgSizeInMiB() {
+<span class="fc" id="L147">        return cachedMsgSizeInMiB;</span>
+    }
+
+    public void setCachedMsgSizeInMiB(final int cachedMsgSizeInMiB) {
+<span class="fc" id="L151">        this.cachedMsgSizeInMiB = cachedMsgSizeInMiB;</span>
+<span class="fc" id="L152">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L156">        return &quot;ProcessQueueInfo [commitOffset=&quot; + commitOffset + &quot;, cachedMsgMinOffset=&quot;</span>
+            + cachedMsgMinOffset + &quot;, cachedMsgMaxOffset=&quot; + cachedMsgMaxOffset
+            + &quot;, cachedMsgCount=&quot; + cachedMsgCount + &quot;, cachedMsgSizeInMiB=&quot; + cachedMsgSizeInMiB
+            + &quot;, transactionMsgMinOffset=&quot; + transactionMsgMinOffset
+            + &quot;, transactionMsgMaxOffset=&quot; + transactionMsgMaxOffset + &quot;, transactionMsgCount=&quot;
+            + transactionMsgCount + &quot;, locked=&quot; + locked + &quot;, tryUnlockTimes=&quot; + tryUnlockTimes
+<span class="nc" id="L162">            + &quot;, lastLockTimestamp=&quot; + UtilAll.timeMillisToHumanString(lastLockTimestamp) + &quot;, droped=&quot;</span>
+<span class="nc" id="L163">            + droped + &quot;, lastPullTimestamp=&quot; + UtilAll.timeMillisToHumanString(lastPullTimestamp)</span>
+<span class="nc" id="L164">            + &quot;, lastConsumeTimestamp=&quot; + UtilAll.timeMillisToHumanString(lastConsumeTimestamp) + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

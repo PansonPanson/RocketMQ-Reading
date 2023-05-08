@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MQHelper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client</a> &gt; <span class="el_source">MQHelper.java</span></div><h1>MQHelper.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client;
+
+import java.util.Set;
+import java.util.TreeSet;
+import org.apache.rocketmq.client.consumer.DefaultMQPullConsumer;
+import org.apache.rocketmq.client.log.ClientLogger;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
+
+<span class="nc" id="L27">public class MQHelper {</span>
+    @Deprecated
+    public static void resetOffsetByTimestamp(
+        final MessageModel messageModel,
+        final String consumerGroup,
+        final String topic,
+        final long timestamp) throws Exception {
+<span class="nc" id="L34">        resetOffsetByTimestamp(messageModel, &quot;DEFAULT&quot;, consumerGroup, topic, timestamp);</span>
+<span class="nc" id="L35">    }</span>
+
+    /**
+     * Reset consumer topic offset according to time
+     *
+     * @param messageModel which model
+     * @param instanceName which instance
+     * @param consumerGroup consumer group
+     * @param topic topic
+     * @param timestamp time
+     */
+    public static void resetOffsetByTimestamp(
+        final MessageModel messageModel,
+        final String instanceName,
+        final String consumerGroup,
+        final String topic,
+        final long timestamp) throws Exception {
+<span class="nc" id="L52">        final InternalLogger log = ClientLogger.getLog();</span>
+
+<span class="nc" id="L54">        DefaultMQPullConsumer consumer = new DefaultMQPullConsumer(consumerGroup);</span>
+<span class="nc" id="L55">        consumer.setInstanceName(instanceName);</span>
+<span class="nc" id="L56">        consumer.setMessageModel(messageModel);</span>
+<span class="nc" id="L57">        consumer.start();</span>
+
+<span class="nc" id="L59">        Set&lt;MessageQueue&gt; mqs = null;</span>
+        try {
+<span class="nc" id="L61">            mqs = consumer.fetchSubscribeMessageQueues(topic);</span>
+<span class="nc bnc" id="L62" title="All 4 branches missed.">            if (mqs != null &amp;&amp; !mqs.isEmpty()) {</span>
+<span class="nc" id="L63">                TreeSet&lt;MessageQueue&gt; mqsNew = new TreeSet&lt;MessageQueue&gt;(mqs);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">                for (MessageQueue mq : mqsNew) {</span>
+<span class="nc" id="L65">                    long offset = consumer.searchOffset(mq, timestamp);</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                    if (offset &gt;= 0) {</span>
+<span class="nc" id="L67">                        consumer.updateConsumeOffset(mq, offset);</span>
+<span class="nc" id="L68">                        log.info(&quot;resetOffsetByTimestamp updateConsumeOffset success, {} {} {}&quot;,</span>
+<span class="nc" id="L69">                            consumerGroup, offset, mq);</span>
+                    }
+<span class="nc" id="L71">                }</span>
+            }
+<span class="nc" id="L73">        } catch (Exception e) {</span>
+<span class="nc" id="L74">            log.warn(&quot;resetOffsetByTimestamp Exception&quot;, e);</span>
+<span class="nc" id="L75">            throw e;</span>
+        } finally {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            if (mqs != null) {</span>
+<span class="nc" id="L78">                consumer.getDefaultMQPullConsumerImpl().getOffsetStore().persistAll(mqs);</span>
+            }
+<span class="nc" id="L80">            consumer.shutdown();</span>
+        }
+<span class="nc" id="L82">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

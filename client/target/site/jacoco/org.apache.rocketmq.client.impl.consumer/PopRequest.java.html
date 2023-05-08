@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PopRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.impl.consumer</a> &gt; <span class="el_source">PopRequest.java</span></div><h1>PopRequest.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.impl.consumer;
+
+import org.apache.rocketmq.common.constant.ConsumeInitMode;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.message.MessageRequestMode;
+
+<span class="nc" id="L23">public class PopRequest implements MessageRequest {</span>
+    private String topic;
+    private String consumerGroup;
+    private MessageQueue messageQueue;
+    private PopProcessQueue popProcessQueue;
+<span class="nc" id="L28">    private boolean lockedFirst = false;</span>
+<span class="nc" id="L29">    private int initMode = ConsumeInitMode.MAX;</span>
+
+    public boolean isLockedFirst() {
+<span class="nc" id="L32">        return lockedFirst;</span>
+    }
+
+    public void setLockedFirst(boolean lockedFirst) {
+<span class="nc" id="L36">        this.lockedFirst = lockedFirst;</span>
+<span class="nc" id="L37">    }</span>
+
+    public String getConsumerGroup() {
+<span class="nc" id="L40">        return consumerGroup;</span>
+    }
+
+    public void setConsumerGroup(String consumerGroup) {
+<span class="nc" id="L44">        this.consumerGroup = consumerGroup;</span>
+<span class="nc" id="L45">    }</span>
+
+    public MessageQueue getMessageQueue() {
+<span class="nc" id="L48">        return messageQueue;</span>
+    }
+
+    public void setMessageQueue(MessageQueue messageQueue) {
+<span class="nc" id="L52">        this.messageQueue = messageQueue;</span>
+<span class="nc" id="L53">    }</span>
+
+    public String getTopic() {
+<span class="nc" id="L56">        return topic;</span>
+    }
+
+    public void setTopic(String topic) {
+<span class="nc" id="L60">        this.topic = topic;</span>
+<span class="nc" id="L61">    }</span>
+
+    public PopProcessQueue getPopProcessQueue() {
+<span class="nc" id="L64">        return popProcessQueue;</span>
+    }
+
+    public void setPopProcessQueue(PopProcessQueue popProcessQueue) {
+<span class="nc" id="L68">        this.popProcessQueue = popProcessQueue;</span>
+<span class="nc" id="L69">    }</span>
+
+    public int getInitMode() {
+<span class="nc" id="L72">        return initMode;</span>
+    }
+
+    public void setInitMode(int initMode) {
+<span class="nc" id="L76">        this.initMode = initMode;</span>
+<span class="nc" id="L77">    }</span>
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L81">        final int prime = 31;</span>
+<span class="nc" id="L82">        int result = 1;</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        result = prime * result + ((topic == null) ? 0 : topic.hashCode());</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        result = prime * result + ((consumerGroup == null) ? 0 : consumerGroup.hashCode());</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        result = prime * result + ((messageQueue == null) ? 0 : messageQueue.hashCode());</span>
+<span class="nc" id="L86">        return result;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (this == obj)</span>
+<span class="nc" id="L92">            return true;</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (obj == null)</span>
+<span class="nc" id="L94">            return false;</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (getClass() != obj.getClass())</span>
+<span class="nc" id="L96">            return false;</span>
+
+<span class="nc" id="L98">        PopRequest other = (PopRequest) obj;</span>
+
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (topic == null) {</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            if (other.topic != null)</span>
+<span class="nc" id="L102">                return false;</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        } else if (!topic.equals(other.topic)) {</span>
+<span class="nc" id="L104">            return false;</span>
+        }
+
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (consumerGroup == null) {</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            if (other.consumerGroup != null)</span>
+<span class="nc" id="L109">                return false;</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        } else if (!consumerGroup.equals(other.consumerGroup))</span>
+<span class="nc" id="L111">            return false;</span>
+
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (messageQueue == null) {</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            if (other.messageQueue != null)</span>
+<span class="nc" id="L115">                return false;</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        } else if (!messageQueue.equals(other.messageQueue)) {</span>
+<span class="nc" id="L117">            return false;</span>
+        }
+<span class="nc" id="L119">        return true;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L124">        return &quot;PopRequest [topic=&quot; + topic + &quot;, consumerGroup=&quot; + consumerGroup + &quot;, messageQueue=&quot; + messageQueue + &quot;]&quot;;</span>
+    }
+
+    @Override
+    public MessageRequestMode getMessageRequestMode() {
+<span class="nc" id="L129">        return MessageRequestMode.POP;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Validators.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client</a> &gt; <span class="el_source">Validators.java</span></div><h1>Validators.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.client;
+
+import static org.apache.rocketmq.common.topic.TopicValidator.isTopicOrGroupIllegal;
+
+import org.apache.rocketmq.client.exception.MQClientException;
+import org.apache.rocketmq.client.producer.DefaultMQProducer;
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.common.protocol.ResponseCode;
+import org.apache.rocketmq.common.topic.TopicValidator;
+
+/**
+ * Common Validator
+ */
+<span class="nc" id="L32">public class Validators {</span>
+    public static final int CHARACTER_MAX_LENGTH = 255;
+    public static final int TOPIC_MAX_LENGTH = 127;
+
+    /**
+     * Validate group
+     */
+    public static void checkGroup(String group) throws MQClientException {
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (UtilAll.isBlank(group)) {</span>
+<span class="fc" id="L41">            throw new MQClientException(&quot;the specified group is blank&quot;, null);</span>
+        }
+
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (group.length() &gt; CHARACTER_MAX_LENGTH) {</span>
+<span class="nc" id="L45">            throw new MQClientException(&quot;the specified group is longer than group max length 255.&quot;, null);</span>
+        }
+
+
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (isTopicOrGroupIllegal(group)) {</span>
+<span class="nc" id="L50">            throw new MQClientException(String.format(</span>
+                    &quot;the specified group[%s] contains illegal characters, allowing only %s&quot;, group,
+                    &quot;^[%|a-zA-Z0-9_-]+$&quot;), null);
+        }
+<span class="fc" id="L54">    }</span>
+
+    public static void checkMessage(Message msg, DefaultMQProducer defaultMQProducer) throws MQClientException {
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (null == msg) {</span>
+<span class="nc" id="L58">            throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL, &quot;the message is null&quot;);</span>
+        }
+        // topic
+<span class="fc" id="L61">        Validators.checkTopic(msg.getTopic());</span>
+<span class="fc" id="L62">        Validators.isNotAllowedSendTopic(msg.getTopic());</span>
+
+        // body
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (null == msg.getBody()) {</span>
+<span class="nc" id="L66">            throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL, &quot;the message body is null&quot;);</span>
+        }
+
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (0 == msg.getBody().length) {</span>
+<span class="fc" id="L70">            throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL, &quot;the message body length is zero&quot;);</span>
+        }
+
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (msg.getBody().length &gt; defaultMQProducer.getMaxMessageSize()) {</span>
+<span class="nc" id="L74">            throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL,</span>
+<span class="nc" id="L75">                &quot;the message body size over max value, MAX: &quot; + defaultMQProducer.getMaxMessageSize());</span>
+        }
+<span class="fc" id="L77">    }</span>
+
+    public static void checkTopic(String topic) throws MQClientException {
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (UtilAll.isBlank(topic)) {</span>
+<span class="fc" id="L81">            throw new MQClientException(&quot;The specified topic is blank&quot;, null);</span>
+        }
+
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (topic.length() &gt; TOPIC_MAX_LENGTH) {</span>
+<span class="fc" id="L85">            throw new MQClientException(</span>
+<span class="fc" id="L86">                String.format(&quot;The specified topic is longer than topic max length %d.&quot;, TOPIC_MAX_LENGTH), null);</span>
+        }
+
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (isTopicOrGroupIllegal(topic)) {</span>
+<span class="fc" id="L90">            throw new MQClientException(String.format(</span>
+                    &quot;The specified topic[%s] contains illegal characters, allowing only %s&quot;, topic,
+                    &quot;^[%|a-zA-Z0-9_-]+$&quot;), null);
+        }
+<span class="fc" id="L94">    }</span>
+
+    public static void isSystemTopic(String topic) throws MQClientException {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (TopicValidator.isSystemTopic(topic)) {</span>
+<span class="fc" id="L98">            throw new MQClientException(</span>
+<span class="fc" id="L99">                    String.format(&quot;The topic[%s] is conflict with system topic.&quot;, topic), null);</span>
+        }
+<span class="nc" id="L101">    }</span>
+
+    public static void isNotAllowedSendTopic(String topic) throws MQClientException {
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (TopicValidator.isNotAllowedSendTopic(topic)) {</span>
+<span class="fc" id="L105">            throw new MQClientException(</span>
+<span class="fc" id="L106">                    String.format(&quot;Sending message to topic[%s] is forbidden.&quot;, topic), null);</span>
+        }
+<span class="fc" id="L108">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

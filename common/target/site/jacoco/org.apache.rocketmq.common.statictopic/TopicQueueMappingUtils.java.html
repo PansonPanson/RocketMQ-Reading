@@ -1,0 +1,695 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TopicQueueMappingUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.statictopic</a> &gt; <span class="el_source">TopicQueueMappingUtils.java</span></div><h1>TopicQueueMappingUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.statictopic;
+
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.TopicConfig;
+
+import java.io.File;
+import java.util.AbstractMap;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Random;
+import java.util.Set;
+
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">public class TopicQueueMappingUtils {</span>
+
+    public static final int DEFAULT_BLOCK_SEQ_SIZE = 10000;
+
+    public static class MappingAllocator {
+<span class="fc" id="L42">        Map&lt;String, Integer&gt; brokerNumMap = new HashMap&lt;String, Integer&gt;();</span>
+<span class="fc" id="L43">        Map&lt;Integer, String&gt; idToBroker = new HashMap&lt;Integer, String&gt;();</span>
+        //used for remapping
+<span class="fc" id="L45">        Map&lt;String, Integer&gt; brokerNumMapBeforeRemapping = null;</span>
+<span class="fc" id="L46">        int currentIndex = 0;</span>
+<span class="fc" id="L47">        Random random = new Random();</span>
+<span class="fc" id="L48">        List&lt;String&gt; leastBrokers = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L49">        private MappingAllocator(Map&lt;Integer, String&gt; idToBroker, Map&lt;String, Integer&gt; brokerNumMap, Map&lt;String, Integer&gt; brokerNumMapBeforeRemapping) {</span>
+<span class="fc" id="L50">            this.idToBroker.putAll(idToBroker);</span>
+<span class="fc" id="L51">            this.brokerNumMap.putAll(brokerNumMap);</span>
+<span class="fc" id="L52">            this.brokerNumMapBeforeRemapping = brokerNumMapBeforeRemapping;</span>
+<span class="fc" id="L53">        }</span>
+
+        private void freshState() {
+<span class="fc" id="L56">            int minNum = Integer.MAX_VALUE;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            for (Map.Entry&lt;String, Integer&gt; entry : brokerNumMap.entrySet()) {</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                if (entry.getValue() &lt; minNum) {</span>
+<span class="fc" id="L59">                    leastBrokers.clear();</span>
+<span class="fc" id="L60">                    leastBrokers.add(entry.getKey());</span>
+<span class="fc" id="L61">                    minNum = entry.getValue();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                } else if (entry.getValue() == minNum) {</span>
+<span class="fc" id="L63">                    leastBrokers.add(entry.getKey());</span>
+                }
+<span class="fc" id="L65">            }</span>
+            //reduce the remapping
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (brokerNumMapBeforeRemapping != null</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                    &amp;&amp; !brokerNumMapBeforeRemapping.isEmpty()) {</span>
+<span class="fc" id="L69">                Collections.sort(leastBrokers, new Comparator&lt;String&gt;() {</span>
+                    @Override
+                    public int compare(String o1, String o2) {
+<span class="fc" id="L72">                        int i1 = 0, i2 = 0;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                        if (brokerNumMapBeforeRemapping.containsKey(o1)) {</span>
+<span class="fc" id="L74">                            i1 = brokerNumMapBeforeRemapping.get(o1);</span>
+                        }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                        if (brokerNumMapBeforeRemapping.containsKey(o2)) {</span>
+<span class="fc" id="L77">                            i2 = brokerNumMapBeforeRemapping.get(o2);</span>
+                        }
+<span class="fc" id="L79">                        return i1 - i2;</span>
+                    }
+                });
+            } else {
+                //reduce the imbalance
+<span class="fc" id="L84">                Collections.shuffle(leastBrokers);</span>
+            }
+<span class="fc" id="L86">            currentIndex = leastBrokers.size() - 1;</span>
+<span class="fc" id="L87">        }</span>
+        private String nextBroker() {
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            if (leastBrokers.isEmpty()) {</span>
+<span class="fc" id="L90">                freshState();</span>
+            }
+<span class="fc" id="L92">            int tmpIndex = currentIndex % leastBrokers.size();</span>
+<span class="fc" id="L93">            return leastBrokers.remove(tmpIndex);</span>
+        }
+
+        public Map&lt;String, Integer&gt; getBrokerNumMap() {
+<span class="fc" id="L97">            return brokerNumMap;</span>
+        }
+
+        public void upToNum(int maxQueueNum) {
+<span class="fc" id="L101">            int currSize = idToBroker.size();</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (maxQueueNum &lt;= currSize) {</span>
+<span class="nc" id="L103">                return;</span>
+            }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (int i = currSize; i &lt; maxQueueNum; i++) {</span>
+<span class="fc" id="L106">                String nextBroker = nextBroker();</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                if (brokerNumMap.containsKey(nextBroker)) {</span>
+<span class="fc" id="L108">                    brokerNumMap.put(nextBroker, brokerNumMap.get(nextBroker) + 1);</span>
+                } else {
+<span class="nc" id="L110">                    brokerNumMap.put(nextBroker, 1);</span>
+                }
+<span class="fc" id="L112">                idToBroker.put(i, nextBroker);</span>
+            }
+<span class="fc" id="L114">        }</span>
+
+        public Map&lt;Integer, String&gt; getIdToBroker() {
+<span class="fc" id="L117">            return idToBroker;</span>
+        }
+    }
+
+
+    public static MappingAllocator buildMappingAllocator(Map&lt;Integer, String&gt; idToBroker, Map&lt;String, Integer&gt; brokerNumMap, Map&lt;String, Integer&gt; brokerNumMapBeforeRemapping) {
+<span class="fc" id="L123">        return new MappingAllocator(idToBroker, brokerNumMap, brokerNumMapBeforeRemapping);</span>
+    }
+
+    public static Map.Entry&lt;Long, Integer&gt; findMaxEpochAndQueueNum(List&lt;TopicQueueMappingDetail&gt; mappingDetailList) {
+<span class="nc" id="L127">        long epoch = -1;</span>
+<span class="nc" id="L128">        int queueNum = 0;</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        for (TopicQueueMappingDetail mappingDetail : mappingDetailList) {</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            if (mappingDetail.getEpoch() &gt; epoch) {</span>
+<span class="nc" id="L131">                epoch = mappingDetail.getEpoch();</span>
+            }
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            if (mappingDetail.getTotalQueues() &gt; queueNum) {</span>
+<span class="nc" id="L134">                queueNum = mappingDetail.getTotalQueues();</span>
+            }
+<span class="nc" id="L136">        }</span>
+<span class="nc" id="L137">        return new AbstractMap.SimpleImmutableEntry&lt;Long, Integer&gt;(epoch, queueNum);</span>
+    }
+
+    public static List&lt;TopicQueueMappingDetail&gt; getMappingDetailFromConfig(Collection&lt;TopicConfigAndQueueMapping&gt; configs) {
+<span class="fc" id="L141">        List&lt;TopicQueueMappingDetail&gt; detailList = new ArrayList&lt;TopicQueueMappingDetail&gt;();</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (TopicConfigAndQueueMapping configMapping : configs) {</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            if (configMapping.getMappingDetail() != null) {</span>
+<span class="fc" id="L144">                detailList.add(configMapping.getMappingDetail());</span>
+            }
+<span class="fc" id="L146">        }</span>
+<span class="fc" id="L147">        return detailList;</span>
+    }
+
+    public static Map.Entry&lt;Long, Integer&gt; checkNameEpochNumConsistence(String topic, Map&lt;String, TopicConfigAndQueueMapping&gt; brokerConfigMap) {
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (brokerConfigMap == null</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            || brokerConfigMap.isEmpty()) {</span>
+<span class="nc" id="L153">            return null;</span>
+        }
+        //make sure it it not null
+<span class="fc" id="L156">        long maxEpoch = -1;</span>
+<span class="fc" id="L157">        int maxNum = -1;</span>
+<span class="fc" id="L158">        String scope = null;</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (Map.Entry&lt;String, TopicConfigAndQueueMapping&gt; entry : brokerConfigMap.entrySet()) {</span>
+<span class="fc" id="L160">            String broker = entry.getKey();</span>
+<span class="fc" id="L161">            TopicConfigAndQueueMapping configMapping = entry.getValue();</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (configMapping.getMappingDetail() == null) {</span>
+<span class="nc" id="L163">                throw new RuntimeException(&quot;Mapping info should not be null in broker &quot; + broker);</span>
+            }
+<span class="fc" id="L165">            TopicQueueMappingDetail mappingDetail = configMapping.getMappingDetail();</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            if (!broker.equals(mappingDetail.getBname())) {</span>
+<span class="nc" id="L167">                throw new RuntimeException(String.format(&quot;The broker name is not equal %s != %s &quot;, broker, mappingDetail.getBname()));</span>
+            }
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">            if (mappingDetail.isDirty()) {</span>
+<span class="nc" id="L170">                throw new RuntimeException(&quot;The mapping info is dirty in broker  &quot; + broker);</span>
+            }
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (!configMapping.getTopicName().equals(mappingDetail.getTopic())) {</span>
+<span class="fc" id="L173">                throw new RuntimeException(&quot;The topic name is inconsistent in broker  &quot; + broker);</span>
+            }
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            if (topic != null</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">                &amp;&amp; !topic.equals(mappingDetail.getTopic())) {</span>
+<span class="nc" id="L177">                throw new RuntimeException(&quot;The topic name is not match for broker  &quot; + broker);</span>
+            }
+
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            if (scope != null</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                &amp;&amp; !scope.equals(mappingDetail.getScope())) {</span>
+<span class="nc" id="L182">                throw new RuntimeException(String.format(&quot;scope dose not match %s != %s in %s&quot;, mappingDetail.getScope(), scope, broker));</span>
+            } else {
+<span class="fc" id="L184">                scope = mappingDetail.getScope();</span>
+            }
+
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (maxEpoch != -1</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">                &amp;&amp; maxEpoch != mappingDetail.getEpoch()) {</span>
+<span class="fc" id="L189">                throw new RuntimeException(String.format(&quot;epoch dose not match %d != %d in %s&quot;, maxEpoch, mappingDetail.getEpoch(), mappingDetail.getBname()));</span>
+            } else {
+<span class="fc" id="L191">                maxEpoch = mappingDetail.getEpoch();</span>
+            }
+
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            if (maxNum != -1</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                &amp;&amp; maxNum != mappingDetail.getTotalQueues()) {</span>
+<span class="fc" id="L196">                throw new RuntimeException(String.format(&quot;total queue number dose not match %d != %d in %s&quot;, maxNum, mappingDetail.getTotalQueues(), mappingDetail.getBname()));</span>
+            } else {
+<span class="fc" id="L198">                maxNum = mappingDetail.getTotalQueues();</span>
+            }
+<span class="fc" id="L200">        }</span>
+<span class="fc" id="L201">        return new AbstractMap.SimpleEntry&lt;Long, Integer&gt;(maxEpoch, maxNum);</span>
+    }
+
+    public static String getMockBrokerName(String scope) {
+<span class="nc bnc" id="L205" title="All 4 branches missed.">        assert scope != null;</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (scope.equals(MixAll.METADATA_SCOPE_GLOBAL)) {</span>
+<span class="nc" id="L207">            return MixAll.LOGICAL_QUEUE_MOCK_BROKER_PREFIX + scope.substring(2);</span>
+        } else {
+<span class="nc" id="L209">            return MixAll.LOGICAL_QUEUE_MOCK_BROKER_PREFIX + scope;</span>
+        }
+    }
+
+    public static void makeSureLogicQueueMappingItemImmutable(List&lt;LogicQueueMappingItem&gt; oldItems, List&lt;LogicQueueMappingItem&gt; newItems, boolean epochEqual, boolean isCLean) {
+<span class="nc bnc" id="L214" title="All 4 branches missed.">        if (oldItems == null || oldItems.isEmpty()) {</span>
+<span class="nc" id="L215">            return;</span>
+        }
+<span class="nc bnc" id="L217" title="All 4 branches missed.">        if (newItems == null || newItems.isEmpty()) {</span>
+<span class="nc" id="L218">            throw new RuntimeException(&quot;The new item list is null or empty&quot;);</span>
+        }
+<span class="nc" id="L220">        int iold = 0, inew = 0;</span>
+<span class="nc bnc" id="L221" title="All 4 branches missed.">        while (iold &lt; oldItems.size() &amp;&amp; inew &lt; newItems.size()) {</span>
+<span class="nc" id="L222">            LogicQueueMappingItem newItem = newItems.get(inew);</span>
+<span class="nc" id="L223">            LogicQueueMappingItem oldItem = oldItems.get(iold);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">            if (newItem.getGen() &lt; oldItem.getGen()) {</span>
+                //the earliest item may have been deleted concurrently
+<span class="nc" id="L226">                inew++;</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            } else if (oldItem.getGen() &lt; newItem.getGen()) {</span>
+                //in the following cases, the new item-list has less items than old item-list
+                //1. the queue is mapped back to a broker which hold the logic queue before
+                //2. The earliest item is deleted by  TopicQueueMappingCleanService
+<span class="nc" id="L231">                iold++;</span>
+            } else {
+<span class="nc bnc" id="L233" title="All 4 branches missed.">                assert oldItem.getBname().equals(newItem.getBname());</span>
+<span class="nc bnc" id="L234" title="All 4 branches missed.">                assert oldItem.getQueueId() == newItem.getQueueId();</span>
+<span class="nc bnc" id="L235" title="All 4 branches missed.">                assert oldItem.getStartOffset() == newItem.getStartOffset();</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">                if (oldItem.getLogicOffset() != -1) {</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">                    assert oldItem.getLogicOffset() == newItem.getLogicOffset();</span>
+                }
+<span class="nc" id="L239">                iold++;</span>
+<span class="nc" id="L240">                inew++;</span>
+            }
+<span class="nc" id="L242">        }</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        if (epochEqual) {</span>
+<span class="nc" id="L244">            LogicQueueMappingItem oldLeader = oldItems.get(oldItems.size() - 1);</span>
+<span class="nc" id="L245">            LogicQueueMappingItem newLeader = newItems.get(newItems.size() - 1);</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">            if (newLeader.getGen() != oldLeader.getGen()</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">                || !newLeader.getBname().equals(oldLeader.getBname())</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">                || newLeader.getQueueId() != oldLeader.getQueueId()</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">                || newLeader.getStartOffset() != oldLeader.getStartOffset()) {</span>
+<span class="nc" id="L250">                throw new RuntimeException(&quot;The new leader is different but epoch equal&quot;);</span>
+            }
+        }
+<span class="nc" id="L253">    }</span>
+
+
+    public static void checkLogicQueueMappingItemOffset(List&lt;LogicQueueMappingItem&gt; items) {
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (items == null</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            || items.isEmpty()) {</span>
+<span class="nc" id="L259">            return;</span>
+        }
+<span class="fc" id="L261">        int lastGen = -1;</span>
+<span class="fc" id="L262">        long lastOffset = -1;</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        for (int i = items.size() - 1; i &gt;= 0 ; i--) {</span>
+<span class="fc" id="L264">            LogicQueueMappingItem item = items.get(i);</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">            if (item.getStartOffset() &lt; 0</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                    || item.getGen() &lt; 0</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                    || item.getQueueId() &lt; 0) {</span>
+<span class="nc" id="L268">                throw new RuntimeException(&quot;The field is illegal, should not be negative&quot;);</span>
+            }
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            if (items.size() &gt;= 2</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">                    &amp;&amp; i &lt;= items.size() - 2</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">                    &amp;&amp; items.get(i).getLogicOffset() &lt; 0) {</span>
+<span class="nc" id="L273">                throw new RuntimeException(&quot;The non-latest item has negative logic offset&quot;);</span>
+            }
+<span class="pc bpc" id="L275" title="1 of 4 branches missed.">            if (lastGen != -1 &amp;&amp; item.getGen() &gt;= lastGen) {</span>
+<span class="nc" id="L276">                throw new RuntimeException(&quot;The gen dose not increase monotonically&quot;);</span>
+            }
+
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">            if (item.getEndOffset() != -1</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">                &amp;&amp; item.getEndOffset() &lt; item.getStartOffset()) {</span>
+<span class="nc" id="L281">                throw new RuntimeException(&quot;The endOffset is smaller than the start offset&quot;);</span>
+            }
+
+<span class="pc bpc" id="L284" title="1 of 4 branches missed.">            if (lastOffset != -1 &amp;&amp; item.getLogicOffset() != -1) {</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">                if (item.getLogicOffset() &gt;= lastOffset) {</span>
+<span class="fc" id="L286">                    throw new RuntimeException(&quot;The base logic offset dose not increase monotonically&quot;);</span>
+                }
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">                if (item.computeMaxStaticQueueOffset() &gt;= lastOffset) {</span>
+<span class="nc" id="L289">                    throw new RuntimeException(&quot;The max logic offset dose not increase monotonically&quot;);</span>
+                }
+            }
+<span class="fc" id="L292">            lastGen = item.getGen();</span>
+<span class="fc" id="L293">            lastOffset = item.getLogicOffset();</span>
+        }
+<span class="fc" id="L295">    }</span>
+
+    public static void  checkIfReusePhysicalQueue(Collection&lt;TopicQueueMappingOne&gt; mappingOnes) {
+<span class="fc" id="L298">        Map&lt;String, TopicQueueMappingOne&gt;  physicalQueueIdMap = new HashMap&lt;String, TopicQueueMappingOne&gt;();</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        for (TopicQueueMappingOne mappingOne : mappingOnes) {</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            for (LogicQueueMappingItem item: mappingOne.items) {</span>
+<span class="fc" id="L301">                String physicalQueueId = item.getBname() + &quot;-&quot; + item.getQueueId();</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">                if (physicalQueueIdMap.containsKey(physicalQueueId)) {</span>
+<span class="nc" id="L303">                    throw new RuntimeException(String.format(&quot;Topic %s global queue id %d and %d shared the same physical queue %s&quot;,</span>
+<span class="nc" id="L304">                            mappingOne.topic, mappingOne.globalId, physicalQueueIdMap.get(physicalQueueId).globalId, physicalQueueId));</span>
+                } else {
+<span class="fc" id="L306">                    physicalQueueIdMap.put(physicalQueueId, mappingOne);</span>
+                }
+<span class="fc" id="L308">            }</span>
+<span class="fc" id="L309">        }</span>
+<span class="fc" id="L310">    }</span>
+
+    public static void  checkLeaderInTargetBrokers(Collection&lt;TopicQueueMappingOne&gt; mappingOnes, Set&lt;String&gt; targetBrokers) {
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        for (TopicQueueMappingOne mappingOne : mappingOnes) {</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">            if (!targetBrokers.contains(mappingOne.bname)) {</span>
+<span class="nc" id="L315">                throw new RuntimeException(&quot;The leader broker does not in target broker&quot;);</span>
+            }
+<span class="fc" id="L317">        }</span>
+<span class="fc" id="L318">    }</span>
+
+    public static void  checkPhysicalQueueConsistence(Map&lt;String, TopicConfigAndQueueMapping&gt; brokerConfigMap) {
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        for (Map.Entry&lt;String, TopicConfigAndQueueMapping&gt; entry : brokerConfigMap.entrySet()) {</span>
+<span class="fc" id="L322">            TopicConfigAndQueueMapping configMapping = entry.getValue();</span>
+<span class="pc bpc" id="L323" title="2 of 4 branches missed.">            assert configMapping != null;</span>
+<span class="pc bpc" id="L324" title="2 of 4 branches missed.">            assert configMapping.getMappingDetail() != null;</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            if (configMapping.getReadQueueNums() &lt; configMapping.getWriteQueueNums()) {</span>
+<span class="nc" id="L326">                throw new RuntimeException(&quot;Read queues is smaller than write queues&quot;);</span>
+            }
+<span class="fc bfc" id="L328" title="All 2 branches covered.">            for (List&lt;LogicQueueMappingItem&gt; items: configMapping.getMappingDetail().getHostedQueues().values()) {</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">                for (LogicQueueMappingItem item: items) {</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">                    if (item.getStartOffset() != 0) {</span>
+<span class="nc" id="L331">                        throw new RuntimeException(&quot;The start offset dose not begin from 0&quot;);</span>
+                    }
+<span class="fc" id="L333">                    TopicConfig topicConfig = brokerConfigMap.get(item.getBname());</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                    if (topicConfig == null) {</span>
+<span class="nc" id="L335">                        throw new RuntimeException(&quot;The broker of item dose not exist&quot;);</span>
+                    }
+<span class="fc bfc" id="L337" title="All 2 branches covered.">                    if (item.getQueueId() &gt;= topicConfig.getWriteQueueNums()) {</span>
+<span class="fc" id="L338">                        throw new RuntimeException(&quot;The physical queue id is overflow the write queues&quot;);</span>
+                    }
+<span class="fc" id="L340">                }</span>
+<span class="fc" id="L341">            }</span>
+<span class="fc" id="L342">        }</span>
+<span class="fc" id="L343">    }</span>
+
+
+
+    public static Map&lt;Integer, TopicQueueMappingOne&gt; checkAndBuildMappingItems(List&lt;TopicQueueMappingDetail&gt; mappingDetailList, boolean replace, boolean checkConsistence) {
+<span class="fc" id="L348">        Collections.sort(mappingDetailList, new Comparator&lt;TopicQueueMappingDetail&gt;() {</span>
+            @Override
+            public int compare(TopicQueueMappingDetail o1, TopicQueueMappingDetail o2) {
+<span class="fc" id="L351">                return (int)(o2.getEpoch() - o1.getEpoch());</span>
+            }
+        });
+
+<span class="fc" id="L355">        int maxNum = 0;</span>
+<span class="fc" id="L356">        Map&lt;Integer, TopicQueueMappingOne&gt; globalIdMap = new HashMap&lt;Integer, TopicQueueMappingOne&gt;();</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">        for (TopicQueueMappingDetail mappingDetail : mappingDetailList) {</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">            if (mappingDetail.totalQueues &gt; maxNum) {</span>
+<span class="fc" id="L359">                maxNum = mappingDetail.totalQueues;</span>
+            }
+<span class="fc bfc" id="L361" title="All 2 branches covered.">            for (Map.Entry&lt;Integer, List&lt;LogicQueueMappingItem&gt;&gt;  entry : mappingDetail.getHostedQueues().entrySet()) {</span>
+<span class="fc" id="L362">                Integer globalid = entry.getKey();</span>
+<span class="fc" id="L363">                checkLogicQueueMappingItemOffset(entry.getValue());</span>
+<span class="fc" id="L364">                String leaderBrokerName  = getLeaderBroker(entry.getValue());</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">                if (!leaderBrokerName.equals(mappingDetail.getBname())) {</span>
+                    //not the leader
+<span class="fc" id="L367">                    continue;</span>
+                }
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">                if (globalIdMap.containsKey(globalid)) {</span>
+<span class="nc bnc" id="L370" title="All 2 branches missed.">                    if (!replace) {</span>
+<span class="nc" id="L371">                        throw new RuntimeException(String.format(&quot;The queue id is duplicated in broker %s %s&quot;, leaderBrokerName, mappingDetail.getBname()));</span>
+                    }
+                } else {
+<span class="fc" id="L374">                    globalIdMap.put(globalid, new TopicQueueMappingOne(mappingDetail, mappingDetail.topic, mappingDetail.bname, globalid, entry.getValue()));</span>
+                }
+<span class="fc" id="L376">            }</span>
+<span class="fc" id="L377">        }</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">        if (checkConsistence) {</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">            if (maxNum != globalIdMap.size()) {</span>
+<span class="fc" id="L380">                throw new RuntimeException(String.format(&quot;The total queue number in config dose not match the real hosted queues %d != %d&quot;, maxNum, globalIdMap.size()));</span>
+            }
+<span class="fc bfc" id="L382" title="All 2 branches covered.">            for (int i = 0; i &lt; maxNum; i++) {</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">                if (!globalIdMap.containsKey(i)) {</span>
+<span class="nc" id="L384">                    throw new RuntimeException(String.format(&quot;The queue number %s is not in globalIdMap&quot;, i));</span>
+                }
+            }
+        }
+<span class="fc" id="L388">        checkIfReusePhysicalQueue(globalIdMap.values());</span>
+<span class="fc" id="L389">        return globalIdMap;</span>
+    }
+
+    public static String getLeaderBroker(List&lt;LogicQueueMappingItem&gt; items) {
+<span class="fc" id="L393">        return getLeaderItem(items).getBname();</span>
+    }
+    public static LogicQueueMappingItem getLeaderItem(List&lt;LogicQueueMappingItem&gt; items) {
+<span class="pc bpc" id="L396" title="2 of 4 branches missed.">        assert items.size() &gt; 0;</span>
+<span class="fc" id="L397">        return items.get(items.size() - 1);</span>
+    }
+
+    public static String writeToTemp(TopicRemappingDetailWrapper wrapper, boolean after) {
+<span class="nc" id="L401">        String topic = wrapper.getTopic();</span>
+<span class="nc" id="L402">        String data = wrapper.toJson();</span>
+<span class="nc" id="L403">        String suffix = TopicRemappingDetailWrapper.SUFFIX_BEFORE;</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">        if (after) {</span>
+<span class="nc" id="L405">            suffix = TopicRemappingDetailWrapper.SUFFIX_AFTER;</span>
+        }
+<span class="nc" id="L407">        String fileName = System.getProperty(&quot;java.io.tmpdir&quot;) + File.separator + topic + &quot;-&quot; + wrapper.getEpoch() + suffix;</span>
+        try {
+<span class="nc" id="L409">            MixAll.string2File(data, fileName);</span>
+<span class="nc" id="L410">            return fileName;</span>
+<span class="nc" id="L411">        } catch (Exception e) {</span>
+<span class="nc" id="L412">            throw new RuntimeException(&quot;write file failed &quot; + fileName,e);</span>
+        }
+    }
+
+    public static long blockSeqRoundUp(long offset, long blockSeqSize) {
+<span class="nc" id="L417">        long num = offset / blockSeqSize;</span>
+<span class="nc" id="L418">        long left = offset % blockSeqSize;</span>
+<span class="nc bnc" id="L419" title="All 2 branches missed.">        if (left &lt; blockSeqSize / 2) {</span>
+<span class="nc" id="L420">            return (num + 1) * blockSeqSize;</span>
+        } else {
+<span class="nc" id="L422">            return (num + 2) * blockSeqSize;</span>
+        }
+    }
+
+    public static void checkTargetBrokersComplete(Set&lt;String&gt; targetBrokers, Map&lt;String, TopicConfigAndQueueMapping&gt; brokerConfigMap) {
+<span class="fc bfc" id="L427" title="All 2 branches covered.">        for (String broker : brokerConfigMap.keySet()) {</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">            if (brokerConfigMap.get(broker).getMappingDetail().getHostedQueues().isEmpty()) {</span>
+<span class="nc" id="L429">                continue;</span>
+            }
+<span class="fc bfc" id="L431" title="All 2 branches covered.">            if (!targetBrokers.contains(broker)) {</span>
+<span class="fc" id="L432">                throw new RuntimeException(&quot;The existed broker &quot; + broker + &quot; dose not in target brokers &quot;);</span>
+            }
+<span class="fc" id="L434">        }</span>
+<span class="fc" id="L435">    }</span>
+
+    public static void checkNonTargetBrokers(Set&lt;String&gt; targetBrokers, Set&lt;String&gt; nonTargetBrokers) {
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        for (String broker : nonTargetBrokers) {</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">            if (targetBrokers.contains(broker)) {</span>
+<span class="nc" id="L440">                throw new RuntimeException(&quot;The non-target broker exist in target broker&quot;);</span>
+            }
+<span class="nc" id="L442">        }</span>
+<span class="nc" id="L443">    }</span>
+
+    public static TopicRemappingDetailWrapper createTopicConfigMapping(String topic, int queueNum, Set&lt;String&gt; targetBrokers, Map&lt;String, TopicConfigAndQueueMapping&gt; brokerConfigMap) {
+<span class="fc" id="L446">        checkTargetBrokersComplete(targetBrokers, brokerConfigMap);</span>
+<span class="fc" id="L447">        Map&lt;Integer, TopicQueueMappingOne&gt; globalIdMap = new HashMap&lt;Integer, TopicQueueMappingOne&gt;();</span>
+<span class="fc" id="L448">        Map.Entry&lt;Long, Integer&gt; maxEpochAndNum = new AbstractMap.SimpleImmutableEntry&lt;Long, Integer&gt;(System.currentTimeMillis(), queueNum);</span>
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        if (!brokerConfigMap.isEmpty()) {</span>
+<span class="fc" id="L450">            maxEpochAndNum = TopicQueueMappingUtils.checkNameEpochNumConsistence(topic, brokerConfigMap);</span>
+<span class="fc" id="L451">            globalIdMap = TopicQueueMappingUtils.checkAndBuildMappingItems(new ArrayList&lt;TopicQueueMappingDetail&gt;(TopicQueueMappingUtils.getMappingDetailFromConfig(brokerConfigMap.values())), false, true);</span>
+<span class="fc" id="L452">            checkIfReusePhysicalQueue(globalIdMap.values());</span>
+<span class="fc" id="L453">            checkPhysicalQueueConsistence(brokerConfigMap);</span>
+        }
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">        if (queueNum &lt; globalIdMap.size()) {</span>
+<span class="nc" id="L456">            throw new RuntimeException(String.format(&quot;Cannot decrease the queue num for static topic %d &lt; %d&quot;, queueNum, globalIdMap.size()));</span>
+        }
+        //check the queue number
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">        if (queueNum == globalIdMap.size()) {</span>
+<span class="nc" id="L460">            throw new RuntimeException(&quot;The topic queue num is equal the existed queue num, do nothing&quot;);</span>
+        }
+
+        //the check is ok, now do the mapping allocation
+<span class="fc" id="L464">        Map&lt;String, Integer&gt; brokerNumMap = new HashMap&lt;String, Integer&gt;();</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        for (String broker: targetBrokers) {</span>
+<span class="fc" id="L466">            brokerNumMap.put(broker, 0);</span>
+<span class="fc" id="L467">        }</span>
+<span class="fc" id="L468">        final Map&lt;Integer, String&gt; oldIdToBroker = new HashMap&lt;Integer, String&gt;();</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, TopicQueueMappingOne&gt; entry : globalIdMap.entrySet()) {</span>
+<span class="fc" id="L470">            String leaderbroker = entry.getValue().getBname();</span>
+<span class="fc" id="L471">            oldIdToBroker.put(entry.getKey(), leaderbroker);</span>
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">            if (!brokerNumMap.containsKey(leaderbroker)) {</span>
+<span class="nc" id="L473">                brokerNumMap.put(leaderbroker, 1);</span>
+            } else {
+<span class="fc" id="L475">                brokerNumMap.put(leaderbroker, brokerNumMap.get(leaderbroker) + 1);</span>
+            }
+<span class="fc" id="L477">        }</span>
+<span class="fc" id="L478">        TopicQueueMappingUtils.MappingAllocator allocator = TopicQueueMappingUtils.buildMappingAllocator(oldIdToBroker, brokerNumMap, null);</span>
+<span class="fc" id="L479">        allocator.upToNum(queueNum);</span>
+<span class="fc" id="L480">        Map&lt;Integer, String&gt; newIdToBroker = allocator.getIdToBroker();</span>
+
+        //construct the topic configAndMapping
+<span class="fc" id="L483">        long newEpoch = Math.max(maxEpochAndNum.getKey() + 1000, System.currentTimeMillis());</span>
+<span class="fc bfc" id="L484" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, String&gt; e : newIdToBroker.entrySet()) {</span>
+<span class="fc" id="L485">            Integer queueId = e.getKey();</span>
+<span class="fc" id="L486">            String broker = e.getValue();</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">            if (globalIdMap.containsKey(queueId)) {</span>
+                //ignore the exited
+<span class="fc" id="L489">                continue;</span>
+            }
+            TopicConfigAndQueueMapping configMapping;
+<span class="fc bfc" id="L492" title="All 2 branches covered.">            if (!brokerConfigMap.containsKey(broker)) {</span>
+<span class="fc" id="L493">                configMapping = new TopicConfigAndQueueMapping(new TopicConfig(topic), new TopicQueueMappingDetail(topic, 0, broker, System.currentTimeMillis()));</span>
+<span class="fc" id="L494">                configMapping.setWriteQueueNums(1);</span>
+<span class="fc" id="L495">                configMapping.setReadQueueNums(1);</span>
+<span class="fc" id="L496">                brokerConfigMap.put(broker, configMapping);</span>
+            } else {
+<span class="fc" id="L498">                configMapping = brokerConfigMap.get(broker);</span>
+<span class="fc" id="L499">                configMapping.setWriteQueueNums(configMapping.getWriteQueueNums() + 1);</span>
+<span class="fc" id="L500">                configMapping.setReadQueueNums(configMapping.getReadQueueNums() + 1);</span>
+            }
+<span class="fc" id="L502">            LogicQueueMappingItem mappingItem = new LogicQueueMappingItem(0, configMapping.getWriteQueueNums() - 1, broker, 0, 0, -1, -1, -1);</span>
+<span class="fc" id="L503">            TopicQueueMappingDetail.putMappingInfo(configMapping.getMappingDetail(), queueId, new ArrayList&lt;LogicQueueMappingItem&gt;(Collections.singletonList(mappingItem)));</span>
+<span class="fc" id="L504">        }</span>
+
+        // set the topic config
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        for (Map.Entry&lt;String, TopicConfigAndQueueMapping&gt; entry : brokerConfigMap.entrySet()) {</span>
+<span class="fc" id="L508">            TopicConfigAndQueueMapping configMapping = entry.getValue();</span>
+<span class="fc" id="L509">            configMapping.getMappingDetail().setEpoch(newEpoch);</span>
+<span class="fc" id="L510">            configMapping.getMappingDetail().setTotalQueues(queueNum);</span>
+<span class="fc" id="L511">        }</span>
+        //double check the config
+        {
+<span class="fc" id="L514">            TopicQueueMappingUtils.checkNameEpochNumConsistence(topic, brokerConfigMap);</span>
+<span class="fc" id="L515">            globalIdMap = TopicQueueMappingUtils.checkAndBuildMappingItems(getMappingDetailFromConfig(brokerConfigMap.values()), false, true);</span>
+<span class="fc" id="L516">            checkIfReusePhysicalQueue(globalIdMap.values());</span>
+<span class="fc" id="L517">            checkPhysicalQueueConsistence(brokerConfigMap);</span>
+        }
+<span class="fc" id="L519">        return new TopicRemappingDetailWrapper(topic, TopicRemappingDetailWrapper.TYPE_CREATE_OR_UPDATE, newEpoch, brokerConfigMap, new HashSet&lt;String&gt;(), new HashSet&lt;String&gt;());</span>
+    }
+
+
+    public static TopicRemappingDetailWrapper remappingStaticTopic(String topic, Map&lt;String, TopicConfigAndQueueMapping&gt; brokerConfigMap, Set&lt;String&gt; targetBrokers) {
+<span class="fc" id="L524">        Map.Entry&lt;Long, Integer&gt; maxEpochAndNum = TopicQueueMappingUtils.checkNameEpochNumConsistence(topic, brokerConfigMap);</span>
+<span class="fc" id="L525">        Map&lt;Integer, TopicQueueMappingOne&gt; globalIdMap = TopicQueueMappingUtils.checkAndBuildMappingItems(getMappingDetailFromConfig(brokerConfigMap.values()), false, true);</span>
+<span class="fc" id="L526">        TopicQueueMappingUtils.checkPhysicalQueueConsistence(brokerConfigMap);</span>
+<span class="fc" id="L527">        TopicQueueMappingUtils.checkIfReusePhysicalQueue(globalIdMap.values());</span>
+
+        //the check is ok, now do the mapping allocation
+<span class="fc" id="L530">        int maxNum = maxEpochAndNum.getValue();</span>
+
+<span class="fc" id="L532">        Map&lt;String, Integer&gt; brokerNumMap = new HashMap&lt;String, Integer&gt;();</span>
+<span class="fc bfc" id="L533" title="All 2 branches covered.">        for (String broker: targetBrokers) {</span>
+<span class="fc" id="L534">            brokerNumMap.put(broker, 0);</span>
+<span class="fc" id="L535">        }</span>
+<span class="fc" id="L536">        Map&lt;String, Integer&gt; brokerNumMapBeforeRemapping = new HashMap&lt;String, Integer&gt;();</span>
+<span class="fc bfc" id="L537" title="All 2 branches covered.">        for (TopicQueueMappingOne mappingOne: globalIdMap.values()) {</span>
+<span class="fc bfc" id="L538" title="All 2 branches covered.">            if (brokerNumMapBeforeRemapping.containsKey(mappingOne.bname)) {</span>
+<span class="fc" id="L539">                brokerNumMapBeforeRemapping.put(mappingOne.bname, brokerNumMapBeforeRemapping.get(mappingOne.bname) + 1);</span>
+            } else {
+<span class="fc" id="L541">                brokerNumMapBeforeRemapping.put(mappingOne.bname, 1);</span>
+            }
+<span class="fc" id="L543">        }</span>
+
+<span class="fc" id="L545">        TopicQueueMappingUtils.MappingAllocator allocator = TopicQueueMappingUtils.buildMappingAllocator(new HashMap&lt;Integer, String&gt;(), brokerNumMap, brokerNumMapBeforeRemapping);</span>
+<span class="fc" id="L546">        allocator.upToNum(maxNum);</span>
+<span class="fc" id="L547">        Map&lt;String, Integer&gt; expectedBrokerNumMap = allocator.getBrokerNumMap();</span>
+<span class="fc" id="L548">        Queue&lt;Integer&gt; waitAssignQueues = new ArrayDeque&lt;Integer&gt;();</span>
+        //cannot directly use the idBrokerMap from allocator, for the number of globalId maybe not in the natural order
+<span class="fc" id="L550">        Map&lt;Integer, String&gt; expectedIdToBroker = new HashMap&lt;Integer, String&gt;();</span>
+        //the following logic will make sure that, for one broker, either &quot;map in&quot; or &quot;map out&quot;
+        //It can't both,  map in some queues but also map out some queues.
+<span class="fc bfc" id="L553" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, TopicQueueMappingOne&gt; entry : globalIdMap.entrySet()) {</span>
+<span class="fc" id="L554">            Integer queueId = entry.getKey();</span>
+<span class="fc" id="L555">            TopicQueueMappingOne mappingOne = entry.getValue();</span>
+<span class="fc" id="L556">            String leaderBroker = mappingOne.getBname();</span>
+<span class="fc bfc" id="L557" title="All 2 branches covered.">            if (expectedBrokerNumMap.containsKey(leaderBroker)) {</span>
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">                if (expectedBrokerNumMap.get(leaderBroker) &gt; 0) {</span>
+<span class="fc" id="L559">                    expectedIdToBroker.put(queueId, leaderBroker);</span>
+<span class="fc" id="L560">                    expectedBrokerNumMap.put(leaderBroker, expectedBrokerNumMap.get(leaderBroker) - 1);</span>
+                } else {
+<span class="nc" id="L562">                    waitAssignQueues.add(queueId);</span>
+<span class="nc" id="L563">                    expectedBrokerNumMap.remove(leaderBroker);</span>
+                }
+            } else {
+<span class="fc" id="L566">                waitAssignQueues.add(queueId);</span>
+            }
+<span class="fc" id="L568">        }</span>
+
+<span class="fc bfc" id="L570" title="All 2 branches covered.">        for (Map.Entry&lt;String, Integer&gt; entry: expectedBrokerNumMap.entrySet()) {</span>
+<span class="fc" id="L571">            String broker = entry.getKey();</span>
+<span class="fc" id="L572">            Integer queueNum = entry.getValue();</span>
+<span class="fc bfc" id="L573" title="All 2 branches covered.">            for (int i = 0; i &lt; queueNum; i++) {</span>
+<span class="fc" id="L574">                Integer queueId = waitAssignQueues.poll();</span>
+<span class="pc bpc" id="L575" title="2 of 4 branches missed.">                assert queueId != null;</span>
+<span class="fc" id="L576">                expectedIdToBroker.put(queueId, broker);</span>
+            }
+<span class="fc" id="L578">        }</span>
+<span class="fc" id="L579">        long newEpoch = Math.max(maxEpochAndNum.getKey() + 1000, System.currentTimeMillis());</span>
+
+        //Now construct the remapping info
+<span class="fc" id="L582">        Set&lt;String&gt; brokersToMapOut = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L583">        Set&lt;String&gt; brokersToMapIn = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L584" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, String&gt; mapEntry : expectedIdToBroker.entrySet()) {</span>
+<span class="fc" id="L585">            Integer queueId = mapEntry.getKey();</span>
+<span class="fc" id="L586">            String broker = mapEntry.getValue();</span>
+<span class="fc" id="L587">            TopicQueueMappingOne topicQueueMappingOne = globalIdMap.get(queueId);</span>
+<span class="pc bpc" id="L588" title="2 of 4 branches missed.">            assert topicQueueMappingOne != null;</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">            if (topicQueueMappingOne.getBname().equals(broker)) {</span>
+<span class="fc" id="L590">                continue;</span>
+            }
+            //remapping
+<span class="fc" id="L593">            final String mapInBroker = broker;</span>
+<span class="fc" id="L594">            final String mapOutBroker = topicQueueMappingOne.getBname();</span>
+<span class="fc" id="L595">            brokersToMapIn.add(mapInBroker);</span>
+<span class="fc" id="L596">            brokersToMapOut.add(mapOutBroker);</span>
+<span class="fc" id="L597">            TopicConfigAndQueueMapping mapInConfig = brokerConfigMap.get(mapInBroker);</span>
+<span class="fc" id="L598">            TopicConfigAndQueueMapping mapOutConfig = brokerConfigMap.get(mapOutBroker);</span>
+
+<span class="fc bfc" id="L600" title="All 2 branches covered.">            if (mapInConfig == null) {</span>
+<span class="fc" id="L601">                mapInConfig = new TopicConfigAndQueueMapping(new TopicConfig(topic, 0, 0), new TopicQueueMappingDetail(topic, maxNum, mapInBroker, newEpoch));</span>
+<span class="fc" id="L602">                brokerConfigMap.put(mapInBroker, mapInConfig);</span>
+            }
+
+<span class="fc" id="L605">            mapInConfig.setWriteQueueNums(mapInConfig.getWriteQueueNums() + 1);</span>
+<span class="fc" id="L606">            mapInConfig.setReadQueueNums(mapInConfig.getReadQueueNums() + 1);</span>
+
+<span class="fc" id="L608">            List&lt;LogicQueueMappingItem&gt; items = new ArrayList&lt;LogicQueueMappingItem&gt;(topicQueueMappingOne.getItems());</span>
+<span class="fc" id="L609">            LogicQueueMappingItem last = items.get(items.size() - 1);</span>
+<span class="fc" id="L610">            items.add(new LogicQueueMappingItem(last.getGen() + 1, mapInConfig.getWriteQueueNums() - 1, mapInBroker, -1, 0, -1, -1, -1));</span>
+
+            //Use the same object
+<span class="fc" id="L613">            TopicQueueMappingDetail.putMappingInfo(mapInConfig.getMappingDetail(), queueId, items);</span>
+<span class="fc" id="L614">            TopicQueueMappingDetail.putMappingInfo(mapOutConfig.getMappingDetail(), queueId, items);</span>
+<span class="fc" id="L615">        }</span>
+
+<span class="fc bfc" id="L617" title="All 2 branches covered.">        for (Map.Entry&lt;String, TopicConfigAndQueueMapping&gt; entry : brokerConfigMap.entrySet()) {</span>
+<span class="fc" id="L618">            TopicConfigAndQueueMapping configMapping = entry.getValue();</span>
+<span class="fc" id="L619">            configMapping.getMappingDetail().setEpoch(newEpoch);</span>
+<span class="fc" id="L620">            configMapping.getMappingDetail().setTotalQueues(maxNum);</span>
+<span class="fc" id="L621">        }</span>
+
+        //double check
+        {
+<span class="fc" id="L625">            TopicQueueMappingUtils.checkNameEpochNumConsistence(topic, brokerConfigMap);</span>
+<span class="fc" id="L626">            globalIdMap = TopicQueueMappingUtils.checkAndBuildMappingItems(getMappingDetailFromConfig(brokerConfigMap.values()), false, true);</span>
+<span class="fc" id="L627">            TopicQueueMappingUtils.checkPhysicalQueueConsistence(brokerConfigMap);</span>
+<span class="fc" id="L628">            TopicQueueMappingUtils.checkIfReusePhysicalQueue(globalIdMap.values());</span>
+<span class="fc" id="L629">            TopicQueueMappingUtils.checkLeaderInTargetBrokers(globalIdMap.values(), targetBrokers);</span>
+        }
+<span class="fc" id="L631">        return new TopicRemappingDetailWrapper(topic, TopicRemappingDetailWrapper.TYPE_REMAPPING, newEpoch, brokerConfigMap, brokersToMapIn, brokersToMapOut);</span>
+    }
+
+    public static LogicQueueMappingItem findLogicQueueMappingItem(List&lt;LogicQueueMappingItem&gt; mappingItems, long logicOffset, boolean ignoreNegative) {
+<span class="nc bnc" id="L635" title="All 2 branches missed.">        if (mappingItems == null</span>
+<span class="nc bnc" id="L636" title="All 2 branches missed.">                || mappingItems.isEmpty()) {</span>
+<span class="nc" id="L637">            return null;</span>
+        }
+        //Could use bi-search to polish performance
+<span class="nc bnc" id="L640" title="All 2 branches missed.">        for (int i = mappingItems.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L641">            LogicQueueMappingItem item =  mappingItems.get(i);</span>
+<span class="nc bnc" id="L642" title="All 4 branches missed.">            if (ignoreNegative &amp;&amp; item.getLogicOffset() &lt; 0) {</span>
+<span class="nc" id="L643">                continue;</span>
+            }
+<span class="nc bnc" id="L645" title="All 2 branches missed.">            if (logicOffset &gt;= item.getLogicOffset()) {</span>
+<span class="nc" id="L646">                return item;</span>
+            }
+        }
+        //if not found, maybe out of range, return the first one
+<span class="nc bnc" id="L650" title="All 2 branches missed.">        for (int i = 0; i &lt; mappingItems.size(); i++) {</span>
+<span class="nc" id="L651">            LogicQueueMappingItem item =  mappingItems.get(i);</span>
+<span class="nc bnc" id="L652" title="All 4 branches missed.">            if (ignoreNegative &amp;&amp; item.getLogicOffset() &lt; 0) {</span>
+<span class="nc" id="L653">                continue;</span>
+            }
+        }
+<span class="nc" id="L656">        return null;</span>
+    }
+
+    public static LogicQueueMappingItem findNext(List&lt;LogicQueueMappingItem&gt; items, LogicQueueMappingItem currentItem, boolean ignoreNegative) {
+<span class="nc bnc" id="L660" title="All 4 branches missed.">        if (items == null</span>
+            || currentItem == null) {
+<span class="nc" id="L662">            return null;</span>
+        }
+<span class="nc bnc" id="L664" title="All 2 branches missed.">        for (int i = 0; i &lt; items.size(); i++) {</span>
+<span class="nc" id="L665">            LogicQueueMappingItem item = items.get(i);</span>
+<span class="nc bnc" id="L666" title="All 4 branches missed.">            if (ignoreNegative &amp;&amp; item.getLogicOffset() &lt; 0) {</span>
+<span class="nc" id="L667">                continue;</span>
+            }
+<span class="nc bnc" id="L669" title="All 2 branches missed.">            if (item.getGen() == currentItem.getGen()) {</span>
+<span class="nc bnc" id="L670" title="All 2 branches missed.">                if (i &lt; items.size() - 1) {</span>
+<span class="nc" id="L671">                    item = items.get(i  + 1);</span>
+<span class="nc bnc" id="L672" title="All 4 branches missed.">                    if (ignoreNegative &amp;&amp; item.getLogicOffset() &lt; 0) {</span>
+<span class="nc" id="L673">                        return null;</span>
+                    } else {
+<span class="nc" id="L675">                        return item;</span>
+                    }
+                } else {
+<span class="nc" id="L678">                    return null;</span>
+                }
+            }
+        }
+<span class="nc" id="L682">        return null;</span>
+    }
+
+
+    public static boolean checkIfLeader(List&lt;LogicQueueMappingItem&gt; items, TopicQueueMappingDetail mappingDetail) {
+<span class="nc bnc" id="L687" title="All 4 branches missed.">        if (items == null</span>
+            || mappingDetail == null
+<span class="nc bnc" id="L689" title="All 2 branches missed.">            || items.isEmpty()) {</span>
+<span class="nc" id="L690">            return false;</span>
+        }
+<span class="nc" id="L692">        return items.get(items.size() - 1).getBname().equals(mappingDetail.getBname());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ControllerConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common</a> &gt; <span class="el_source">ControllerConfig.java</span></div><h1>ControllerConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common;
+
+import java.io.File;
+
+<span class="nc" id="L21">public class ControllerConfig {</span>
+
+<span class="nc" id="L23">    private String rocketmqHome = System.getProperty(MixAll.ROCKETMQ_HOME_PROPERTY, System.getenv(MixAll.ROCKETMQ_HOME_ENV));</span>
+<span class="nc" id="L24">    private String configStorePath = System.getProperty(&quot;user.home&quot;) + File.separator + &quot;controller&quot; + File.separator + &quot;controller.properties&quot;;</span>
+
+    /**
+     * Is startup the controller in this name-srv
+     */
+<span class="nc" id="L29">    private boolean enableControllerInNamesrv = false;</span>
+
+    /**
+     * Interval of periodic scanning for non-active broker;
+     */
+<span class="nc" id="L34">    private long scanNotActiveBrokerInterval = 5 * 1000;</span>
+
+    /**
+     * Indicates the nums of thread to handle broker or operation requests, like REGISTER_BROKER.
+     */
+<span class="nc" id="L39">    private int controllerThreadPoolNums = 16;</span>
+
+    /**
+     * Indicates the capacity of queue to hold client requests.
+     */
+<span class="nc" id="L44">    private int controllerRequestThreadPoolQueueCapacity = 50000;</span>
+
+    private String controllerDLegerGroup;
+    private String controllerDLegerPeers;
+    private String controllerDLegerSelfId;
+<span class="nc" id="L49">    private int mappedFileSize = 1024 * 1024 * 1024;</span>
+<span class="nc" id="L50">    private String controllerStorePath = System.getProperty(&quot;user.home&quot;) + File.separator + &quot;DledgerController&quot;;</span>
+
+    /**
+     * Whether the controller can elect a master which is not in the syncStateSet.
+     */
+<span class="nc" id="L55">    private boolean enableElectUncleanMaster = false;</span>
+
+    /**
+     * Whether process read event
+     */
+<span class="nc" id="L60">    private boolean isProcessReadEvent = false;</span>
+
+    /**
+     * Whether notify broker when its role changed
+     */
+<span class="nc" id="L65">    private volatile boolean notifyBrokerRoleChanged = true;</span>
+
+    public String getRocketmqHome() {
+<span class="nc" id="L68">        return rocketmqHome;</span>
+    }
+
+    public void setRocketmqHome(String rocketmqHome) {
+<span class="nc" id="L72">        this.rocketmqHome = rocketmqHome;</span>
+<span class="nc" id="L73">    }</span>
+
+    public String getConfigStorePath() {
+<span class="nc" id="L76">        return configStorePath;</span>
+    }
+
+    public void setConfigStorePath(String configStorePath) {
+<span class="nc" id="L80">        this.configStorePath = configStorePath;</span>
+<span class="nc" id="L81">    }</span>
+
+    public boolean isEnableControllerInNamesrv() {
+<span class="nc" id="L84">        return enableControllerInNamesrv;</span>
+    }
+
+    public void setEnableControllerInNamesrv(boolean enableControllerInNamesrv) {
+<span class="nc" id="L88">        this.enableControllerInNamesrv = enableControllerInNamesrv;</span>
+<span class="nc" id="L89">    }</span>
+
+    public long getScanNotActiveBrokerInterval() {
+<span class="nc" id="L92">        return scanNotActiveBrokerInterval;</span>
+    }
+
+    public void setScanNotActiveBrokerInterval(long scanNotActiveBrokerInterval) {
+<span class="nc" id="L96">        this.scanNotActiveBrokerInterval = scanNotActiveBrokerInterval;</span>
+<span class="nc" id="L97">    }</span>
+
+    public int getControllerThreadPoolNums() {
+<span class="nc" id="L100">        return controllerThreadPoolNums;</span>
+    }
+
+    public void setControllerThreadPoolNums(int controllerThreadPoolNums) {
+<span class="nc" id="L104">        this.controllerThreadPoolNums = controllerThreadPoolNums;</span>
+<span class="nc" id="L105">    }</span>
+
+    public int getControllerRequestThreadPoolQueueCapacity() {
+<span class="nc" id="L108">        return controllerRequestThreadPoolQueueCapacity;</span>
+    }
+
+    public void setControllerRequestThreadPoolQueueCapacity(int controllerRequestThreadPoolQueueCapacity) {
+<span class="nc" id="L112">        this.controllerRequestThreadPoolQueueCapacity = controllerRequestThreadPoolQueueCapacity;</span>
+<span class="nc" id="L113">    }</span>
+
+    public String getControllerDLegerGroup() {
+<span class="nc" id="L116">        return controllerDLegerGroup;</span>
+    }
+
+    public void setControllerDLegerGroup(String controllerDLegerGroup) {
+<span class="nc" id="L120">        this.controllerDLegerGroup = controllerDLegerGroup;</span>
+<span class="nc" id="L121">    }</span>
+
+    public String getControllerDLegerPeers() {
+<span class="nc" id="L124">        return controllerDLegerPeers;</span>
+    }
+
+    public void setControllerDLegerPeers(String controllerDLegerPeers) {
+<span class="nc" id="L128">        this.controllerDLegerPeers = controllerDLegerPeers;</span>
+<span class="nc" id="L129">    }</span>
+
+    public String getControllerDLegerSelfId() {
+<span class="nc" id="L132">        return controllerDLegerSelfId;</span>
+    }
+
+    public void setControllerDLegerSelfId(String controllerDLegerSelfId) {
+<span class="nc" id="L136">        this.controllerDLegerSelfId = controllerDLegerSelfId;</span>
+<span class="nc" id="L137">    }</span>
+
+    public int getMappedFileSize() {
+<span class="nc" id="L140">        return mappedFileSize;</span>
+    }
+
+    public void setMappedFileSize(int mappedFileSize) {
+<span class="nc" id="L144">        this.mappedFileSize = mappedFileSize;</span>
+<span class="nc" id="L145">    }</span>
+
+    public String getControllerStorePath() {
+<span class="nc" id="L148">        return controllerStorePath;</span>
+    }
+
+    public void setControllerStorePath(String controllerStorePath) {
+<span class="nc" id="L152">        this.controllerStorePath = controllerStorePath;</span>
+<span class="nc" id="L153">    }</span>
+
+    public boolean isEnableElectUncleanMaster() {
+<span class="nc" id="L156">        return enableElectUncleanMaster;</span>
+    }
+
+    public void setEnableElectUncleanMaster(boolean enableElectUncleanMaster) {
+<span class="nc" id="L160">        this.enableElectUncleanMaster = enableElectUncleanMaster;</span>
+<span class="nc" id="L161">    }</span>
+
+    public boolean isProcessReadEvent() {
+<span class="nc" id="L164">        return isProcessReadEvent;</span>
+    }
+
+    public void setProcessReadEvent(boolean processReadEvent) {
+<span class="nc" id="L168">        isProcessReadEvent = processReadEvent;</span>
+<span class="nc" id="L169">    }</span>
+
+    public boolean isNotifyBrokerRoleChanged() {
+<span class="nc" id="L172">        return notifyBrokerRoleChanged;</span>
+    }
+
+    public void setNotifyBrokerRoleChanged(boolean notifyBrokerRoleChanged) {
+<span class="nc" id="L176">        this.notifyBrokerRoleChanged = notifyBrokerRoleChanged;</span>
+<span class="nc" id="L177">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

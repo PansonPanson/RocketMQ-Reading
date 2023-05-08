@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ServiceProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.utils</a> &gt; <span class="el_source">ServiceProvider.java</span></div><h1>ServiceProvider.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.utils;
+
+import java.nio.charset.StandardCharsets;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
+
+<span class="nc" id="L31">public class ServiceProvider {</span>
+
+<span class="nc" id="L33">    private static final InternalLogger LOG = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);</span>
+    /**
+     * A reference to the classloader that loaded this class. It's more efficient to compute it once and cache it here.
+     */
+    private static ClassLoader thisClassLoader;
+
+    /**
+     * JDK1.3+ &lt;a href= &quot;http://java.sun.com/j2se/1.3/docs/guide/jar/jar.html#Service%20Provider&quot; &gt; 'Service Provider'
+     * specification&lt;/a&gt;.
+     */
+    public static final String TRANSACTION_SERVICE_ID = &quot;META-INF/service/org.apache.rocketmq.broker.transaction.TransactionalMessageService&quot;;
+
+    public static final String TRANSACTION_LISTENER_ID = &quot;META-INF/service/org.apache.rocketmq.broker.transaction.AbstractTransactionalMessageCheckListener&quot;;
+
+    public static final String HA_SERVICE_ID = &quot;META-INF/service/org.apache.rocketmq.store.ha.HAService&quot;;
+
+    public static final String RPC_HOOK_ID = &quot;META-INF/service/org.apache.rocketmq.remoting.RPCHook&quot;;
+
+    public static final String ACL_VALIDATOR_ID = &quot;META-INF/service/org.apache.rocketmq.acl.AccessValidator&quot;;
+
+    static {
+<span class="nc" id="L54">        thisClassLoader = getClassLoader(ServiceProvider.class);</span>
+<span class="nc" id="L55">    }</span>
+
+    /**
+     * Returns a string that uniquely identifies the specified object, including its class.
+     * &lt;p&gt;
+     * The returned string is of form &quot;classname@hashcode&quot;, ie is the same as the return value of the Object.toString()
+     * method, but works even when the specified object's class has overidden the toString method.
+     *
+     * @param o may be null.
+     * @return a string of form classname@hashcode, or &quot;null&quot; if param o is null.
+     */
+    protected static String objectId(Object o) {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (o == null) {</span>
+<span class="nc" id="L68">            return &quot;null&quot;;</span>
+        } else {
+<span class="nc" id="L70">            return o.getClass().getName() + &quot;@&quot; + System.identityHashCode(o);</span>
+        }
+    }
+
+    protected static ClassLoader getClassLoader(Class&lt;?&gt; clazz) {
+        try {
+<span class="nc" id="L76">            return clazz.getClassLoader();</span>
+<span class="nc" id="L77">        } catch (SecurityException e) {</span>
+<span class="nc" id="L78">            LOG.error(&quot;Unable to get classloader for class {} due to security restrictions , error info {}&quot;,</span>
+<span class="nc" id="L79">                clazz, e.getMessage());</span>
+<span class="nc" id="L80">            throw e;</span>
+        }
+    }
+
+    protected static ClassLoader getContextClassLoader() {
+<span class="nc" id="L85">        ClassLoader classLoader = null;</span>
+        try {
+<span class="nc" id="L87">            classLoader = Thread.currentThread().getContextClassLoader();</span>
+<span class="nc" id="L88">        } catch (SecurityException ex) {</span>
+            /**
+             * The getContextClassLoader() method throws SecurityException when the context
+             * class loader isn't an ancestor of the calling class's class
+             * loader, or if security permissions are restricted.
+             */
+<span class="nc" id="L94">        }</span>
+<span class="nc" id="L95">        return classLoader;</span>
+    }
+
+    protected static InputStream getResourceAsStream(ClassLoader loader, String name) {
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (loader != null) {</span>
+<span class="nc" id="L100">            return loader.getResourceAsStream(name);</span>
+        } else {
+<span class="nc" id="L102">            return ClassLoader.getSystemResourceAsStream(name);</span>
+        }
+    }
+
+    public static &lt;T&gt; List&lt;T&gt; load(String name, Class&lt;?&gt; clazz) {
+<span class="nc" id="L107">        LOG.info(&quot;Looking for a resource file of name [{}] ...&quot;, name);</span>
+<span class="nc" id="L108">        List&lt;T&gt; services = new ArrayList&lt;T&gt;();</span>
+        try {
+<span class="nc" id="L110">            ArrayList&lt;String&gt; names = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L111">            final InputStream is = getResourceAsStream(getContextClassLoader(), name);</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            if (is != null) {</span>
+                BufferedReader reader;
+<span class="nc" id="L114">                reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));</span>
+<span class="nc" id="L115">                String serviceName = reader.readLine();</span>
+<span class="nc bnc" id="L116" title="All 4 branches missed.">                while (serviceName != null &amp;&amp; !&quot;&quot;.equals(serviceName)) {</span>
+<span class="nc" id="L117">                    LOG.info(</span>
+                        &quot;Creating an instance as specified by file {} which was present in the path of the context classloader.&quot;,
+                        name);
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                    if (!names.contains(serviceName)) {</span>
+<span class="nc" id="L121">                        names.add(serviceName);</span>
+                    }
+
+<span class="nc" id="L124">                    services.add((T) initService(getContextClassLoader(), serviceName, clazz));</span>
+
+<span class="nc" id="L126">                    serviceName = reader.readLine();</span>
+                }
+<span class="nc" id="L128">                reader.close();</span>
+<span class="nc" id="L129">            } else {</span>
+                // is == null
+<span class="nc" id="L131">                LOG.warn(&quot;No resource file with name [{}] found.&quot;, name);</span>
+            }
+<span class="nc" id="L133">        } catch (Exception e) {</span>
+<span class="nc" id="L134">            LOG.error(&quot;Error occured when looking for resource file &quot; + name, e);</span>
+<span class="nc" id="L135">        }</span>
+<span class="nc" id="L136">        return services;</span>
+    }
+
+    public static &lt;T&gt; T loadClass(String name, Class&lt;?&gt; clazz) {
+<span class="nc" id="L140">        final InputStream is = getResourceAsStream(getContextClassLoader(), name);</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (is != null) {</span>
+            BufferedReader reader;
+            try {
+<span class="nc" id="L144">                reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));</span>
+<span class="nc" id="L145">                String serviceName = reader.readLine();</span>
+<span class="nc" id="L146">                reader.close();</span>
+<span class="nc bnc" id="L147" title="All 4 branches missed.">                if (serviceName != null &amp;&amp; !&quot;&quot;.equals(serviceName)) {</span>
+<span class="nc" id="L148">                    return initService(getContextClassLoader(), serviceName, clazz);</span>
+                } else {
+<span class="nc" id="L150">                    LOG.warn(&quot;ServiceName is empty!&quot;);</span>
+<span class="nc" id="L151">                    return null;</span>
+                }
+<span class="nc" id="L153">            } catch (Exception e) {</span>
+<span class="nc" id="L154">                LOG.warn(&quot;Error occurred when looking for resource file &quot; + name, e);</span>
+            }
+        }
+<span class="nc" id="L157">        return null;</span>
+    }
+
+    protected static &lt;T&gt; T initService(ClassLoader classLoader, String serviceName, Class&lt;?&gt; clazz) {
+<span class="nc" id="L161">        Class&lt;?&gt; serviceClazz = null;</span>
+        try {
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (classLoader != null) {</span>
+                try {
+                    // Warning: must typecast here &amp; allow exception to be generated/caught &amp; recast properly
+<span class="nc" id="L166">                    serviceClazz = classLoader.loadClass(serviceName);</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">                    if (clazz.isAssignableFrom(serviceClazz)) {</span>
+<span class="nc" id="L168">                        LOG.info(&quot;Loaded class {} from classloader {}&quot;, serviceClazz.getName(),</span>
+<span class="nc" id="L169">                            objectId(classLoader));</span>
+                    } else {
+                        // This indicates a problem with the ClassLoader tree. An incompatible ClassLoader was used to load the implementation.
+<span class="nc" id="L172">                        LOG.error(</span>
+                            &quot;Class {} loaded from classloader {} does not extend {} as loaded by this classloader.&quot;,
+<span class="nc" id="L174">                            serviceClazz.getName(),</span>
+<span class="nc" id="L175">                            objectId(serviceClazz.getClassLoader()), clazz.getName());</span>
+                    }
+<span class="nc" id="L177">                    return (T) serviceClazz.getDeclaredConstructor().newInstance();</span>
+<span class="nc" id="L178">                } catch (ClassNotFoundException ex) {</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                    if (classLoader == thisClassLoader) {</span>
+                        // Nothing more to try, onwards.
+<span class="nc" id="L181">                        LOG.warn(&quot;Unable to locate any class {} via classloader {}&quot;, serviceName,</span>
+<span class="nc" id="L182">                            objectId(classLoader));</span>
+<span class="nc" id="L183">                        throw ex;</span>
+                    }
+                    // Ignore exception, continue
+<span class="nc" id="L186">                } catch (NoClassDefFoundError e) {</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">                    if (classLoader == thisClassLoader) {</span>
+                        // Nothing more to try, onwards.
+<span class="nc" id="L189">                        LOG.warn(</span>
+                            &quot;Class {} cannot be loaded via classloader {}.it depends on some other class that cannot be found.&quot;,
+<span class="nc" id="L191">                            serviceClazz, objectId(classLoader));</span>
+<span class="nc" id="L192">                        throw e;</span>
+                    }
+                    // Ignore exception, continue
+<span class="nc" id="L195">                }</span>
+            }
+<span class="nc" id="L197">        } catch (Exception e) {</span>
+<span class="nc" id="L198">            LOG.error(&quot;Unable to init service.&quot;, e);</span>
+<span class="nc" id="L199">        }</span>
+<span class="nc" id="L200">        return (T) serviceClazz;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

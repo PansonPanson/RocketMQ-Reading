@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TlsSystemConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-remoting 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.remoting.netty</a> &gt; <span class="el_source">TlsSystemConfig.java</span></div><h1>TlsSystemConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.remoting.netty;
+
+import io.netty.handler.ssl.SslContext;
+import org.apache.rocketmq.remoting.common.TlsMode;
+
+<span class="nc" id="L23">public class TlsSystemConfig {</span>
+    public static final String TLS_SERVER_MODE = &quot;tls.server.mode&quot;;
+    public static final String TLS_ENABLE = &quot;tls.enable&quot;;
+    public static final String TLS_CONFIG_FILE = &quot;tls.config.file&quot;;
+    public static final String TLS_TEST_MODE_ENABLE = &quot;tls.test.mode.enable&quot;;
+
+    public static final String TLS_SERVER_NEED_CLIENT_AUTH = &quot;tls.server.need.client.auth&quot;;
+    public static final String TLS_SERVER_KEYPATH = &quot;tls.server.keyPath&quot;;
+    public static final String TLS_SERVER_KEYPASSWORD = &quot;tls.server.keyPassword&quot;;
+    public static final String TLS_SERVER_CERTPATH = &quot;tls.server.certPath&quot;;
+    public static final String TLS_SERVER_AUTHCLIENT = &quot;tls.server.authClient&quot;;
+    public static final String TLS_SERVER_TRUSTCERTPATH = &quot;tls.server.trustCertPath&quot;;
+
+    public static final String TLS_CLIENT_KEYPATH = &quot;tls.client.keyPath&quot;;
+    public static final String TLS_CLIENT_KEYPASSWORD = &quot;tls.client.keyPassword&quot;;
+    public static final String TLS_CLIENT_CERTPATH = &quot;tls.client.certPath&quot;;
+    public static final String TLS_CLIENT_AUTHSERVER = &quot;tls.client.authServer&quot;;
+    public static final String TLS_CLIENT_TRUSTCERTPATH = &quot;tls.client.trustCertPath&quot;;
+
+
+    /**
+     * To determine whether use SSL in client-side, include SDK client and BrokerOuterAPI
+     */
+<span class="fc" id="L46">    public static boolean tlsEnable = Boolean.parseBoolean(System.getProperty(TLS_ENABLE, &quot;false&quot;));</span>
+
+    /**
+     * To determine whether use test mode when initialize TLS context
+     */
+<span class="fc" id="L51">    public static boolean tlsTestModeEnable = Boolean.parseBoolean(System.getProperty(TLS_TEST_MODE_ENABLE, &quot;true&quot;));</span>
+
+    /**
+     * Indicates the state of the {@link javax.net.ssl.SSLEngine} with respect to client authentication.
+     * This configuration item really only applies when building the server-side {@link SslContext},
+     * and can be set to none, require or optional.
+     */
+<span class="fc" id="L58">    public static String tlsServerNeedClientAuth = System.getProperty(TLS_SERVER_NEED_CLIENT_AUTH, &quot;none&quot;);</span>
+    /**
+     * The store path of server-side private key
+     */
+<span class="fc" id="L62">    public static String tlsServerKeyPath = System.getProperty(TLS_SERVER_KEYPATH, null);</span>
+
+    /**
+     * The  password of the server-side private key
+     */
+<span class="fc" id="L67">    public static String tlsServerKeyPassword = System.getProperty(TLS_SERVER_KEYPASSWORD, null);</span>
+
+    /**
+     * The store path of server-side X.509 certificate chain in PEM format
+     */
+<span class="fc" id="L72">    public static String tlsServerCertPath = System.getProperty(TLS_SERVER_CERTPATH, null);</span>
+
+    /**
+     * To determine whether verify the client endpoint's certificate strictly
+     */
+<span class="fc" id="L77">    public static boolean tlsServerAuthClient = Boolean.parseBoolean(System.getProperty(TLS_SERVER_AUTHCLIENT, &quot;false&quot;));</span>
+
+    /**
+     * The store path of trusted certificates for verifying the client endpoint's certificate
+     */
+<span class="fc" id="L82">    public static String tlsServerTrustCertPath = System.getProperty(TLS_SERVER_TRUSTCERTPATH, null);</span>
+
+    /**
+     * The store path of client-side private key
+     */
+<span class="fc" id="L87">    public static String tlsClientKeyPath = System.getProperty(TLS_CLIENT_KEYPATH, null);</span>
+
+    /**
+     * The  password of the client-side private key
+     */
+<span class="fc" id="L92">    public static String tlsClientKeyPassword = System.getProperty(TLS_CLIENT_KEYPASSWORD, null);</span>
+
+    /**
+     * The store path of client-side X.509 certificate chain in PEM format
+     */
+<span class="fc" id="L97">    public static String tlsClientCertPath = System.getProperty(TLS_CLIENT_CERTPATH, null);</span>
+
+    /**
+     * To determine whether verify the server endpoint's certificate strictly
+     */
+<span class="fc" id="L102">    public static boolean tlsClientAuthServer = Boolean.parseBoolean(System.getProperty(TLS_CLIENT_AUTHSERVER, &quot;false&quot;));</span>
+
+    /**
+     * The store path of trusted certificates for verifying the server endpoint's certificate
+     */
+<span class="fc" id="L107">    public static String tlsClientTrustCertPath = System.getProperty(TLS_CLIENT_TRUSTCERTPATH, null);</span>
+
+    /**
+     * For server, three SSL modes are supported: disabled, permissive and enforcing.
+     * For client, use {@link TlsSystemConfig#tlsEnable} to determine whether use SSL.
+     * &lt;ol&gt;
+     *     &lt;li&gt;&lt;strong&gt;disabled:&lt;/strong&gt; SSL is not supported; any incoming SSL handshake will be rejected, causing connection closed.&lt;/li&gt;
+     *     &lt;li&gt;&lt;strong&gt;permissive:&lt;/strong&gt; SSL is optional, aka, server in this mode can serve client connections with or without SSL;&lt;/li&gt;
+     *     &lt;li&gt;&lt;strong&gt;enforcing:&lt;/strong&gt; SSL is required, aka, non SSL connection will be rejected.&lt;/li&gt;
+     * &lt;/ol&gt;
+     */
+<span class="fc" id="L118">    public static TlsMode tlsMode = TlsMode.parse(System.getProperty(TLS_SERVER_MODE, &quot;permissive&quot;));</span>
+
+    /**
+     * A config file to store the above TLS related configurations,
+     * except {@link TlsSystemConfig#tlsMode} and {@link TlsSystemConfig#tlsEnable}
+     */
+<span class="fc" id="L124">    public static String tlsConfigFile = System.getProperty(TLS_CONFIG_FILE, &quot;/etc/rocketmq/tls.properties&quot;);</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

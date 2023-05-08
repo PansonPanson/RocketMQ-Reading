@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestTask.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-remoting 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.remoting.netty</a> &gt; <span class="el_source">RequestTask.java</span></div><h1>RequestTask.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.remoting.netty;
+
+import io.netty.channel.Channel;
+import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+
+public class RequestTask implements Runnable {
+    private final Runnable runnable;
+<span class="fc" id="L25">    private final long createTimestamp = System.currentTimeMillis();</span>
+    private final Channel channel;
+    private final RemotingCommand request;
+<span class="fc" id="L28">    private boolean stopRun = false;</span>
+
+<span class="fc" id="L30">    public RequestTask(final Runnable runnable, final Channel channel, final RemotingCommand request) {</span>
+<span class="fc" id="L31">        this.runnable = runnable;</span>
+<span class="fc" id="L32">        this.channel = channel;</span>
+<span class="fc" id="L33">        this.request = request;</span>
+<span class="fc" id="L34">    }</span>
+
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L38" title="All 2 branches missed.">        int result = runnable != null ? runnable.hashCode() : 0;</span>
+<span class="nc" id="L39">        result = 31 * result + (int) (getCreateTimestamp() ^ (getCreateTimestamp() &gt;&gt;&gt; 32));</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        result = 31 * result + (channel != null ? channel.hashCode() : 0);</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        result = 31 * result + (request != null ? request.hashCode() : 0);</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        result = 31 * result + (isStopRun() ? 1 : 0);</span>
+<span class="nc" id="L43">        return result;</span>
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (this == o)</span>
+<span class="nc" id="L49">            return true;</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (!(o instanceof RequestTask))</span>
+<span class="nc" id="L51">            return false;</span>
+
+<span class="nc" id="L53">        final RequestTask that = (RequestTask) o;</span>
+
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (getCreateTimestamp() != that.getCreateTimestamp())</span>
+<span class="nc" id="L56">            return false;</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (isStopRun() != that.isStopRun())</span>
+<span class="nc" id="L58">            return false;</span>
+<span class="nc bnc" id="L59" title="All 6 branches missed.">        if (channel != null ? !channel.equals(that.channel) : that.channel != null)</span>
+<span class="nc" id="L60">            return false;</span>
+<span class="nc bnc" id="L61" title="All 6 branches missed.">        return request != null ? request.getOpaque() == that.request.getOpaque() : that.request == null;</span>
+
+    }
+
+    public long getCreateTimestamp() {
+<span class="nc" id="L66">        return createTimestamp;</span>
+    }
+
+    public boolean isStopRun() {
+<span class="nc" id="L70">        return stopRun;</span>
+    }
+
+    public void setStopRun(final boolean stopRun) {
+<span class="nc" id="L74">        this.stopRun = stopRun;</span>
+<span class="nc" id="L75">    }</span>
+
+    @Override
+    public void run() {
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (!this.stopRun)</span>
+<span class="fc" id="L80">            this.runnable.run();</span>
+<span class="fc" id="L81">    }</span>
+
+    public void returnResponse(int code, String remark) {
+<span class="nc" id="L84">        final RemotingCommand response = RemotingCommand.createResponseCommand(code, remark);</span>
+<span class="nc" id="L85">        response.setOpaque(request.getOpaque());</span>
+<span class="nc" id="L86">        this.channel.writeAndFlush(response);</span>
+<span class="nc" id="L87">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

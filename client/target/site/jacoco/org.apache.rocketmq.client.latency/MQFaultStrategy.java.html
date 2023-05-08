@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MQFaultStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.latency</a> &gt; <span class="el_source">MQFaultStrategy.java</span></div><h1>MQFaultStrategy.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.client.latency;
+
+import org.apache.rocketmq.client.impl.producer.TopicPublishInfo;
+import org.apache.rocketmq.client.log.ClientLogger;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.logging.InternalLogger;
+
+<span class="fc" id="L25">public class MQFaultStrategy {</span>
+<span class="fc" id="L26">    private final static InternalLogger log = ClientLogger.getLog();</span>
+<span class="fc" id="L27">    private final LatencyFaultTolerance&lt;String&gt; latencyFaultTolerance = new LatencyFaultToleranceImpl();</span>
+
+<span class="fc" id="L29">    private boolean sendLatencyFaultEnable = false;</span>
+
+<span class="fc" id="L31">    private long[] latencyMax = {50L, 100L, 550L, 1000L, 2000L, 3000L, 15000L};</span>
+<span class="fc" id="L32">    private long[] notAvailableDuration = {0L, 0L, 30000L, 60000L, 120000L, 180000L, 600000L};</span>
+
+    public long[] getNotAvailableDuration() {
+<span class="nc" id="L35">        return notAvailableDuration;</span>
+    }
+
+    public void setNotAvailableDuration(final long[] notAvailableDuration) {
+<span class="nc" id="L39">        this.notAvailableDuration = notAvailableDuration;</span>
+<span class="nc" id="L40">    }</span>
+
+    public long[] getLatencyMax() {
+<span class="nc" id="L43">        return latencyMax;</span>
+    }
+
+    public void setLatencyMax(final long[] latencyMax) {
+<span class="nc" id="L47">        this.latencyMax = latencyMax;</span>
+<span class="nc" id="L48">    }</span>
+
+    public boolean isSendLatencyFaultEnable() {
+<span class="nc" id="L51">        return sendLatencyFaultEnable;</span>
+    }
+
+    public void setSendLatencyFaultEnable(final boolean sendLatencyFaultEnable) {
+<span class="nc" id="L55">        this.sendLatencyFaultEnable = sendLatencyFaultEnable;</span>
+<span class="nc" id="L56">    }</span>
+
+    public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName) {
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (this.sendLatencyFaultEnable) {</span>
+            try {
+<span class="nc" id="L61">                int index = tpInfo.getSendWhichQueue().incrementAndGet();</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">                for (int i = 0; i &lt; tpInfo.getMessageQueueList().size(); i++) {</span>
+<span class="nc" id="L63">                    int pos = Math.abs(index++) % tpInfo.getMessageQueueList().size();</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">                    if (pos &lt; 0)</span>
+<span class="nc" id="L65">                        pos = 0;</span>
+<span class="nc" id="L66">                    MessageQueue mq = tpInfo.getMessageQueueList().get(pos);</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">                    if (latencyFaultTolerance.isAvailable(mq.getBrokerName()))</span>
+<span class="nc" id="L68">                        return mq;</span>
+                }
+
+<span class="nc" id="L71">                final String notBestBroker = latencyFaultTolerance.pickOneAtLeast();</span>
+<span class="nc" id="L72">                int writeQueueNums = tpInfo.getQueueIdByBroker(notBestBroker);</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                if (writeQueueNums &gt; 0) {</span>
+<span class="nc" id="L74">                    final MessageQueue mq = tpInfo.selectOneMessageQueue();</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                    if (notBestBroker != null) {</span>
+<span class="nc" id="L76">                        mq.setBrokerName(notBestBroker);</span>
+<span class="nc" id="L77">                        mq.setQueueId(tpInfo.getSendWhichQueue().incrementAndGet() % writeQueueNums);</span>
+                    }
+<span class="nc" id="L79">                    return mq;</span>
+                } else {
+<span class="nc" id="L81">                    latencyFaultTolerance.remove(notBestBroker);</span>
+                }
+<span class="nc" id="L83">            } catch (Exception e) {</span>
+<span class="nc" id="L84">                log.error(&quot;Error occurred when selecting message queue&quot;, e);</span>
+<span class="nc" id="L85">            }</span>
+
+<span class="nc" id="L87">            return tpInfo.selectOneMessageQueue();</span>
+        }
+
+<span class="fc" id="L90">        return tpInfo.selectOneMessageQueue(lastBrokerName);</span>
+    }
+
+    public void updateFaultItem(final String brokerName, final long currentLatency, boolean isolation) {
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (this.sendLatencyFaultEnable) {</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            long duration = computeNotAvailableDuration(isolation ? 30000 : currentLatency);</span>
+<span class="nc" id="L96">            this.latencyFaultTolerance.updateFaultItem(brokerName, currentLatency, duration);</span>
+        }
+<span class="fc" id="L98">    }</span>
+
+    private long computeNotAvailableDuration(final long currentLatency) {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        for (int i = latencyMax.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            if (currentLatency &gt;= latencyMax[i])</span>
+<span class="nc" id="L103">                return this.notAvailableDuration[i];</span>
+        }
+
+<span class="nc" id="L106">        return 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

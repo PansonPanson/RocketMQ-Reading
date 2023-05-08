@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GroupRetryPolicy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.subscription</a> &gt; <span class="el_source">GroupRetryPolicy.java</span></div><h1>GroupRetryPolicy.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.subscription;
+
+import com.alibaba.fastjson.annotation.JSONField;
+import com.google.common.base.MoreObjects;
+
+<span class="fc" id="L23">public class GroupRetryPolicy {</span>
+<span class="fc" id="L24">    private final static RetryPolicy DEFAULT_RETRY_POLICY = new CustomizedRetryPolicy();</span>
+<span class="fc" id="L25">    private GroupRetryPolicyType type = GroupRetryPolicyType.CUSTOMIZED;</span>
+    private ExponentialRetryPolicy exponentialRetryPolicy;
+    private CustomizedRetryPolicy customizedRetryPolicy;
+
+    public GroupRetryPolicyType getType() {
+<span class="fc" id="L30">        return type;</span>
+    }
+
+    public void setType(GroupRetryPolicyType type) {
+<span class="fc" id="L34">        this.type = type;</span>
+<span class="fc" id="L35">    }</span>
+
+    public ExponentialRetryPolicy getExponentialRetryPolicy() {
+<span class="fc" id="L38">        return exponentialRetryPolicy;</span>
+    }
+
+    public void setExponentialRetryPolicy(ExponentialRetryPolicy exponentialRetryPolicy) {
+<span class="fc" id="L42">        this.exponentialRetryPolicy = exponentialRetryPolicy;</span>
+<span class="fc" id="L43">    }</span>
+
+    public CustomizedRetryPolicy getCustomizedRetryPolicy() {
+<span class="fc" id="L46">        return customizedRetryPolicy;</span>
+    }
+
+    public void setCustomizedRetryPolicy(CustomizedRetryPolicy customizedRetryPolicy) {
+<span class="fc" id="L50">        this.customizedRetryPolicy = customizedRetryPolicy;</span>
+<span class="fc" id="L51">    }</span>
+
+    @JSONField(serialize = false, deserialize = false)
+    public RetryPolicy getRetryPolicy() {
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (GroupRetryPolicyType.EXPONENTIAL.equals(type)) {</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (exponentialRetryPolicy == null) {</span>
+<span class="fc" id="L57">                return DEFAULT_RETRY_POLICY;</span>
+            }
+<span class="fc" id="L59">            return exponentialRetryPolicy;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        } else if (GroupRetryPolicyType.CUSTOMIZED.equals(type)) {</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            if (customizedRetryPolicy == null) {</span>
+<span class="fc" id="L62">                return DEFAULT_RETRY_POLICY;</span>
+            }
+<span class="fc" id="L64">            return customizedRetryPolicy;</span>
+        } else {
+<span class="fc" id="L66">            return DEFAULT_RETRY_POLICY;</span>
+        }
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L72">        return MoreObjects.toStringHelper(this)</span>
+<span class="nc" id="L73">            .add(&quot;type&quot;, type)</span>
+<span class="nc" id="L74">            .add(&quot;exponentialRetryPolicy&quot;, exponentialRetryPolicy)</span>
+<span class="nc" id="L75">            .add(&quot;customizedRetryPolicy&quot;, customizedRetryPolicy)</span>
+<span class="nc" id="L76">            .toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

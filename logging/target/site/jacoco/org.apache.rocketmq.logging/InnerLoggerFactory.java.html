@@ -1,0 +1,483 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InnerLoggerFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-logging 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.logging</a> &gt; <span class="el_source">InnerLoggerFactory.java</span></div><h1>InnerLoggerFactory.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.logging;
+
+import org.apache.rocketmq.logging.inner.Logger;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class InnerLoggerFactory extends InternalLoggerFactory {
+
+<span class="fc" id="L27">    public InnerLoggerFactory() {</span>
+<span class="fc" id="L28">        doRegister();</span>
+<span class="fc" id="L29">    }</span>
+
+    @Override
+    protected InternalLogger getLoggerInstance(String name) {
+<span class="fc" id="L33">        return new InnerLogger(name);</span>
+    }
+
+    @Override
+    protected String getLoggerType() {
+<span class="fc" id="L38">        return LOGGER_INNER;</span>
+    }
+
+    @Override
+    protected void shutdown() {
+<span class="nc" id="L43">        Logger.getRepository().shutdown();</span>
+<span class="nc" id="L44">    }</span>
+
+    public static class InnerLogger implements InternalLogger {
+
+        private Logger logger;
+
+<span class="fc" id="L50">        public InnerLogger(String name) {</span>
+<span class="fc" id="L51">            logger = Logger.getLogger(name);</span>
+<span class="fc" id="L52">        }</span>
+
+        @Override
+        public String getName() {
+<span class="fc" id="L56">            return logger.getName();</span>
+        }
+
+        @Override
+        public void debug(String var1) {
+<span class="fc" id="L61">            logger.debug(var1);</span>
+<span class="fc" id="L62">        }</span>
+
+        @Override
+        public void debug(String var1, Throwable var2) {
+<span class="nc" id="L66">            logger.debug(var1, var2);</span>
+<span class="nc" id="L67">        }</span>
+
+        @Override
+        public void info(String var1) {
+<span class="fc" id="L71">            logger.info(var1);</span>
+<span class="fc" id="L72">        }</span>
+
+        @Override
+        public void info(String var1, Throwable var2) {
+<span class="nc" id="L76">            logger.info(var1, var2);</span>
+<span class="nc" id="L77">        }</span>
+
+        @Override
+        public void warn(String var1) {
+<span class="fc" id="L81">            logger.warn(var1);</span>
+<span class="fc" id="L82">        }</span>
+
+        @Override
+        public void warn(String var1, Throwable var2) {
+<span class="nc" id="L86">            logger.warn(var1, var2);</span>
+<span class="nc" id="L87">        }</span>
+
+        @Override
+        public void error(String var1) {
+<span class="fc" id="L91">            logger.error(var1);</span>
+<span class="fc" id="L92">        }</span>
+
+        @Override
+        public void error(String var1, Throwable var2) {
+<span class="fc" id="L96">            logger.error(var1, var2);</span>
+<span class="fc" id="L97">        }</span>
+
+        @Override
+        public void debug(String var1, Object var2) {
+<span class="fc" id="L101">            FormattingTuple format = MessageFormatter.format(var1, var2);</span>
+<span class="fc" id="L102">            logger.debug(format.getMessage(), format.getThrowable());</span>
+<span class="fc" id="L103">        }</span>
+
+        @Override
+        public void debug(String var1, Object var2, Object var3) {
+<span class="nc" id="L107">            FormattingTuple format = MessageFormatter.format(var1, var2, var3);</span>
+<span class="nc" id="L108">            logger.debug(format.getMessage(), format.getThrowable());</span>
+<span class="nc" id="L109">        }</span>
+
+        @Override
+        public void debug(String var1, Object... var2) {
+<span class="nc" id="L113">            FormattingTuple format = MessageFormatter.arrayFormat(var1, var2);</span>
+<span class="nc" id="L114">            logger.debug(format.getMessage(), format.getThrowable());</span>
+<span class="nc" id="L115">        }</span>
+
+        @Override
+        public void info(String var1, Object var2) {
+<span class="fc" id="L119">            FormattingTuple format = MessageFormatter.format(var1, var2);</span>
+<span class="fc" id="L120">            logger.info(format.getMessage(), format.getThrowable());</span>
+<span class="fc" id="L121">        }</span>
+
+        @Override
+        public void info(String var1, Object var2, Object var3) {
+<span class="fc" id="L125">            FormattingTuple format = MessageFormatter.format(var1, var2, var3);</span>
+<span class="fc" id="L126">            logger.info(format.getMessage(), format.getThrowable());</span>
+<span class="fc" id="L127">        }</span>
+
+        @Override
+        public void info(String var1, Object... var2) {
+<span class="fc" id="L131">            FormattingTuple format = MessageFormatter.arrayFormat(var1, var2);</span>
+<span class="fc" id="L132">            logger.info(format.getMessage(), format.getThrowable());</span>
+<span class="fc" id="L133">        }</span>
+
+        @Override
+        public void warn(String var1, Object var2) {
+<span class="fc" id="L137">            FormattingTuple format = MessageFormatter.format(var1, var2);</span>
+<span class="fc" id="L138">            logger.warn(format.getMessage(), format.getThrowable());</span>
+<span class="fc" id="L139">        }</span>
+
+        @Override
+        public void warn(String var1, Object... var2) {
+<span class="nc" id="L143">            FormattingTuple format = MessageFormatter.arrayFormat(var1, var2);</span>
+<span class="nc" id="L144">            logger.warn(format.getMessage(), format.getThrowable());</span>
+<span class="nc" id="L145">        }</span>
+
+        @Override
+        public void warn(String var1, Object var2, Object var3) {
+<span class="nc" id="L149">            FormattingTuple format = MessageFormatter.format(var1, var2, var3);</span>
+<span class="nc" id="L150">            logger.warn(format.getMessage(), format.getThrowable());</span>
+<span class="nc" id="L151">        }</span>
+
+        @Override
+        public void error(String var1, Object var2) {
+<span class="fc" id="L155">            FormattingTuple format = MessageFormatter.format(var1, var2);</span>
+<span class="fc" id="L156">            logger.warn(format.getMessage(), format.getThrowable());</span>
+<span class="fc" id="L157">        }</span>
+
+        @Override
+        public void error(String var1, Object var2, Object var3) {
+<span class="nc" id="L161">            FormattingTuple format = MessageFormatter.format(var1, var2, var3);</span>
+<span class="nc" id="L162">            logger.warn(format.getMessage(), format.getThrowable());</span>
+<span class="nc" id="L163">        }</span>
+
+        @Override
+        public void error(String var1, Object... var2) {
+<span class="nc" id="L167">            FormattingTuple format = MessageFormatter.arrayFormat(var1, var2);</span>
+<span class="nc" id="L168">            logger.warn(format.getMessage(), format.getThrowable());</span>
+<span class="nc" id="L169">        }</span>
+
+        public Logger getLogger() {
+<span class="nc" id="L172">            return logger;</span>
+        }
+    }
+
+
+    public static class FormattingTuple {
+        private String message;
+        private Throwable throwable;
+        private Object[] argArray;
+
+        public FormattingTuple(String message) {
+<span class="nc" id="L183">            this(message, null, null);</span>
+<span class="nc" id="L184">        }</span>
+
+<span class="fc" id="L186">        public FormattingTuple(String message, Object[] argArray, Throwable throwable) {</span>
+<span class="fc" id="L187">            this.message = message;</span>
+<span class="fc" id="L188">            this.throwable = throwable;</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (throwable == null) {</span>
+<span class="fc" id="L190">                this.argArray = argArray;</span>
+            } else {
+<span class="fc" id="L192">                this.argArray = trimmedCopy(argArray);</span>
+            }
+
+<span class="fc" id="L195">        }</span>
+
+        static Object[] trimmedCopy(Object[] argArray) {
+<span class="pc bpc" id="L198" title="2 of 4 branches missed.">            if (argArray != null &amp;&amp; argArray.length != 0) {</span>
+<span class="fc" id="L199">                int trimemdLen = argArray.length - 1;</span>
+<span class="fc" id="L200">                Object[] trimmed = new Object[trimemdLen];</span>
+<span class="fc" id="L201">                System.arraycopy(argArray, 0, trimmed, 0, trimemdLen);</span>
+<span class="fc" id="L202">                return trimmed;</span>
+            } else {
+<span class="nc" id="L204">                throw new IllegalStateException(&quot;non-sensical empty or null argument array&quot;);</span>
+            }
+        }
+
+        public String getMessage() {
+<span class="fc" id="L209">            return this.message;</span>
+        }
+
+        public Object[] getArgArray() {
+<span class="nc" id="L213">            return this.argArray;</span>
+        }
+
+        public Throwable getThrowable() {
+<span class="fc" id="L217">            return this.throwable;</span>
+        }
+    }
+
+    public static class MessageFormatter {
+
+<span class="nc" id="L223">        public MessageFormatter() {</span>
+<span class="nc" id="L224">        }</span>
+
+        public static FormattingTuple format(String messagePattern, Object arg) {
+<span class="fc" id="L227">            return arrayFormat(messagePattern, new Object[]{arg});</span>
+        }
+
+        public static FormattingTuple format(String messagePattern, Object arg1, Object arg2) {
+<span class="fc" id="L231">            return arrayFormat(messagePattern, new Object[]{arg1, arg2});</span>
+        }
+
+        static Throwable getThrowableCandidate(Object[] argArray) {
+<span class="pc bpc" id="L235" title="2 of 4 branches missed.">            if (argArray != null &amp;&amp; argArray.length != 0) {</span>
+<span class="fc" id="L236">                Object lastEntry = argArray[argArray.length - 1];</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">                return lastEntry instanceof Throwable ? (Throwable) lastEntry : null;</span>
+            } else {
+<span class="nc" id="L239">                return null;</span>
+            }
+        }
+
+        public static FormattingTuple arrayFormat(String messagePattern, Object[] argArray) {
+<span class="fc" id="L244">            Throwable throwableCandidate = getThrowableCandidate(argArray);</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            if (messagePattern == null) {</span>
+<span class="nc" id="L246">                return new FormattingTuple(null, argArray, throwableCandidate);</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            } else if (argArray == null) {</span>
+<span class="nc" id="L248">                return new FormattingTuple(messagePattern);</span>
+            } else {
+<span class="fc" id="L250">                int i = 0;</span>
+<span class="fc" id="L251">                StringBuilder sbuf = new StringBuilder(messagePattern.length() + 50);</span>
+
+                int len;
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                for (len = 0; len &lt; argArray.length; ++len) {</span>
+<span class="fc" id="L255">                    int j = messagePattern.indexOf(&quot;{}&quot;, i);</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">                    if (j == -1) {</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">                        if (i == 0) {</span>
+<span class="nc" id="L258">                            return new FormattingTuple(messagePattern, argArray, throwableCandidate);</span>
+                        }
+
+<span class="fc" id="L261">                        sbuf.append(messagePattern.substring(i, messagePattern.length()));</span>
+<span class="fc" id="L262">                        return new FormattingTuple(sbuf.toString(), argArray, throwableCandidate);</span>
+                    }
+
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                    if (isEscapeDelimeter(messagePattern, j)) {</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                        if (!isDoubleEscaped(messagePattern, j)) {</span>
+<span class="nc" id="L267">                            --len;</span>
+<span class="nc" id="L268">                            sbuf.append(messagePattern.substring(i, j - 1));</span>
+<span class="nc" id="L269">                            sbuf.append('{');</span>
+<span class="nc" id="L270">                            i = j + 1;</span>
+                        } else {
+<span class="nc" id="L272">                            sbuf.append(messagePattern.substring(i, j - 1));</span>
+<span class="nc" id="L273">                            deeplyAppendParameter(sbuf, argArray[len], null);</span>
+<span class="nc" id="L274">                            i = j + 2;</span>
+                        }
+                    } else {
+<span class="fc" id="L277">                        sbuf.append(messagePattern.substring(i, j));</span>
+<span class="fc" id="L278">                        deeplyAppendParameter(sbuf, argArray[len], null);</span>
+<span class="fc" id="L279">                        i = j + 2;</span>
+                    }
+                }
+
+<span class="fc" id="L283">                sbuf.append(messagePattern.substring(i, messagePattern.length()));</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">                if (len &lt; argArray.length - 1) {</span>
+<span class="nc" id="L285">                    return new FormattingTuple(sbuf.toString(), argArray, throwableCandidate);</span>
+                } else {
+<span class="fc" id="L287">                    return new FormattingTuple(sbuf.toString(), argArray, null);</span>
+                }
+            }
+        }
+
+        static boolean isEscapeDelimeter(String messagePattern, int delimeterStartIndex) {
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            if (delimeterStartIndex == 0) {</span>
+<span class="nc" id="L294">                return false;</span>
+            } else {
+<span class="fc" id="L296">                char potentialEscape = messagePattern.charAt(delimeterStartIndex - 1);</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">                return potentialEscape == 92;</span>
+            }
+        }
+
+        static boolean isDoubleEscaped(String messagePattern, int delimeterStartIndex) {
+<span class="nc bnc" id="L302" title="All 4 branches missed.">            return delimeterStartIndex &gt;= 2 &amp;&amp; messagePattern.charAt(delimeterStartIndex - 2) == 92;</span>
+        }
+
+        private static void deeplyAppendParameter(StringBuilder sbuf, Object o, Map&lt;Object[], Object&gt; seenMap) {
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">            if (o == null) {</span>
+<span class="nc" id="L307">                sbuf.append(&quot;null&quot;);</span>
+            } else {
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">                if (!o.getClass().isArray()) {</span>
+<span class="fc" id="L310">                    safeObjectAppend(sbuf, o);</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                } else if (o instanceof boolean[]) {</span>
+<span class="nc" id="L312">                    booleanArrayAppend(sbuf, (boolean[]) o);</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">                } else if (o instanceof byte[]) {</span>
+<span class="nc" id="L314">                    byteArrayAppend(sbuf, (byte[]) o);</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">                } else if (o instanceof char[]) {</span>
+<span class="nc" id="L316">                    charArrayAppend(sbuf, (char[]) o);</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">                } else if (o instanceof short[]) {</span>
+<span class="nc" id="L318">                    shortArrayAppend(sbuf, (short[]) o);</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">                } else if (o instanceof int[]) {</span>
+<span class="nc" id="L320">                    intArrayAppend(sbuf, (int[]) o);</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">                } else if (o instanceof long[]) {</span>
+<span class="nc" id="L322">                    longArrayAppend(sbuf, (long[]) o);</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">                } else if (o instanceof float[]) {</span>
+<span class="nc" id="L324">                    floatArrayAppend(sbuf, (float[]) o);</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">                } else if (o instanceof double[]) {</span>
+<span class="nc" id="L326">                    doubleArrayAppend(sbuf, (double[]) o);</span>
+                } else {
+<span class="nc" id="L328">                    objectArrayAppend(sbuf, (Object[]) o, seenMap);</span>
+                }
+
+            }
+<span class="fc" id="L332">        }</span>
+
+        private static void safeObjectAppend(StringBuilder sbuf, Object o) {
+            try {
+<span class="fc" id="L336">                String t = o.toString();</span>
+<span class="fc" id="L337">                sbuf.append(t);</span>
+<span class="nc" id="L338">            } catch (Throwable var3) {</span>
+<span class="nc" id="L339">                System.err.println(&quot;RocketMQ InnerLogger: Failed toString() invocation on an object of type [&quot; + o.getClass().getName() + &quot;]&quot;);</span>
+<span class="nc" id="L340">                var3.printStackTrace();</span>
+<span class="nc" id="L341">                sbuf.append(&quot;[FAILED toString()]&quot;);</span>
+<span class="fc" id="L342">            }</span>
+
+<span class="fc" id="L344">        }</span>
+
+        private static void objectArrayAppend(StringBuilder sbuf, Object[] a, Map&lt;Object[], Object&gt; seenMap) {
+<span class="nc bnc" id="L347" title="All 2 branches missed.">            if (seenMap == null) {</span>
+<span class="nc" id="L348">                seenMap = new HashMap&lt;Object[], Object&gt;();</span>
+            }
+<span class="nc" id="L350">            sbuf.append('[');</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">            if (!seenMap.containsKey(a)) {</span>
+<span class="nc" id="L352">                seenMap.put(a, null);</span>
+<span class="nc" id="L353">                int len = a.length;</span>
+
+<span class="nc bnc" id="L355" title="All 2 branches missed.">                for (int i = 0; i &lt; len; ++i) {</span>
+<span class="nc" id="L356">                    deeplyAppendParameter(sbuf, a[i], seenMap);</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">                    if (i != len - 1) {</span>
+<span class="nc" id="L358">                        sbuf.append(&quot;, &quot;);</span>
+                    }
+                }
+
+<span class="nc" id="L362">                seenMap.remove(a);</span>
+<span class="nc" id="L363">            } else {</span>
+<span class="nc" id="L364">                sbuf.append(&quot;...&quot;);</span>
+            }
+
+<span class="nc" id="L367">            sbuf.append(']');</span>
+<span class="nc" id="L368">        }</span>
+
+        private static void booleanArrayAppend(StringBuilder sbuf, boolean[] a) {
+<span class="nc" id="L371">            sbuf.append('[');</span>
+<span class="nc" id="L372">            int len = a.length;</span>
+
+<span class="nc bnc" id="L374" title="All 2 branches missed.">            for (int i = 0; i &lt; len; ++i) {</span>
+<span class="nc" id="L375">                sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">                if (i != len - 1) {</span>
+<span class="nc" id="L377">                    sbuf.append(&quot;, &quot;);</span>
+                }
+            }
+
+<span class="nc" id="L381">            sbuf.append(']');</span>
+<span class="nc" id="L382">        }</span>
+
+        private static void byteArrayAppend(StringBuilder sbuf, byte[] a) {
+<span class="nc" id="L385">            sbuf.append('[');</span>
+<span class="nc" id="L386">            int len = a.length;</span>
+
+<span class="nc bnc" id="L388" title="All 2 branches missed.">            for (int i = 0; i &lt; len; ++i) {</span>
+<span class="nc" id="L389">                sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L390" title="All 2 branches missed.">                if (i != len - 1) {</span>
+<span class="nc" id="L391">                    sbuf.append(&quot;, &quot;);</span>
+                }
+            }
+
+<span class="nc" id="L395">            sbuf.append(']');</span>
+<span class="nc" id="L396">        }</span>
+
+        private static void charArrayAppend(StringBuilder sbuf, char[] a) {
+<span class="nc" id="L399">            sbuf.append('[');</span>
+<span class="nc" id="L400">            int len = a.length;</span>
+
+<span class="nc bnc" id="L402" title="All 2 branches missed.">            for (int i = 0; i &lt; len; ++i) {</span>
+<span class="nc" id="L403">                sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">                if (i != len - 1) {</span>
+<span class="nc" id="L405">                    sbuf.append(&quot;, &quot;);</span>
+                }
+            }
+
+<span class="nc" id="L409">            sbuf.append(']');</span>
+<span class="nc" id="L410">        }</span>
+
+        private static void shortArrayAppend(StringBuilder sbuf, short[] a) {
+<span class="nc" id="L413">            sbuf.append('[');</span>
+<span class="nc" id="L414">            int len = a.length;</span>
+
+<span class="nc bnc" id="L416" title="All 2 branches missed.">            for (int i = 0; i &lt; len; ++i) {</span>
+<span class="nc" id="L417">                sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L418" title="All 2 branches missed.">                if (i != len - 1) {</span>
+<span class="nc" id="L419">                    sbuf.append(&quot;, &quot;);</span>
+                }
+            }
+
+<span class="nc" id="L423">            sbuf.append(']');</span>
+<span class="nc" id="L424">        }</span>
+
+        private static void intArrayAppend(StringBuilder sbuf, int[] a) {
+<span class="nc" id="L427">            sbuf.append('[');</span>
+<span class="nc" id="L428">            int len = a.length;</span>
+
+<span class="nc bnc" id="L430" title="All 2 branches missed.">            for (int i = 0; i &lt; len; ++i) {</span>
+<span class="nc" id="L431">                sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">                if (i != len - 1) {</span>
+<span class="nc" id="L433">                    sbuf.append(&quot;, &quot;);</span>
+                }
+            }
+
+<span class="nc" id="L437">            sbuf.append(']');</span>
+<span class="nc" id="L438">        }</span>
+
+        private static void longArrayAppend(StringBuilder sbuf, long[] a) {
+<span class="nc" id="L441">            sbuf.append('[');</span>
+<span class="nc" id="L442">            int len = a.length;</span>
+
+<span class="nc bnc" id="L444" title="All 2 branches missed.">            for (int i = 0; i &lt; len; ++i) {</span>
+<span class="nc" id="L445">                sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L446" title="All 2 branches missed.">                if (i != len - 1) {</span>
+<span class="nc" id="L447">                    sbuf.append(&quot;, &quot;);</span>
+                }
+            }
+
+<span class="nc" id="L451">            sbuf.append(']');</span>
+<span class="nc" id="L452">        }</span>
+
+        private static void floatArrayAppend(StringBuilder sbuf, float[] a) {
+<span class="nc" id="L455">            sbuf.append('[');</span>
+<span class="nc" id="L456">            int len = a.length;</span>
+
+<span class="nc bnc" id="L458" title="All 2 branches missed.">            for (int i = 0; i &lt; len; ++i) {</span>
+<span class="nc" id="L459">                sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L460" title="All 2 branches missed.">                if (i != len - 1) {</span>
+<span class="nc" id="L461">                    sbuf.append(&quot;, &quot;);</span>
+                }
+            }
+
+<span class="nc" id="L465">            sbuf.append(']');</span>
+<span class="nc" id="L466">        }</span>
+
+        private static void doubleArrayAppend(StringBuilder sbuf, double[] a) {
+<span class="nc" id="L469">            sbuf.append('[');</span>
+<span class="nc" id="L470">            int len = a.length;</span>
+
+<span class="nc bnc" id="L472" title="All 2 branches missed.">            for (int i = 0; i &lt; len; ++i) {</span>
+<span class="nc" id="L473">                sbuf.append(a[i]);</span>
+<span class="nc bnc" id="L474" title="All 2 branches missed.">                if (i != len - 1) {</span>
+<span class="nc" id="L475">                    sbuf.append(&quot;, &quot;);</span>
+                }
+            }
+
+<span class="nc" id="L479">            sbuf.append(']');</span>
+<span class="nc" id="L480">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

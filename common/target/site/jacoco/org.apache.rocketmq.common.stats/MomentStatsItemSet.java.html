@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MomentStatsItemSet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.stats</a> &gt; <span class="el_source">MomentStatsItemSet.java</span></div><h1>MomentStatsItemSet.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.stats;
+
+import java.util.Iterator;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.logging.InternalLogger;
+
+public class MomentStatsItemSet {
+<span class="fc" id="L30">    private final ConcurrentMap&lt;String/* key */, MomentStatsItem&gt; statsItemTable =</span>
+        new ConcurrentHashMap&lt;String, MomentStatsItem&gt;(128);
+    private final String statsName;
+    private final ScheduledExecutorService scheduledExecutorService;
+    private final InternalLogger log;
+
+<span class="fc" id="L36">    public MomentStatsItemSet(String statsName, ScheduledExecutorService scheduledExecutorService, InternalLogger log) {</span>
+<span class="fc" id="L37">        this.statsName = statsName;</span>
+<span class="fc" id="L38">        this.scheduledExecutorService = scheduledExecutorService;</span>
+<span class="fc" id="L39">        this.log = log;</span>
+<span class="fc" id="L40">        this.init();</span>
+<span class="fc" id="L41">    }</span>
+
+    public ConcurrentMap&lt;String, MomentStatsItem&gt; getStatsItemTable() {
+<span class="nc" id="L44">        return statsItemTable;</span>
+    }
+
+    public String getStatsName() {
+<span class="nc" id="L48">        return statsName;</span>
+    }
+
+    public void init() {
+
+<span class="fc" id="L53">        this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L57">                    printAtMinutes();</span>
+<span class="nc" id="L58">                } catch (Throwable ignored) {</span>
+<span class="nc" id="L59">                }</span>
+<span class="nc" id="L60">            }</span>
+<span class="fc" id="L61">        }, Math.abs(UtilAll.computeNextMinutesTimeMillis() - System.currentTimeMillis()), 1000 * 60 * 5, TimeUnit.MILLISECONDS);</span>
+<span class="fc" id="L62">    }</span>
+
+    private void printAtMinutes() {
+<span class="nc" id="L65">        Iterator&lt;Entry&lt;String, MomentStatsItem&gt;&gt; it = this.statsItemTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        while (it.hasNext()) {</span>
+<span class="nc" id="L67">            Entry&lt;String, MomentStatsItem&gt; next = it.next();</span>
+<span class="nc" id="L68">            next.getValue().printAtMinutes();</span>
+<span class="nc" id="L69">        }</span>
+<span class="nc" id="L70">    }</span>
+
+    public void setValue(final String statsKey, final int value) {
+<span class="fc" id="L73">        MomentStatsItem statsItem = this.getAndCreateStatsItem(statsKey);</span>
+<span class="fc" id="L74">        statsItem.getValue().set(value);</span>
+<span class="fc" id="L75">    }</span>
+
+    public void delValueByInfixKey(final String statsKey, String separator) {
+<span class="nc" id="L78">        Iterator&lt;Entry&lt;String, MomentStatsItem&gt;&gt; it = this.statsItemTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        while (it.hasNext()) {</span>
+<span class="nc" id="L80">            Entry&lt;String, MomentStatsItem&gt; next = it.next();</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            if (next.getKey().contains(separator + statsKey + separator)) {</span>
+<span class="nc" id="L82">                it.remove();</span>
+            }
+<span class="nc" id="L84">        }</span>
+<span class="nc" id="L85">    }</span>
+
+    public void delValueBySuffixKey(final String statsKey, String separator) {
+<span class="nc" id="L88">        Iterator&lt;Entry&lt;String, MomentStatsItem&gt;&gt; it = this.statsItemTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        while (it.hasNext()) {</span>
+<span class="nc" id="L90">            Entry&lt;String, MomentStatsItem&gt; next = it.next();</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            if (next.getKey().endsWith(separator + statsKey)) {</span>
+<span class="nc" id="L92">                it.remove();</span>
+            }
+<span class="nc" id="L94">        }</span>
+<span class="nc" id="L95">    }</span>
+
+    public MomentStatsItem getAndCreateStatsItem(final String statsKey) {
+<span class="fc" id="L98">        MomentStatsItem statsItem = this.statsItemTable.get(statsKey);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (null == statsItem) {</span>
+<span class="fc" id="L100">            statsItem =</span>
+                new MomentStatsItem(this.statsName, statsKey, this.scheduledExecutorService, this.log);
+<span class="fc" id="L102">            MomentStatsItem prev = this.statsItemTable.putIfAbsent(statsKey, statsItem);</span>
+
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (null != prev) {</span>
+<span class="fc" id="L105">                statsItem = prev;</span>
+                // statsItem.init();
+            }
+        }
+
+<span class="fc" id="L110">        return statsItem;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

@@ -1,0 +1,759 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MessageDecoder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.message</a> &gt; <span class="el_source">MessageDecoder.java</span></div><h1>MessageDecoder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.message;
+
+import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.compression.Compressor;
+import org.apache.rocketmq.common.compression.CompressorFactory;
+import org.apache.rocketmq.common.sysflag.MessageSysFlag;
+
+<span class="nc" id="L37">public class MessageDecoder {</span>
+//    public final static int MSG_ID_LENGTH = 8 + 8;
+
+<span class="fc" id="L40">    public final static Charset CHARSET_UTF8 = StandardCharsets.UTF_8;</span>
+    public final static int MESSAGE_MAGIC_CODE_POSTION = 4;
+    public final static int MESSAGE_FLAG_POSTION = 16;
+    public final static int MESSAGE_PHYSIC_OFFSET_POSTION = 28;
+    public final static int MESSAGE_STORE_TIMESTAMP_POSITION = 56;
+    public final static int MESSAGE_MAGIC_CODE = -626843481;
+    public static final char NAME_VALUE_SEPARATOR = 1;
+    public static final char PROPERTY_SEPARATOR = 2;
+    public static final int PHY_POS_POSITION = 4 + 4 + 4 + 4 + 4 + 8;
+    public static final int QUEUE_OFFSET_POSITION = 4 + 4 + 4 + 4 + 4;
+    public static final int SYSFLAG_POSITION = 4 + 4 + 4 + 4 + 4 + 8 + 8;
+//    public static final int BODY_SIZE_POSITION = 4 // 1 TOTALSIZE
+//        + 4 // 2 MAGICCODE
+//        + 4 // 3 BODYCRC
+//        + 4 // 4 QUEUEID
+//        + 4 // 5 FLAG
+//        + 8 // 6 QUEUEOFFSET
+//        + 8 // 7 PHYSICALOFFSET
+//        + 4 // 8 SYSFLAG
+//        + 8 // 9 BORNTIMESTAMP
+//        + 8 // 10 BORNHOST
+//        + 8 // 11 STORETIMESTAMP
+//        + 8 // 12 STOREHOSTADDRESS
+//        + 4 // 13 RECONSUMETIMES
+//        + 8; // 14 Prepared Transaction Offset
+
+    public static String createMessageId(final ByteBuffer input, final ByteBuffer addr, final long offset) {
+<span class="fc" id="L67">        input.flip();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        int msgIDLength = addr.limit() == 8 ? 16 : 28;</span>
+<span class="fc" id="L69">        input.limit(msgIDLength);</span>
+
+<span class="fc" id="L71">        input.put(addr);</span>
+<span class="fc" id="L72">        input.putLong(offset);</span>
+
+<span class="fc" id="L74">        return UtilAll.bytes2string(input.array());</span>
+    }
+
+    public static String createMessageId(SocketAddress socketAddress, long transactionIdhashCode) {
+<span class="nc" id="L78">        InetSocketAddress inetSocketAddress = (InetSocketAddress) socketAddress;</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        int msgIDLength = inetSocketAddress.getAddress() instanceof Inet4Address ? 16 : 28;</span>
+<span class="nc" id="L80">        ByteBuffer byteBuffer = ByteBuffer.allocate(msgIDLength);</span>
+<span class="nc" id="L81">        byteBuffer.put(inetSocketAddress.getAddress().getAddress());</span>
+<span class="nc" id="L82">        byteBuffer.putInt(inetSocketAddress.getPort());</span>
+<span class="nc" id="L83">        byteBuffer.putLong(transactionIdhashCode);</span>
+<span class="nc" id="L84">        byteBuffer.flip();</span>
+<span class="nc" id="L85">        return UtilAll.bytes2string(byteBuffer.array());</span>
+    }
+
+    public static MessageId decodeMessageId(final String msgId) throws UnknownHostException {
+<span class="fc" id="L89">        byte[] bytes = UtilAll.string2bytes(msgId);</span>
+<span class="fc" id="L90">        ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);</span>
+
+        // address(ip+port)
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        byte[] ip = new byte[msgId.length() == 32 ? 4 : 16];</span>
+<span class="fc" id="L94">        byteBuffer.get(ip);</span>
+<span class="fc" id="L95">        int port = byteBuffer.getInt();</span>
+<span class="fc" id="L96">        SocketAddress address = new InetSocketAddress(InetAddress.getByAddress(ip), port);</span>
+
+        // offset
+<span class="fc" id="L99">        long offset = byteBuffer.getLong();</span>
+
+<span class="fc" id="L101">        return new MessageId(address, offset);</span>
+    }
+
+    /**
+     * Just decode properties from msg buffer.
+     *
+     * @param byteBuffer msg commit log buffer.
+     */
+    public static Map&lt;String, String&gt; decodeProperties(ByteBuffer byteBuffer) {
+<span class="fc" id="L110">        int sysFlag = byteBuffer.getInt(SYSFLAG_POSITION);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        int bornhostLength = (sysFlag &amp; MessageSysFlag.BORNHOST_V6_FLAG) == 0 ? 8 : 20;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        int storehostAddressLength = (sysFlag &amp; MessageSysFlag.STOREHOSTADDRESS_V6_FLAG) == 0 ? 8 : 20;</span>
+<span class="fc" id="L113">        int bodySizePosition = 4 // 1 TOTALSIZE</span>
+            + 4 // 2 MAGICCODE
+            + 4 // 3 BODYCRC
+            + 4 // 4 QUEUEID
+            + 4 // 5 FLAG
+            + 8 // 6 QUEUEOFFSET
+            + 8 // 7 PHYSICALOFFSET
+            + 4 // 8 SYSFLAG
+            + 8 // 9 BORNTIMESTAMP
+            + bornhostLength // 10 BORNHOST
+            + 8 // 11 STORETIMESTAMP
+            + storehostAddressLength // 12 STOREHOSTADDRESS
+            + 4 // 13 RECONSUMETIMES
+            + 8; // 14 Prepared Transaction Offset
+<span class="fc" id="L127">        int topicLengthPosition = bodySizePosition + 4 + byteBuffer.getInt(bodySizePosition);</span>
+
+<span class="fc" id="L129">        byte topicLength = byteBuffer.get(topicLengthPosition);</span>
+
+<span class="fc" id="L131">        short propertiesLength = byteBuffer.getShort(topicLengthPosition + 1 + topicLength);</span>
+
+<span class="fc" id="L133">        byteBuffer.position(topicLengthPosition + 1 + topicLength + 2);</span>
+
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (propertiesLength &gt; 0) {</span>
+<span class="fc" id="L136">            byte[] properties = new byte[propertiesLength];</span>
+<span class="fc" id="L137">            byteBuffer.get(properties);</span>
+<span class="fc" id="L138">            String propertiesString = new String(properties, CHARSET_UTF8);</span>
+<span class="fc" id="L139">            Map&lt;String, String&gt; map = string2messageProperties(propertiesString);</span>
+<span class="fc" id="L140">            return map;</span>
+        }
+<span class="nc" id="L142">        return null;</span>
+    }
+
+    public static MessageExt decode(ByteBuffer byteBuffer) {
+<span class="fc" id="L146">        return decode(byteBuffer, true, true, false);</span>
+    }
+
+    public static MessageExt clientDecode(ByteBuffer byteBuffer, final boolean readBody) {
+<span class="nc" id="L150">        return decode(byteBuffer, readBody, true, true);</span>
+    }
+
+    public static MessageExt decode(ByteBuffer byteBuffer, final boolean readBody) {
+<span class="nc" id="L154">        return decode(byteBuffer, readBody, true, false);</span>
+    }
+
+    public static byte[] encode(MessageExt messageExt, boolean needCompress) throws Exception {
+<span class="fc" id="L158">        byte[] body = messageExt.getBody();</span>
+<span class="fc" id="L159">        byte[] topics = messageExt.getTopic().getBytes(CHARSET_UTF8);</span>
+<span class="fc" id="L160">        byte topicLen = (byte) topics.length;</span>
+<span class="fc" id="L161">        String properties = messageProperties2String(messageExt.getProperties());</span>
+<span class="fc" id="L162">        byte[] propertiesBytes = properties.getBytes(CHARSET_UTF8);</span>
+<span class="fc" id="L163">        short propertiesLength = (short) propertiesBytes.length;</span>
+<span class="fc" id="L164">        int sysFlag = messageExt.getSysFlag();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        int bornhostLength = (sysFlag &amp; MessageSysFlag.BORNHOST_V6_FLAG) == 0 ? 8 : 20;</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        int storehostAddressLength = (sysFlag &amp; MessageSysFlag.STOREHOSTADDRESS_V6_FLAG) == 0 ? 8 : 20;</span>
+<span class="fc" id="L167">        byte[] newBody = messageExt.getBody();</span>
+<span class="pc bpc" id="L168" title="3 of 4 branches missed.">        if (needCompress &amp;&amp; (sysFlag &amp; MessageSysFlag.COMPRESSED_FLAG) == MessageSysFlag.COMPRESSED_FLAG) {</span>
+<span class="nc" id="L169">            Compressor compressor = CompressorFactory.getCompressor(MessageSysFlag.getCompressionType(sysFlag));</span>
+<span class="nc" id="L170">            newBody = compressor.compress(body, 5);</span>
+        }
+<span class="fc" id="L172">        int bodyLength = newBody.length;</span>
+<span class="fc" id="L173">        int storeSize = messageExt.getStoreSize();</span>
+        ByteBuffer byteBuffer;
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (storeSize &gt; 0) {</span>
+<span class="nc" id="L176">            byteBuffer = ByteBuffer.allocate(storeSize);</span>
+        } else {
+<span class="fc" id="L178">            storeSize = 4 // 1 TOTALSIZE</span>
+                + 4 // 2 MAGICCODE
+                + 4 // 3 BODYCRC
+                + 4 // 4 QUEUEID
+                + 4 // 5 FLAG
+                + 8 // 6 QUEUEOFFSET
+                + 8 // 7 PHYSICALOFFSET
+                + 4 // 8 SYSFLAG
+                + 8 // 9 BORNTIMESTAMP
+                + bornhostLength // 10 BORNHOST
+                + 8 // 11 STORETIMESTAMP
+                + storehostAddressLength // 12 STOREHOSTADDRESS
+                + 4 // 13 RECONSUMETIMES
+                + 8 // 14 Prepared Transaction Offset
+                + 4 + bodyLength // 14 BODY
+                + 1 + topicLen // 15 TOPIC
+                + 2 + propertiesLength // 16 propertiesLength
+                + 0;
+<span class="fc" id="L196">            byteBuffer = ByteBuffer.allocate(storeSize);</span>
+        }
+        // 1 TOTALSIZE
+<span class="fc" id="L199">        byteBuffer.putInt(storeSize);</span>
+
+        // 2 MAGICCODE
+<span class="fc" id="L202">        byteBuffer.putInt(MESSAGE_MAGIC_CODE);</span>
+
+        // 3 BODYCRC
+<span class="fc" id="L205">        int bodyCRC = messageExt.getBodyCRC();</span>
+<span class="fc" id="L206">        byteBuffer.putInt(bodyCRC);</span>
+
+        // 4 QUEUEID
+<span class="fc" id="L209">        int queueId = messageExt.getQueueId();</span>
+<span class="fc" id="L210">        byteBuffer.putInt(queueId);</span>
+
+        // 5 FLAG
+<span class="fc" id="L213">        int flag = messageExt.getFlag();</span>
+<span class="fc" id="L214">        byteBuffer.putInt(flag);</span>
+
+        // 6 QUEUEOFFSET
+<span class="fc" id="L217">        long queueOffset = messageExt.getQueueOffset();</span>
+<span class="fc" id="L218">        byteBuffer.putLong(queueOffset);</span>
+
+        // 7 PHYSICALOFFSET
+<span class="fc" id="L221">        long physicOffset = messageExt.getCommitLogOffset();</span>
+<span class="fc" id="L222">        byteBuffer.putLong(physicOffset);</span>
+
+        // 8 SYSFLAG
+<span class="fc" id="L225">        byteBuffer.putInt(sysFlag);</span>
+
+        // 9 BORNTIMESTAMP
+<span class="fc" id="L228">        long bornTimeStamp = messageExt.getBornTimestamp();</span>
+<span class="fc" id="L229">        byteBuffer.putLong(bornTimeStamp);</span>
+
+        // 10 BORNHOST
+<span class="fc" id="L232">        InetSocketAddress bornHost = (InetSocketAddress) messageExt.getBornHost();</span>
+<span class="fc" id="L233">        byteBuffer.put(bornHost.getAddress().getAddress());</span>
+<span class="fc" id="L234">        byteBuffer.putInt(bornHost.getPort());</span>
+
+        // 11 STORETIMESTAMP
+<span class="fc" id="L237">        long storeTimestamp = messageExt.getStoreTimestamp();</span>
+<span class="fc" id="L238">        byteBuffer.putLong(storeTimestamp);</span>
+
+        // 12 STOREHOST
+<span class="fc" id="L241">        InetSocketAddress serverHost = (InetSocketAddress) messageExt.getStoreHost();</span>
+<span class="fc" id="L242">        byteBuffer.put(serverHost.getAddress().getAddress());</span>
+<span class="fc" id="L243">        byteBuffer.putInt(serverHost.getPort());</span>
+
+        // 13 RECONSUMETIMES
+<span class="fc" id="L246">        int reconsumeTimes = messageExt.getReconsumeTimes();</span>
+<span class="fc" id="L247">        byteBuffer.putInt(reconsumeTimes);</span>
+
+        // 14 Prepared Transaction Offset
+<span class="fc" id="L250">        long preparedTransactionOffset = messageExt.getPreparedTransactionOffset();</span>
+<span class="fc" id="L251">        byteBuffer.putLong(preparedTransactionOffset);</span>
+
+        // 15 BODY
+<span class="fc" id="L254">        byteBuffer.putInt(bodyLength);</span>
+<span class="fc" id="L255">        byteBuffer.put(newBody);</span>
+
+        // 16 TOPIC
+<span class="fc" id="L258">        byteBuffer.put(topicLen);</span>
+<span class="fc" id="L259">        byteBuffer.put(topics);</span>
+
+        // 17 properties
+<span class="fc" id="L262">        byteBuffer.putShort(propertiesLength);</span>
+<span class="fc" id="L263">        byteBuffer.put(propertiesBytes);</span>
+
+<span class="fc" id="L265">        return byteBuffer.array();</span>
+    }
+
+    /**
+     * Encode without store timestamp and store host, skip blank msg.
+     *
+     * @param messageExt msg
+     * @param needCompress need compress or not
+     * @return byte array
+     * @throws IOException when compress failed
+     */
+    public static byte[] encodeUniquely(MessageExt messageExt, boolean needCompress) throws IOException {
+<span class="nc" id="L277">        byte[] body = messageExt.getBody();</span>
+<span class="nc" id="L278">        byte[] topics = messageExt.getTopic().getBytes(CHARSET_UTF8);</span>
+<span class="nc" id="L279">        byte topicLen = (byte) topics.length;</span>
+<span class="nc" id="L280">        String properties = messageProperties2String(messageExt.getProperties());</span>
+<span class="nc" id="L281">        byte[] propertiesBytes = properties.getBytes(CHARSET_UTF8);</span>
+<span class="nc" id="L282">        short propertiesLength = (short) propertiesBytes.length;</span>
+<span class="nc" id="L283">        int sysFlag = messageExt.getSysFlag();</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        int bornhostLength = (sysFlag &amp; MessageSysFlag.BORNHOST_V6_FLAG) == 0 ? 8 : 20;</span>
+<span class="nc" id="L285">        byte[] newBody = messageExt.getBody();</span>
+<span class="nc bnc" id="L286" title="All 4 branches missed.">        if (needCompress &amp;&amp; (sysFlag &amp; MessageSysFlag.COMPRESSED_FLAG) == MessageSysFlag.COMPRESSED_FLAG) {</span>
+<span class="nc" id="L287">            newBody = UtilAll.compress(body, 5);</span>
+        }
+<span class="nc" id="L289">        int bodyLength = newBody.length;</span>
+<span class="nc" id="L290">        int storeSize = messageExt.getStoreSize();</span>
+        ByteBuffer byteBuffer;
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        if (storeSize &gt; 0) {</span>
+<span class="nc" id="L293">            byteBuffer = ByteBuffer.allocate(storeSize - 8); // except size for store timestamp</span>
+        } else {
+<span class="nc" id="L295">            storeSize = 4 +  // 1 TOTALSIZE</span>
+                4 +  // 2 MAGICCODE
+                4 +  // 3 BODYCRC
+                4 +  // 4 QUEUEID
+                4 +  // 5 FLAG
+                8 +  // 6 QUEUEOFFSET
+                8 +  // 7 PHYSICALOFFSET
+                4 +  // 8 SYSFLAG
+                8 +  // 9 BORNTIMESTAMP
+                bornhostLength + // 10 BORNHOST
+                4 +  // 11 RECONSUMETIMES
+                8 +  // 12 Prepared Transaction Offset
+                4 + bodyLength +  // 13 BODY
+                +1 + topicLen +  // 14 TOPIC
+                2 + propertiesLength // 15 propertiesLength
+            ;
+<span class="nc" id="L311">            byteBuffer = ByteBuffer.allocate(storeSize);</span>
+        }
+
+        // 1 TOTALSIZE
+<span class="nc" id="L315">        byteBuffer.putInt(storeSize);</span>
+
+        // 2 MAGICCODE
+<span class="nc" id="L318">        byteBuffer.putInt(MESSAGE_MAGIC_CODE);</span>
+
+        // 3 BODYCRC
+<span class="nc" id="L321">        int bodyCRC = messageExt.getBodyCRC();</span>
+<span class="nc" id="L322">        byteBuffer.putInt(bodyCRC);</span>
+
+        // 4 QUEUEID
+<span class="nc" id="L325">        int queueId = messageExt.getQueueId();</span>
+<span class="nc" id="L326">        byteBuffer.putInt(queueId);</span>
+
+        // 5 FLAG
+<span class="nc" id="L329">        int flag = messageExt.getFlag();</span>
+<span class="nc" id="L330">        byteBuffer.putInt(flag);</span>
+
+        // 6 QUEUEOFFSET
+<span class="nc" id="L333">        long queueOffset = messageExt.getQueueOffset();</span>
+<span class="nc" id="L334">        byteBuffer.putLong(queueOffset);</span>
+
+        // 7 PHYSICALOFFSET
+<span class="nc" id="L337">        long physicOffset = messageExt.getCommitLogOffset();</span>
+<span class="nc" id="L338">        byteBuffer.putLong(physicOffset);</span>
+
+        // 8 SYSFLAG
+<span class="nc" id="L341">        byteBuffer.putInt(sysFlag);</span>
+
+        // 9 BORNTIMESTAMP
+<span class="nc" id="L344">        long bornTimeStamp = messageExt.getBornTimestamp();</span>
+<span class="nc" id="L345">        byteBuffer.putLong(bornTimeStamp);</span>
+
+        // 10 BORNHOST
+<span class="nc" id="L348">        InetSocketAddress bornHost = (InetSocketAddress) messageExt.getBornHost();</span>
+<span class="nc" id="L349">        byteBuffer.put(bornHost.getAddress().getAddress());</span>
+<span class="nc" id="L350">        byteBuffer.putInt(bornHost.getPort());</span>
+
+        // 11 RECONSUMETIMES
+<span class="nc" id="L353">        int reconsumeTimes = messageExt.getReconsumeTimes();</span>
+<span class="nc" id="L354">        byteBuffer.putInt(reconsumeTimes);</span>
+
+        // 12 Prepared Transaction Offset
+<span class="nc" id="L357">        long preparedTransactionOffset = messageExt.getPreparedTransactionOffset();</span>
+<span class="nc" id="L358">        byteBuffer.putLong(preparedTransactionOffset);</span>
+
+        // 13 BODY
+<span class="nc" id="L361">        byteBuffer.putInt(bodyLength);</span>
+<span class="nc" id="L362">        byteBuffer.put(newBody);</span>
+
+        // 14 TOPIC
+<span class="nc" id="L365">        byteBuffer.put(topicLen);</span>
+<span class="nc" id="L366">        byteBuffer.put(topics);</span>
+
+        // 15 properties
+<span class="nc" id="L369">        byteBuffer.putShort(propertiesLength);</span>
+<span class="nc" id="L370">        byteBuffer.put(propertiesBytes);</span>
+
+<span class="nc" id="L372">        return byteBuffer.array();</span>
+    }
+
+    public static MessageExt decode(
+        ByteBuffer byteBuffer, final boolean readBody, final boolean deCompressBody) {
+<span class="nc" id="L377">        return decode(byteBuffer, readBody, deCompressBody, false);</span>
+    }
+
+    public static MessageExt decode(
+        java.nio.ByteBuffer byteBuffer, final boolean readBody, final boolean deCompressBody, final boolean isClient) {
+<span class="fc" id="L382">        return decode(byteBuffer, readBody, deCompressBody, isClient, false, false);</span>
+    }
+
+    public static MessageExt decode(
+        java.nio.ByteBuffer byteBuffer, final boolean readBody, final boolean deCompressBody, final boolean isClient,
+        final boolean isSetPropertiesString) {
+<span class="nc" id="L388">        return decode(byteBuffer, readBody, deCompressBody, isClient, isSetPropertiesString, false);</span>
+    }
+
+    public static MessageExt decode(
+        java.nio.ByteBuffer byteBuffer, final boolean readBody, final boolean deCompressBody, final boolean isClient,
+        final boolean isSetPropertiesString, final boolean checkCRC) {
+        try {
+
+            MessageExt msgExt;
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">            if (isClient) {</span>
+<span class="nc" id="L398">                msgExt = new MessageClientExt();</span>
+            } else {
+<span class="fc" id="L400">                msgExt = new MessageExt();</span>
+            }
+
+            // 1 TOTALSIZE
+<span class="fc" id="L404">            int storeSize = byteBuffer.getInt();</span>
+<span class="fc" id="L405">            msgExt.setStoreSize(storeSize);</span>
+
+            // 2 MAGICCODE
+<span class="fc" id="L408">            int magicCode = byteBuffer.getInt();</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">            if (magicCode != MESSAGE_MAGIC_CODE) {</span>
+<span class="nc" id="L410">                throw new RuntimeException(&quot;Unknown magicCode: &quot; + magicCode);</span>
+            }
+
+            // 3 BODYCRC
+<span class="fc" id="L414">            int bodyCRC = byteBuffer.getInt();</span>
+<span class="fc" id="L415">            msgExt.setBodyCRC(bodyCRC);</span>
+
+            // 4 QUEUEID
+<span class="fc" id="L418">            int queueId = byteBuffer.getInt();</span>
+<span class="fc" id="L419">            msgExt.setQueueId(queueId);</span>
+
+            // 5 FLAG
+<span class="fc" id="L422">            int flag = byteBuffer.getInt();</span>
+<span class="fc" id="L423">            msgExt.setFlag(flag);</span>
+
+            // 6 QUEUEOFFSET
+<span class="fc" id="L426">            long queueOffset = byteBuffer.getLong();</span>
+<span class="fc" id="L427">            msgExt.setQueueOffset(queueOffset);</span>
+
+            // 7 PHYSICALOFFSET
+<span class="fc" id="L430">            long physicOffset = byteBuffer.getLong();</span>
+<span class="fc" id="L431">            msgExt.setCommitLogOffset(physicOffset);</span>
+
+            // 8 SYSFLAG
+<span class="fc" id="L434">            int sysFlag = byteBuffer.getInt();</span>
+<span class="fc" id="L435">            msgExt.setSysFlag(sysFlag);</span>
+
+            // 9 BORNTIMESTAMP
+<span class="fc" id="L438">            long bornTimeStamp = byteBuffer.getLong();</span>
+<span class="fc" id="L439">            msgExt.setBornTimestamp(bornTimeStamp);</span>
+
+            // 10 BORNHOST
+<span class="fc bfc" id="L442" title="All 2 branches covered.">            int bornhostIPLength = (sysFlag &amp; MessageSysFlag.BORNHOST_V6_FLAG) == 0 ? 4 : 16;</span>
+<span class="fc" id="L443">            byte[] bornHost = new byte[bornhostIPLength];</span>
+<span class="fc" id="L444">            byteBuffer.get(bornHost, 0, bornhostIPLength);</span>
+<span class="fc" id="L445">            int port = byteBuffer.getInt();</span>
+<span class="fc" id="L446">            msgExt.setBornHost(new InetSocketAddress(InetAddress.getByAddress(bornHost), port));</span>
+
+            // 11 STORETIMESTAMP
+<span class="fc" id="L449">            long storeTimestamp = byteBuffer.getLong();</span>
+<span class="fc" id="L450">            msgExt.setStoreTimestamp(storeTimestamp);</span>
+
+            // 12 STOREHOST
+<span class="fc bfc" id="L453" title="All 2 branches covered.">            int storehostIPLength = (sysFlag &amp; MessageSysFlag.STOREHOSTADDRESS_V6_FLAG) == 0 ? 4 : 16;</span>
+<span class="fc" id="L454">            byte[] storeHost = new byte[storehostIPLength];</span>
+<span class="fc" id="L455">            byteBuffer.get(storeHost, 0, storehostIPLength);</span>
+<span class="fc" id="L456">            port = byteBuffer.getInt();</span>
+<span class="fc" id="L457">            msgExt.setStoreHost(new InetSocketAddress(InetAddress.getByAddress(storeHost), port));</span>
+
+            // 13 RECONSUMETIMES
+<span class="fc" id="L460">            int reconsumeTimes = byteBuffer.getInt();</span>
+<span class="fc" id="L461">            msgExt.setReconsumeTimes(reconsumeTimes);</span>
+
+            // 14 Prepared Transaction Offset
+<span class="fc" id="L464">            long preparedTransactionOffset = byteBuffer.getLong();</span>
+<span class="fc" id="L465">            msgExt.setPreparedTransactionOffset(preparedTransactionOffset);</span>
+
+            // 15 BODY
+<span class="fc" id="L468">            int bodyLen = byteBuffer.getInt();</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">            if (bodyLen &gt; 0) {</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">                if (readBody) {</span>
+<span class="fc" id="L471">                    byte[] body = new byte[bodyLen];</span>
+<span class="fc" id="L472">                    byteBuffer.get(body);</span>
+
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">                    if (checkCRC) {</span>
+                        //crc body
+<span class="nc" id="L476">                        int crc = UtilAll.crc32(body, 0, bodyLen);</span>
+<span class="nc bnc" id="L477" title="All 2 branches missed.">                        if (crc != bodyCRC) {</span>
+<span class="nc" id="L478">                            throw new Exception(&quot;Msg crc is error!&quot;);</span>
+                        }
+                    }
+
+                    // uncompress body
+<span class="pc bpc" id="L483" title="2 of 4 branches missed.">                    if (deCompressBody &amp;&amp; (sysFlag &amp; MessageSysFlag.COMPRESSED_FLAG) == MessageSysFlag.COMPRESSED_FLAG) {</span>
+<span class="nc" id="L484">                        Compressor compressor = CompressorFactory.getCompressor(MessageSysFlag.getCompressionType(sysFlag));</span>
+<span class="nc" id="L485">                        body = compressor.decompress(body);</span>
+                    }
+
+<span class="fc" id="L488">                    msgExt.setBody(body);</span>
+<span class="fc" id="L489">                } else {</span>
+<span class="nc" id="L490">                    byteBuffer.position(byteBuffer.position() + bodyLen);</span>
+                }
+            }
+
+            // 16 TOPIC
+<span class="fc" id="L495">            byte topicLen = byteBuffer.get();</span>
+<span class="fc" id="L496">            byte[] topic = new byte[(int) topicLen];</span>
+<span class="fc" id="L497">            byteBuffer.get(topic);</span>
+<span class="fc" id="L498">            msgExt.setTopic(new String(topic, CHARSET_UTF8));</span>
+
+            // 17 properties
+<span class="fc" id="L501">            short propertiesLength = byteBuffer.getShort();</span>
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">            if (propertiesLength &gt; 0) {</span>
+<span class="fc" id="L503">                byte[] properties = new byte[propertiesLength];</span>
+<span class="fc" id="L504">                byteBuffer.get(properties);</span>
+<span class="fc" id="L505">                String propertiesString = new String(properties, CHARSET_UTF8);</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">                if (!isSetPropertiesString) {</span>
+<span class="fc" id="L507">                    Map&lt;String, String&gt; map = string2messageProperties(propertiesString);</span>
+<span class="fc" id="L508">                    msgExt.setProperties(map);</span>
+<span class="fc" id="L509">                } else {</span>
+<span class="nc" id="L510">                    Map&lt;String, String&gt; map = string2messageProperties(propertiesString);</span>
+<span class="nc" id="L511">                    map.put(&quot;propertiesString&quot;, propertiesString);</span>
+<span class="nc" id="L512">                    msgExt.setProperties(map);</span>
+                }
+            }
+
+<span class="fc" id="L516">            int msgIDLength = storehostIPLength + 4 + 8;</span>
+<span class="fc" id="L517">            ByteBuffer byteBufferMsgId = ByteBuffer.allocate(msgIDLength);</span>
+<span class="fc" id="L518">            String msgId = createMessageId(byteBufferMsgId, msgExt.getStoreHostBytes(), msgExt.getCommitLogOffset());</span>
+<span class="fc" id="L519">            msgExt.setMsgId(msgId);</span>
+
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">            if (isClient) {</span>
+<span class="nc" id="L522">                ((MessageClientExt) msgExt).setOffsetMsgId(msgId);</span>
+            }
+
+<span class="fc" id="L525">            return msgExt;</span>
+<span class="nc" id="L526">        } catch (Exception e) {</span>
+<span class="nc" id="L527">            byteBuffer.position(byteBuffer.limit());</span>
+        }
+
+<span class="nc" id="L530">        return null;</span>
+    }
+
+    public static List&lt;MessageExt&gt; decodes(ByteBuffer byteBuffer) {
+<span class="nc" id="L534">        return decodes(byteBuffer, true);</span>
+    }
+
+    public static List&lt;MessageExt&gt; decodesBatch(ByteBuffer byteBuffer,
+        final boolean readBody,
+        final boolean decompressBody,
+        final boolean isClient) {
+<span class="nc" id="L541">        List&lt;MessageExt&gt; msgExts = new ArrayList&lt;MessageExt&gt;();</span>
+<span class="nc bnc" id="L542" title="All 2 branches missed.">        while (byteBuffer.hasRemaining()) {</span>
+<span class="nc" id="L543">            MessageExt msgExt = decode(byteBuffer, readBody, decompressBody, isClient);</span>
+<span class="nc bnc" id="L544" title="All 2 branches missed.">            if (null != msgExt) {</span>
+<span class="nc" id="L545">                msgExts.add(msgExt);</span>
+            } else {
+                break;
+            }
+<span class="nc" id="L549">        }</span>
+<span class="nc" id="L550">        return msgExts;</span>
+    }
+
+    public static List&lt;MessageExt&gt; decodes(ByteBuffer byteBuffer, final boolean readBody) {
+<span class="nc" id="L554">        List&lt;MessageExt&gt; msgExts = new ArrayList&lt;MessageExt&gt;();</span>
+<span class="nc bnc" id="L555" title="All 2 branches missed.">        while (byteBuffer.hasRemaining()) {</span>
+<span class="nc" id="L556">            MessageExt msgExt = clientDecode(byteBuffer, readBody);</span>
+<span class="nc bnc" id="L557" title="All 2 branches missed.">            if (null != msgExt) {</span>
+<span class="nc" id="L558">                msgExts.add(msgExt);</span>
+            } else {
+                break;
+            }
+<span class="nc" id="L562">        }</span>
+<span class="nc" id="L563">        return msgExts;</span>
+    }
+
+    public static String messageProperties2String(Map&lt;String, String&gt; properties) {
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">        if (properties == null) {</span>
+<span class="nc" id="L568">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L570">        int len = 0;</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">        for (final Map.Entry&lt;String, String&gt; entry : properties.entrySet()) {</span>
+<span class="fc" id="L572">            final String name = entry.getKey();</span>
+<span class="fc" id="L573">            final String value = entry.getValue();</span>
+<span class="pc bpc" id="L574" title="1 of 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L575">                continue;</span>
+            }
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">            if (name != null) {</span>
+<span class="fc" id="L578">                len += name.length();</span>
+            }
+<span class="fc" id="L580">            len += value.length();</span>
+<span class="fc" id="L581">            len += 2; // separator</span>
+<span class="fc" id="L582">        }</span>
+<span class="fc" id="L583">        StringBuilder sb = new StringBuilder(len);</span>
+<span class="fc bfc" id="L584" title="All 2 branches covered.">        for (final Map.Entry&lt;String, String&gt; entry : properties.entrySet()) {</span>
+<span class="fc" id="L585">            final String name = entry.getKey();</span>
+<span class="fc" id="L586">            final String value = entry.getValue();</span>
+
+<span class="pc bpc" id="L588" title="1 of 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L589">                continue;</span>
+            }
+<span class="fc" id="L591">            sb.append(name);</span>
+<span class="fc" id="L592">            sb.append(NAME_VALUE_SEPARATOR);</span>
+<span class="fc" id="L593">            sb.append(value);</span>
+<span class="fc" id="L594">            sb.append(PROPERTY_SEPARATOR);</span>
+<span class="fc" id="L595">        }</span>
+<span class="pc bpc" id="L596" title="1 of 2 branches missed.">        if (sb.length() &gt; 0) {</span>
+<span class="fc" id="L597">            sb.deleteCharAt(sb.length() - 1);</span>
+        }
+<span class="fc" id="L599">        return sb.toString();</span>
+    }
+
+    public static Map&lt;String, String&gt; string2messageProperties(final String properties) {
+<span class="fc" id="L603">        Map&lt;String, String&gt; map = new HashMap&lt;String, String&gt;();</span>
+<span class="pc bpc" id="L604" title="1 of 2 branches missed.">        if (properties != null) {</span>
+<span class="fc" id="L605">            int len = properties.length();</span>
+<span class="fc" id="L606">            int index = 0;</span>
+<span class="fc bfc" id="L607" title="All 2 branches covered.">            while (index &lt; len) {</span>
+<span class="fc" id="L608">                int newIndex = properties.indexOf(PROPERTY_SEPARATOR, index);</span>
+<span class="fc bfc" id="L609" title="All 2 branches covered.">                if (newIndex &lt; 0) {</span>
+<span class="fc" id="L610">                    newIndex = len;</span>
+                }
+<span class="fc bfc" id="L612" title="All 2 branches covered.">                if (newIndex - index &gt;= 3) {</span>
+<span class="fc" id="L613">                    int kvSepIndex = properties.indexOf(NAME_VALUE_SEPARATOR, index);</span>
+<span class="fc bfc" id="L614" title="All 4 branches covered.">                    if (kvSepIndex &gt; index &amp;&amp; kvSepIndex &lt; newIndex - 1) {</span>
+<span class="fc" id="L615">                        String k = properties.substring(index, kvSepIndex);</span>
+<span class="fc" id="L616">                        String v = properties.substring(kvSepIndex + 1, newIndex);</span>
+<span class="fc" id="L617">                        map.put(k, v);</span>
+                    }
+                }
+<span class="fc" id="L620">                index = newIndex + 1;</span>
+<span class="fc" id="L621">            }</span>
+        }
+
+<span class="fc" id="L624">        return map;</span>
+    }
+
+    public static byte[] encodeMessage(Message message) {
+        //only need flag, body, properties
+<span class="fc" id="L629">        byte[] body = message.getBody();</span>
+<span class="fc" id="L630">        int bodyLen = body.length;</span>
+<span class="fc" id="L631">        String properties = messageProperties2String(message.getProperties());</span>
+<span class="fc" id="L632">        byte[] propertiesBytes = properties.getBytes(CHARSET_UTF8);</span>
+        //note properties length must not more than Short.MAX
+<span class="fc" id="L634">        short propertiesLength = (short) propertiesBytes.length;</span>
+<span class="fc" id="L635">        int sysFlag = message.getFlag();</span>
+<span class="fc" id="L636">        int storeSize = 4 // 1 TOTALSIZE</span>
+            + 4 // 2 MAGICCOD
+            + 4 // 3 BODYCRC
+            + 4 // 4 FLAG
+            + 4 + bodyLen // 4 BODY
+            + 2 + propertiesLength;
+<span class="fc" id="L642">        ByteBuffer byteBuffer = ByteBuffer.allocate(storeSize);</span>
+        // 1 TOTALSIZE
+<span class="fc" id="L644">        byteBuffer.putInt(storeSize);</span>
+
+        // 2 MAGICCODE
+<span class="fc" id="L647">        byteBuffer.putInt(0);</span>
+
+        // 3 BODYCRC
+<span class="fc" id="L650">        byteBuffer.putInt(0);</span>
+
+        // 4 FLAG
+<span class="fc" id="L653">        int flag = message.getFlag();</span>
+<span class="fc" id="L654">        byteBuffer.putInt(flag);</span>
+
+        // 5 BODY
+<span class="fc" id="L657">        byteBuffer.putInt(bodyLen);</span>
+<span class="fc" id="L658">        byteBuffer.put(body);</span>
+
+        // 6 properties
+<span class="fc" id="L661">        byteBuffer.putShort(propertiesLength);</span>
+<span class="fc" id="L662">        byteBuffer.put(propertiesBytes);</span>
+
+<span class="fc" id="L664">        return byteBuffer.array();</span>
+    }
+
+    public static Message decodeMessage(ByteBuffer byteBuffer) throws Exception {
+<span class="fc" id="L668">        Message message = new Message();</span>
+
+        // 1 TOTALSIZE
+<span class="fc" id="L671">        byteBuffer.getInt();</span>
+
+        // 2 MAGICCODE
+<span class="fc" id="L674">        byteBuffer.getInt();</span>
+
+        // 3 BODYCRC
+<span class="fc" id="L677">        byteBuffer.getInt();</span>
+
+        // 4 FLAG
+<span class="fc" id="L680">        int flag = byteBuffer.getInt();</span>
+<span class="fc" id="L681">        message.setFlag(flag);</span>
+
+        // 5 BODY
+<span class="fc" id="L684">        int bodyLen = byteBuffer.getInt();</span>
+<span class="fc" id="L685">        byte[] body = new byte[bodyLen];</span>
+<span class="fc" id="L686">        byteBuffer.get(body);</span>
+<span class="fc" id="L687">        message.setBody(body);</span>
+
+        // 6 properties
+<span class="fc" id="L690">        short propertiesLen = byteBuffer.getShort();</span>
+<span class="fc" id="L691">        byte[] propertiesBytes = new byte[propertiesLen];</span>
+<span class="fc" id="L692">        byteBuffer.get(propertiesBytes);</span>
+<span class="fc" id="L693">        message.setProperties(string2messageProperties(new String(propertiesBytes, CHARSET_UTF8)));</span>
+
+<span class="fc" id="L695">        return message;</span>
+    }
+
+    public static byte[] encodeMessages(List&lt;Message&gt; messages) {
+        //TO DO refactor, accumulate in one buffer, avoid copies
+<span class="fc" id="L700">        List&lt;byte[]&gt; encodedMessages = new ArrayList&lt;byte[]&gt;(messages.size());</span>
+<span class="fc" id="L701">        int allSize = 0;</span>
+<span class="fc bfc" id="L702" title="All 2 branches covered.">        for (Message message : messages) {</span>
+<span class="fc" id="L703">            byte[] tmp = encodeMessage(message);</span>
+<span class="fc" id="L704">            encodedMessages.add(tmp);</span>
+<span class="fc" id="L705">            allSize += tmp.length;</span>
+<span class="fc" id="L706">        }</span>
+<span class="fc" id="L707">        byte[] allBytes = new byte[allSize];</span>
+<span class="fc" id="L708">        int pos = 0;</span>
+<span class="fc bfc" id="L709" title="All 2 branches covered.">        for (byte[] bytes : encodedMessages) {</span>
+<span class="fc" id="L710">            System.arraycopy(bytes, 0, allBytes, pos, bytes.length);</span>
+<span class="fc" id="L711">            pos += bytes.length;</span>
+<span class="fc" id="L712">        }</span>
+<span class="fc" id="L713">        return allBytes;</span>
+    }
+
+    public static List&lt;Message&gt; decodeMessages(ByteBuffer byteBuffer) throws Exception {
+        //TO DO add a callback for processing,  avoid creating lists
+<span class="fc" id="L718">        List&lt;Message&gt; msgs = new ArrayList&lt;Message&gt;();</span>
+<span class="fc bfc" id="L719" title="All 2 branches covered.">        while (byteBuffer.hasRemaining()) {</span>
+<span class="fc" id="L720">            Message msg = decodeMessage(byteBuffer);</span>
+<span class="fc" id="L721">            msgs.add(msg);</span>
+<span class="fc" id="L722">        }</span>
+<span class="fc" id="L723">        return msgs;</span>
+    }
+
+    public static void decodeMessage(MessageExt messageExt, List&lt;MessageExt&gt; list) throws Exception {
+<span class="nc" id="L727">        List&lt;Message&gt; messages = MessageDecoder.decodeMessages(ByteBuffer.wrap(messageExt.getBody()));</span>
+<span class="nc bnc" id="L728" title="All 2 branches missed.">        for (int i = 0; i &lt; messages.size(); i++) {</span>
+<span class="nc" id="L729">            Message message = messages.get(i);</span>
+<span class="nc" id="L730">            MessageClientExt messageClientExt = new MessageClientExt();</span>
+<span class="nc" id="L731">            messageClientExt.setTopic(messageExt.getTopic());</span>
+<span class="nc" id="L732">            messageClientExt.setQueueOffset(messageExt.getQueueOffset() + i);</span>
+<span class="nc" id="L733">            messageClientExt.setQueueId(messageExt.getQueueId());</span>
+<span class="nc" id="L734">            messageClientExt.setFlag(message.getFlag());</span>
+<span class="nc" id="L735">            MessageAccessor.setProperties(messageClientExt, message.getProperties());</span>
+<span class="nc" id="L736">            messageClientExt.setBody(message.getBody());</span>
+<span class="nc" id="L737">            messageClientExt.setStoreHost(messageExt.getStoreHost());</span>
+<span class="nc" id="L738">            messageClientExt.setBornHost(messageExt.getBornHost());</span>
+<span class="nc" id="L739">            messageClientExt.setBornTimestamp(messageExt.getBornTimestamp());</span>
+<span class="nc" id="L740">            messageClientExt.setStoreTimestamp(messageExt.getStoreTimestamp());</span>
+<span class="nc" id="L741">            messageClientExt.setSysFlag(messageExt.getSysFlag());</span>
+<span class="nc" id="L742">            messageClientExt.setCommitLogOffset(messageExt.getCommitLogOffset());</span>
+<span class="nc" id="L743">            messageClientExt.setWaitStoreMsgOK(messageExt.isWaitStoreMsgOK());</span>
+<span class="nc" id="L744">            list.add(messageClientExt);</span>
+        }
+<span class="nc" id="L746">    }</span>
+
+    public static int countInnerMsgNum(ByteBuffer buffer) {
+<span class="nc" id="L749">        int count = 0;</span>
+<span class="nc bnc" id="L750" title="All 2 branches missed.">        while (buffer.hasRemaining()) {</span>
+<span class="nc" id="L751">            count++;</span>
+<span class="nc" id="L752">            int currPos = buffer.position();</span>
+<span class="nc" id="L753">            int size = buffer.getInt();</span>
+<span class="nc" id="L754">            buffer.position(currPos + size);</span>
+<span class="nc" id="L755">        }</span>
+<span class="nc" id="L756">        return count;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

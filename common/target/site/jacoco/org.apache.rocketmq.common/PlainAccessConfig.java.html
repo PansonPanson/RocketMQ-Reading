@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PlainAccessConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common</a> &gt; <span class="el_source">PlainAccessConfig.java</span></div><h1>PlainAccessConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common;
+
+import java.util.List;
+
+<span class="nc" id="L21">public class PlainAccessConfig {</span>
+
+    private String accessKey;
+
+    private String secretKey;
+
+    private String whiteRemoteAddress;
+
+    private boolean admin;
+
+    private String defaultTopicPerm;
+
+    private String defaultGroupPerm;
+
+    private List&lt;String&gt; topicPerms;
+
+    private List&lt;String&gt; groupPerms;
+
+    public String getAccessKey() {
+<span class="nc" id="L40">        return accessKey;</span>
+    }
+
+    public void setAccessKey(String accessKey) {
+<span class="nc" id="L44">        this.accessKey = accessKey;</span>
+<span class="nc" id="L45">    }</span>
+
+    public String getSecretKey() {
+<span class="nc" id="L48">        return secretKey;</span>
+    }
+
+    public void setSecretKey(String secretKey) {
+<span class="nc" id="L52">        this.secretKey = secretKey;</span>
+<span class="nc" id="L53">    }</span>
+
+    public String getWhiteRemoteAddress() {
+<span class="nc" id="L56">        return whiteRemoteAddress;</span>
+    }
+
+    public void setWhiteRemoteAddress(String whiteRemoteAddress) {
+<span class="nc" id="L60">        this.whiteRemoteAddress = whiteRemoteAddress;</span>
+<span class="nc" id="L61">    }</span>
+
+    public boolean isAdmin() {
+<span class="nc" id="L64">        return admin;</span>
+    }
+
+    public void setAdmin(boolean admin) {
+<span class="nc" id="L68">        this.admin = admin;</span>
+<span class="nc" id="L69">    }</span>
+
+    public String getDefaultTopicPerm() {
+<span class="nc" id="L72">        return defaultTopicPerm;</span>
+    }
+
+    public void setDefaultTopicPerm(String defaultTopicPerm) {
+<span class="nc" id="L76">        this.defaultTopicPerm = defaultTopicPerm;</span>
+<span class="nc" id="L77">    }</span>
+
+    public String getDefaultGroupPerm() {
+<span class="nc" id="L80">        return defaultGroupPerm;</span>
+    }
+
+    public void setDefaultGroupPerm(String defaultGroupPerm) {
+<span class="nc" id="L84">        this.defaultGroupPerm = defaultGroupPerm;</span>
+<span class="nc" id="L85">    }</span>
+
+    public List&lt;String&gt; getTopicPerms() {
+<span class="nc" id="L88">        return topicPerms;</span>
+    }
+
+    public void setTopicPerms(List&lt;String&gt; topicPerms) {
+<span class="nc" id="L92">        this.topicPerms = topicPerms;</span>
+<span class="nc" id="L93">    }</span>
+
+    public List&lt;String&gt; getGroupPerms() {
+<span class="nc" id="L96">        return groupPerms;</span>
+    }
+
+    public void setGroupPerms(List&lt;String&gt; groupPerms) {
+<span class="nc" id="L100">        this.groupPerms = groupPerms;</span>
+<span class="nc" id="L101">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

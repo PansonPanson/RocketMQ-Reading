@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EndTransactionRequestHeader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.header</a> &gt; <span class="el_source">EndTransactionRequestHeader.java</span></div><h1>EndTransactionRequestHeader.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.protocol.header;
+
+import com.google.common.base.MoreObjects;
+import org.apache.rocketmq.common.sysflag.MessageSysFlag;
+import org.apache.rocketmq.remoting.CommandCustomHeader;
+import org.apache.rocketmq.remoting.annotation.CFNotNull;
+import org.apache.rocketmq.remoting.annotation.CFNullable;
+import org.apache.rocketmq.remoting.exception.RemotingCommandException;
+
+<span class="nc" id="L27">public class EndTransactionRequestHeader implements CommandCustomHeader {</span>
+    @CFNotNull
+    private String producerGroup;
+    @CFNotNull
+    private Long tranStateTableOffset;
+    @CFNotNull
+    private Long commitLogOffset;
+    @CFNotNull
+    private Integer commitOrRollback; // TRANSACTION_COMMIT_TYPE
+    // TRANSACTION_ROLLBACK_TYPE
+    // TRANSACTION_NOT_TYPE
+
+<span class="nc" id="L39">    @CFNullable</span>
+<span class="nc" id="L40">    private Boolean fromTransactionCheck = false;</span>
+
+    @CFNotNull
+    private String msgId;
+
+    private String transactionId;
+
+    @Override
+    public void checkFields() throws RemotingCommandException {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (MessageSysFlag.TRANSACTION_NOT_TYPE == this.commitOrRollback) {</span>
+<span class="nc" id="L50">            return;</span>
+        }
+
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (MessageSysFlag.TRANSACTION_COMMIT_TYPE == this.commitOrRollback) {</span>
+<span class="nc" id="L54">            return;</span>
+        }
+
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (MessageSysFlag.TRANSACTION_ROLLBACK_TYPE == this.commitOrRollback) {</span>
+<span class="nc" id="L58">            return;</span>
+        }
+
+<span class="nc" id="L61">        throw new RemotingCommandException(&quot;commitOrRollback field wrong&quot;);</span>
+    }
+
+    public String getProducerGroup() {
+<span class="nc" id="L65">        return producerGroup;</span>
+    }
+
+    public void setProducerGroup(String producerGroup) {
+<span class="nc" id="L69">        this.producerGroup = producerGroup;</span>
+<span class="nc" id="L70">    }</span>
+
+    public Long getTranStateTableOffset() {
+<span class="nc" id="L73">        return tranStateTableOffset;</span>
+    }
+
+    public void setTranStateTableOffset(Long tranStateTableOffset) {
+<span class="nc" id="L77">        this.tranStateTableOffset = tranStateTableOffset;</span>
+<span class="nc" id="L78">    }</span>
+
+    public Long getCommitLogOffset() {
+<span class="nc" id="L81">        return commitLogOffset;</span>
+    }
+
+    public void setCommitLogOffset(Long commitLogOffset) {
+<span class="nc" id="L85">        this.commitLogOffset = commitLogOffset;</span>
+<span class="nc" id="L86">    }</span>
+
+    public Integer getCommitOrRollback() {
+<span class="nc" id="L89">        return commitOrRollback;</span>
+    }
+
+    public void setCommitOrRollback(Integer commitOrRollback) {
+<span class="nc" id="L93">        this.commitOrRollback = commitOrRollback;</span>
+<span class="nc" id="L94">    }</span>
+
+    public Boolean getFromTransactionCheck() {
+<span class="nc" id="L97">        return fromTransactionCheck;</span>
+    }
+
+    public void setFromTransactionCheck(Boolean fromTransactionCheck) {
+<span class="nc" id="L101">        this.fromTransactionCheck = fromTransactionCheck;</span>
+<span class="nc" id="L102">    }</span>
+
+    public String getMsgId() {
+<span class="nc" id="L105">        return msgId;</span>
+    }
+
+    public void setMsgId(String msgId) {
+<span class="nc" id="L109">        this.msgId = msgId;</span>
+<span class="nc" id="L110">    }</span>
+
+    public String getTransactionId() {
+<span class="nc" id="L113">        return transactionId;</span>
+    }
+
+    public void setTransactionId(String transactionId) {
+<span class="nc" id="L117">        this.transactionId = transactionId;</span>
+<span class="nc" id="L118">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L122">        return MoreObjects.toStringHelper(this)</span>
+<span class="nc" id="L123">            .add(&quot;producerGroup&quot;, producerGroup)</span>
+<span class="nc" id="L124">            .add(&quot;tranStateTableOffset&quot;, tranStateTableOffset)</span>
+<span class="nc" id="L125">            .add(&quot;commitLogOffset&quot;, commitLogOffset)</span>
+<span class="nc" id="L126">            .add(&quot;commitOrRollback&quot;, commitOrRollback)</span>
+<span class="nc" id="L127">            .add(&quot;fromTransactionCheck&quot;, fromTransactionCheck)</span>
+<span class="nc" id="L128">            .add(&quot;msgId&quot;, msgId)</span>
+<span class="nc" id="L129">            .add(&quot;transactionId&quot;, transactionId)</span>
+<span class="nc" id="L130">            .toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

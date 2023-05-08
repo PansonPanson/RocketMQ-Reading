@@ -1,0 +1,30 @@
+2022-05-12 23:20:58 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@2a3b5b47
+2022-05-12 23:20:58 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@128d2484
+2022-05-12 23:20:58 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@7cc0cdad
+2022-05-12 23:20:58 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@7c7b252e
+2022-05-12 23:20:59 WARN main - Unknown channel option 'SO_KEEPALIVE' for channel '[id: 0x367ee6ba]'
+2022-05-22 20:34:15 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@2a3b5b47
+2022-05-22 20:34:15 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@128d2484
+2022-05-22 20:34:15 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@7cc0cdad
+2022-05-22 20:34:15 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@7c7b252e
+2022-05-22 20:34:16 WARN main - Unknown channel option 'SO_KEEPALIVE' for channel '[id: 0x48c26736]'
+2022-05-22 20:59:38 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@e45f292
+2022-05-22 20:59:38 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@59494225
+2022-05-22 20:59:38 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@6e1567f1
+2022-05-22 20:59:38 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@5cb9f472
+2022-05-22 20:59:38 WARN main - Unknown channel option 'SO_KEEPALIVE' for channel '[id: 0xf41182b9]'
+2022-05-22 20:59:47 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@2a3b5b47
+2022-05-22 20:59:47 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@128d2484
+2022-05-22 20:59:47 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@7cc0cdad
+2022-05-22 20:59:47 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@7c7b252e
+2022-05-22 20:59:47 WARN main - Unknown channel option 'SO_KEEPALIVE' for channel '[id: 0xe7ba85b2]'
+2022-05-22 22:10:38 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@2a3b5b47
+2022-05-22 22:10:38 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@128d2484
+2022-05-22 22:10:38 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@7cc0cdad
+2022-05-22 22:10:38 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@7c7b252e
+2022-05-22 22:10:38 WARN main - Unknown channel option 'SO_KEEPALIVE' for channel '[id: 0x236295cc]'
+2022-07-18 00:45:07 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@e45f292
+2022-07-18 00:45:07 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@59494225
+2022-07-18 00:45:07 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@6e1567f1
+2022-07-18 00:45:07 INFO main - instrumented a special java.util.Set into: sun.nio.ch.KQueueSelectorImpl@5cb9f472
+2022-07-18 00:45:08 WARN main - Unknown channel option 'SO_KEEPALIVE' for channel '[id: 0x54a9d0ee]'

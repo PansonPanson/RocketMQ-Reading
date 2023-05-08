@@ -1,0 +1,843 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultMQPullConsumerImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.impl.consumer</a> &gt; <span class="el_source">DefaultMQPullConsumerImpl.java</span></div><h1>DefaultMQPullConsumerImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.impl.consumer;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
+import org.apache.rocketmq.client.QueryResult;
+import org.apache.rocketmq.client.Validators;
+import org.apache.rocketmq.client.consumer.DefaultMQPullConsumer;
+import org.apache.rocketmq.client.consumer.MessageSelector;
+import org.apache.rocketmq.client.consumer.PullCallback;
+import org.apache.rocketmq.client.consumer.PullResult;
+import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
+import org.apache.rocketmq.client.consumer.store.LocalFileOffsetStore;
+import org.apache.rocketmq.client.consumer.store.OffsetStore;
+import org.apache.rocketmq.client.consumer.store.ReadOffsetType;
+import org.apache.rocketmq.client.consumer.store.RemoteBrokerOffsetStore;
+import org.apache.rocketmq.client.exception.MQBrokerException;
+import org.apache.rocketmq.client.exception.MQClientException;
+import org.apache.rocketmq.client.hook.ConsumeMessageContext;
+import org.apache.rocketmq.client.hook.ConsumeMessageHook;
+import org.apache.rocketmq.client.hook.FilterMessageHook;
+import org.apache.rocketmq.client.impl.CommunicationMode;
+import org.apache.rocketmq.client.impl.MQClientManager;
+import org.apache.rocketmq.client.impl.factory.MQClientInstance;
+import org.apache.rocketmq.client.log.ClientLogger;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.ServiceState;
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.consumer.ConsumeFromWhere;
+import org.apache.rocketmq.common.filter.ExpressionType;
+import org.apache.rocketmq.common.filter.FilterAPI;
+import org.apache.rocketmq.common.help.FAQUrl;
+import org.apache.rocketmq.common.protocol.NamespaceUtil;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.common.message.MessageAccessor;
+import org.apache.rocketmq.common.message.MessageConst;
+import org.apache.rocketmq.common.message.MessageExt;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.protocol.body.ConsumerRunningInfo;
+import org.apache.rocketmq.common.protocol.heartbeat.ConsumeType;
+import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
+import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
+import org.apache.rocketmq.common.sysflag.PullSysFlag;
+import org.apache.rocketmq.remoting.RPCHook;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
+import org.apache.rocketmq.remoting.exception.RemotingException;
+
+/**
+ * This class will be removed in 2022, and a better implementation {@link DefaultLitePullConsumerImpl} is recommend to use
+ * in the scenario of actively pulling messages.
+ */
+@Deprecated
+public class DefaultMQPullConsumerImpl implements MQConsumerInner {
+<span class="fc" id="L75">    private final InternalLogger log = ClientLogger.getLog();</span>
+    private final DefaultMQPullConsumer defaultMQPullConsumer;
+<span class="fc" id="L77">    private final long consumerStartTimestamp = System.currentTimeMillis();</span>
+    private final RPCHook rpcHook;
+<span class="fc" id="L79">    private final ArrayList&lt;ConsumeMessageHook&gt; consumeMessageHookList = new ArrayList&lt;ConsumeMessageHook&gt;();</span>
+<span class="fc" id="L80">    private final ArrayList&lt;FilterMessageHook&gt; filterMessageHookList = new ArrayList&lt;FilterMessageHook&gt;();</span>
+<span class="fc" id="L81">    private volatile ServiceState serviceState = ServiceState.CREATE_JUST;</span>
+    protected MQClientInstance mQClientFactory;
+    private PullAPIWrapper pullAPIWrapper;
+    private OffsetStore offsetStore;
+<span class="fc" id="L85">    private RebalanceImpl rebalanceImpl = new RebalancePullImpl(this);</span>
+
+<span class="fc" id="L87">    public DefaultMQPullConsumerImpl(final DefaultMQPullConsumer defaultMQPullConsumer, final RPCHook rpcHook) {</span>
+<span class="fc" id="L88">        this.defaultMQPullConsumer = defaultMQPullConsumer;</span>
+<span class="fc" id="L89">        this.rpcHook = rpcHook;</span>
+<span class="fc" id="L90">    }</span>
+
+    public void registerConsumeMessageHook(final ConsumeMessageHook hook) {
+<span class="nc" id="L93">        this.consumeMessageHookList.add(hook);</span>
+<span class="nc" id="L94">        log.info(&quot;register consumeMessageHook Hook, {}&quot;, hook.hookName());</span>
+<span class="nc" id="L95">    }</span>
+
+    public void createTopic(String key, String newTopic, int queueNum) throws MQClientException {
+<span class="nc" id="L98">        createTopic(key, newTopic, queueNum, 0);</span>
+<span class="nc" id="L99">    }</span>
+
+    public void createTopic(String key, String newTopic, int queueNum, int topicSysFlag) throws MQClientException {
+<span class="nc" id="L102">        this.isRunning();</span>
+<span class="nc" id="L103">        this.mQClientFactory.getMQAdminImpl().createTopic(key, newTopic, queueNum, topicSysFlag, null);</span>
+<span class="nc" id="L104">    }</span>
+
+    private void isRunning() throws MQClientException {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (this.serviceState != ServiceState.RUNNING) {</span>
+<span class="nc" id="L108">            throw new MQClientException(&quot;The consumer is not in running status, &quot;</span>
+                + this.serviceState
+<span class="nc" id="L110">                + FAQUrl.suggestTodo(FAQUrl.CLIENT_SERVICE_NOT_OK),</span>
+                null);
+        }
+<span class="fc" id="L113">    }</span>
+
+    public long fetchConsumeOffset(MessageQueue mq, boolean fromStore) throws MQClientException {
+<span class="nc" id="L116">        this.isRunning();</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        return this.offsetStore.readOffset(mq, fromStore ? ReadOffsetType.READ_FROM_STORE : ReadOffsetType.MEMORY_FIRST_THEN_STORE);</span>
+    }
+
+    public Set&lt;MessageQueue&gt; fetchMessageQueuesInBalance(String topic) throws MQClientException {
+<span class="nc" id="L121">        this.isRunning();</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (null == topic) {</span>
+<span class="nc" id="L123">            throw new IllegalArgumentException(&quot;topic is null&quot;);</span>
+        }
+
+<span class="nc" id="L126">        ConcurrentMap&lt;MessageQueue, ProcessQueue&gt; mqTable = this.rebalanceImpl.getProcessQueueTable();</span>
+<span class="nc" id="L127">        Set&lt;MessageQueue&gt; mqResult = new HashSet&lt;MessageQueue&gt;();</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        for (MessageQueue mq : mqTable.keySet()) {</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            if (mq.getTopic().equals(topic)) {</span>
+<span class="nc" id="L130">                mqResult.add(mq);</span>
+            }
+<span class="nc" id="L132">        }</span>
+
+<span class="nc" id="L134">        return parseSubscribeMessageQueues(mqResult);</span>
+    }
+
+    public List&lt;MessageQueue&gt; fetchPublishMessageQueues(String topic) throws MQClientException {
+<span class="nc" id="L138">        this.isRunning();</span>
+<span class="nc" id="L139">        return this.mQClientFactory.getMQAdminImpl().fetchPublishMessageQueues(topic);</span>
+    }
+
+    public Set&lt;MessageQueue&gt; fetchSubscribeMessageQueues(String topic) throws MQClientException {
+<span class="nc" id="L143">        this.isRunning();</span>
+        // check if has info in memory, otherwise invoke api.
+<span class="nc" id="L145">        Set&lt;MessageQueue&gt; result = this.rebalanceImpl.getTopicSubscribeInfoTable().get(topic);</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (null == result) {</span>
+<span class="nc" id="L147">            result = this.mQClientFactory.getMQAdminImpl().fetchSubscribeMessageQueues(topic);</span>
+        }
+
+<span class="nc" id="L150">        return parseSubscribeMessageQueues(result);</span>
+    }
+
+    public Set&lt;MessageQueue&gt; parseSubscribeMessageQueues(Set&lt;MessageQueue&gt; queueSet) {
+<span class="nc" id="L154">        Set&lt;MessageQueue&gt; resultQueues = new HashSet&lt;MessageQueue&gt;();</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        for (MessageQueue messageQueue : queueSet) {</span>
+<span class="nc" id="L156">            String userTopic = NamespaceUtil.withoutNamespace(messageQueue.getTopic(),</span>
+<span class="nc" id="L157">                this.defaultMQPullConsumer.getNamespace());</span>
+<span class="nc" id="L158">            resultQueues.add(new MessageQueue(userTopic, messageQueue.getBrokerName(), messageQueue.getQueueId()));</span>
+<span class="nc" id="L159">        }</span>
+<span class="nc" id="L160">        return resultQueues;</span>
+    }
+
+    public long earliestMsgStoreTime(MessageQueue mq) throws MQClientException {
+<span class="nc" id="L164">        this.isRunning();</span>
+<span class="nc" id="L165">        return this.mQClientFactory.getMQAdminImpl().earliestMsgStoreTime(mq);</span>
+    }
+
+    public long maxOffset(MessageQueue mq) throws MQClientException {
+<span class="nc" id="L169">        this.isRunning();</span>
+<span class="nc" id="L170">        return this.mQClientFactory.getMQAdminImpl().maxOffset(mq);</span>
+    }
+
+    public long minOffset(MessageQueue mq) throws MQClientException {
+<span class="nc" id="L174">        this.isRunning();</span>
+<span class="nc" id="L175">        return this.mQClientFactory.getMQAdminImpl().minOffset(mq);</span>
+    }
+
+    public PullResult pull(MessageQueue mq, String subExpression, long offset, int maxNums)
+        throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="fc" id="L180">        return pull(mq, subExpression, offset, maxNums, this.defaultMQPullConsumer.getConsumerPullTimeoutMillis());</span>
+    }
+
+    public PullResult pull(MessageQueue mq, String subExpression, long offset, int maxNums, long timeout)
+        throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="fc" id="L185">        SubscriptionData subscriptionData = getSubscriptionData(mq, subExpression);</span>
+<span class="fc" id="L186">        return this.pullSyncImpl(mq, subscriptionData, offset, maxNums, false, timeout);</span>
+    }
+
+    public PullResult pull(MessageQueue mq, MessageSelector messageSelector, long offset, int maxNums)
+        throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="nc" id="L191">        return pull(mq, messageSelector, offset, maxNums, this.defaultMQPullConsumer.getConsumerPullTimeoutMillis());</span>
+    }
+
+    public PullResult pull(MessageQueue mq, MessageSelector messageSelector, long offset, int maxNums, long timeout)
+        throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="nc" id="L196">        SubscriptionData subscriptionData = getSubscriptionData(mq, messageSelector);</span>
+<span class="nc" id="L197">        return this.pullSyncImpl(mq, subscriptionData, offset, maxNums, false, timeout);</span>
+    }
+
+    private SubscriptionData getSubscriptionData(MessageQueue mq, String subExpression)
+        throws MQClientException {
+
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (null == mq) {</span>
+<span class="nc" id="L204">            throw new MQClientException(&quot;mq is null&quot;, null);</span>
+        }
+
+        try {
+<span class="fc" id="L208">            return FilterAPI.buildSubscriptionData(mq.getTopic(), subExpression);</span>
+<span class="nc" id="L209">        } catch (Exception e) {</span>
+<span class="nc" id="L210">            throw new MQClientException(&quot;parse subscription error&quot;, e);</span>
+        }
+    }
+
+    private SubscriptionData getSubscriptionData(MessageQueue mq, MessageSelector messageSelector)
+        throws MQClientException {
+
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (null == mq) {</span>
+<span class="nc" id="L218">            throw new MQClientException(&quot;mq is null&quot;, null);</span>
+        }
+
+        try {
+<span class="nc" id="L222">            return FilterAPI.build(mq.getTopic(),</span>
+<span class="nc" id="L223">                messageSelector.getExpression(), messageSelector.getExpressionType());</span>
+<span class="nc" id="L224">        } catch (Exception e) {</span>
+<span class="nc" id="L225">            throw new MQClientException(&quot;parse subscription error&quot;, e);</span>
+        }
+    }
+
+    private PullResult pullSyncImpl(MessageQueue mq, SubscriptionData subscriptionData, long offset, int maxNums, boolean block,
+        long timeout)
+        throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="fc" id="L232">        this.isRunning();</span>
+
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        if (null == mq) {</span>
+<span class="nc" id="L235">            throw new MQClientException(&quot;mq is null&quot;, null);</span>
+        }
+
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (offset &lt; 0) {</span>
+<span class="nc" id="L239">            throw new MQClientException(&quot;offset &lt; 0&quot;, null);</span>
+        }
+
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (maxNums &lt;= 0) {</span>
+<span class="nc" id="L243">            throw new MQClientException(&quot;maxNums &lt;= 0&quot;, null);</span>
+        }
+
+<span class="fc" id="L246">        this.subscriptionAutomatically(mq.getTopic());</span>
+
+<span class="fc" id="L248">        int sysFlag = PullSysFlag.buildSysFlag(false, block, true, false);</span>
+
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        long timeoutMillis = block ? this.defaultMQPullConsumer.getConsumerTimeoutMillisWhenSuspend() : timeout;</span>
+
+<span class="fc" id="L252">        boolean isTagType = ExpressionType.isTagType(subscriptionData.getExpressionType());</span>
+<span class="fc" id="L253">        PullResult pullResult = this.pullAPIWrapper.pullKernelImpl(</span>
+            mq,
+<span class="fc" id="L255">            subscriptionData.getSubString(),</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">            subscriptionData.getExpressionType(),</span>
+<span class="pc" id="L257">            isTagType ? 0L : subscriptionData.getSubVersion(),</span>
+            offset,
+            maxNums,
+            sysFlag,
+            0,
+<span class="fc" id="L262">            this.defaultMQPullConsumer.getBrokerSuspendMaxTimeMillis(),</span>
+            timeoutMillis,
+            CommunicationMode.SYNC,
+            null
+        );
+<span class="fc" id="L267">        this.pullAPIWrapper.processPullResult(mq, pullResult, subscriptionData);</span>
+        //If namespace is not null , reset Topic without namespace.
+<span class="fc" id="L269">        this.resetTopic(pullResult.getMsgFoundList());</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (!this.consumeMessageHookList.isEmpty()) {</span>
+<span class="nc" id="L271">            ConsumeMessageContext consumeMessageContext = null;</span>
+<span class="nc" id="L272">            consumeMessageContext = new ConsumeMessageContext();</span>
+<span class="nc" id="L273">            consumeMessageContext.setNamespace(defaultMQPullConsumer.getNamespace());</span>
+<span class="nc" id="L274">            consumeMessageContext.setConsumerGroup(this.groupName());</span>
+<span class="nc" id="L275">            consumeMessageContext.setMq(mq);</span>
+<span class="nc" id="L276">            consumeMessageContext.setMsgList(pullResult.getMsgFoundList());</span>
+<span class="nc" id="L277">            consumeMessageContext.setSuccess(false);</span>
+<span class="nc" id="L278">            this.executeHookBefore(consumeMessageContext);</span>
+<span class="nc" id="L279">            consumeMessageContext.setStatus(ConsumeConcurrentlyStatus.CONSUME_SUCCESS.toString());</span>
+<span class="nc" id="L280">            consumeMessageContext.setSuccess(true);</span>
+<span class="nc" id="L281">            this.executeHookAfter(consumeMessageContext);</span>
+        }
+<span class="fc" id="L283">        return pullResult;</span>
+    }
+
+    public void resetTopic(List&lt;MessageExt&gt; msgList) {
+<span class="pc bpc" id="L287" title="2 of 4 branches missed.">        if (null == msgList || msgList.size() == 0) {</span>
+<span class="fc" id="L288">            return;</span>
+        }
+
+        //If namespace not null , reset Topic without namespace.
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        for (MessageExt messageExt : msgList) {</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">            if (null != this.getDefaultMQPullConsumer().getNamespace()) {</span>
+<span class="nc" id="L294">                messageExt.setTopic(NamespaceUtil.withoutNamespace(messageExt.getTopic(), this.defaultMQPullConsumer.getNamespace()));</span>
+            }
+<span class="nc" id="L296">        }</span>
+
+<span class="nc" id="L298">    }</span>
+
+    public void subscriptionAutomatically(final String topic) {
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (!this.rebalanceImpl.getSubscriptionInner().containsKey(topic)) {</span>
+            try {
+<span class="fc" id="L303">                SubscriptionData subscriptionData = FilterAPI.buildSubscriptionData(topic, SubscriptionData.SUB_ALL);</span>
+<span class="fc" id="L304">                this.rebalanceImpl.subscriptionInner.putIfAbsent(topic, subscriptionData);</span>
+<span class="nc" id="L305">            } catch (Exception ignore) {</span>
+<span class="fc" id="L306">            }</span>
+        }
+<span class="fc" id="L308">    }</span>
+
+    public void unsubscribe(String topic) {
+<span class="nc" id="L311">        this.rebalanceImpl.getSubscriptionInner().remove(topic);</span>
+<span class="nc" id="L312">    }</span>
+
+    @Override
+    public String groupName() {
+<span class="fc" id="L316">        return this.defaultMQPullConsumer.getConsumerGroup();</span>
+    }
+
+    public void executeHookBefore(final ConsumeMessageContext context) {
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        if (!this.consumeMessageHookList.isEmpty()) {</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">            for (ConsumeMessageHook hook : this.consumeMessageHookList) {</span>
+                try {
+<span class="nc" id="L323">                    hook.consumeMessageBefore(context);</span>
+<span class="nc" id="L324">                } catch (Throwable ignored) {</span>
+<span class="nc" id="L325">                }</span>
+<span class="nc" id="L326">            }</span>
+        }
+<span class="nc" id="L328">    }</span>
+
+    public void executeHookAfter(final ConsumeMessageContext context) {
+<span class="nc bnc" id="L331" title="All 2 branches missed.">        if (!this.consumeMessageHookList.isEmpty()) {</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">            for (ConsumeMessageHook hook : this.consumeMessageHookList) {</span>
+                try {
+<span class="nc" id="L334">                    hook.consumeMessageAfter(context);</span>
+<span class="nc" id="L335">                } catch (Throwable ignored) {</span>
+<span class="nc" id="L336">                }</span>
+<span class="nc" id="L337">            }</span>
+        }
+<span class="nc" id="L339">    }</span>
+
+    @Override
+    public MessageModel messageModel() {
+<span class="fc" id="L343">        return this.defaultMQPullConsumer.getMessageModel();</span>
+    }
+
+    @Override
+    public ConsumeType consumeType() {
+<span class="fc" id="L348">        return ConsumeType.CONSUME_ACTIVELY;</span>
+    }
+
+    @Override
+    public ConsumeFromWhere consumeFromWhere() {
+<span class="fc" id="L353">        return ConsumeFromWhere.CONSUME_FROM_LAST_OFFSET;</span>
+    }
+
+    @Override
+    public Set&lt;SubscriptionData&gt; subscriptions() {
+<span class="fc" id="L358">        Set&lt;SubscriptionData&gt; result = new HashSet&lt;SubscriptionData&gt;();</span>
+
+<span class="fc" id="L360">        Set&lt;String&gt; topics = this.defaultMQPullConsumer.getRegisterTopics();</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">        if (topics != null) {</span>
+<span class="fc" id="L362">            synchronized (topics) {</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">                for (String t : topics) {</span>
+<span class="nc" id="L364">                    SubscriptionData ms = null;</span>
+                    try {
+<span class="nc" id="L366">                        ms = FilterAPI.buildSubscriptionData(t, SubscriptionData.SUB_ALL);</span>
+<span class="nc" id="L367">                    } catch (Exception e) {</span>
+<span class="nc" id="L368">                        log.error(&quot;parse subscription error&quot;, e);</span>
+<span class="nc" id="L369">                    }</span>
+<span class="nc bnc" id="L370" title="All 2 branches missed.">                    if (ms != null) {</span>
+<span class="nc" id="L371">                        ms.setSubVersion(0L);</span>
+<span class="nc" id="L372">                        result.add(ms);</span>
+                    }
+<span class="nc" id="L374">                }</span>
+<span class="fc" id="L375">            }</span>
+        }
+
+<span class="fc" id="L378">        return result;</span>
+    }
+
+    @Override
+    public void doRebalance() {
+<span class="nc bnc" id="L383" title="All 2 branches missed.">        if (this.rebalanceImpl != null) {</span>
+<span class="nc" id="L384">            this.rebalanceImpl.doRebalance(false);</span>
+        }
+<span class="nc" id="L386">    }</span>
+
+    @Override
+    public void persistConsumerOffset() {
+        try {
+<span class="fc" id="L391">            this.isRunning();</span>
+<span class="fc" id="L392">            Set&lt;MessageQueue&gt; mqs = new HashSet&lt;MessageQueue&gt;();</span>
+<span class="fc" id="L393">            Set&lt;MessageQueue&gt; allocateMq = this.rebalanceImpl.getProcessQueueTable().keySet();</span>
+<span class="fc" id="L394">            mqs.addAll(allocateMq);</span>
+<span class="fc" id="L395">            this.offsetStore.persistAll(mqs);</span>
+<span class="nc" id="L396">        } catch (Exception e) {</span>
+<span class="nc" id="L397">            log.error(&quot;group: &quot; + this.defaultMQPullConsumer.getConsumerGroup() + &quot; persistConsumerOffset exception&quot;, e);</span>
+<span class="fc" id="L398">        }</span>
+<span class="fc" id="L399">    }</span>
+
+    @Override
+    public void updateTopicSubscribeInfo(String topic, Set&lt;MessageQueue&gt; info) {
+<span class="nc" id="L403">        Map&lt;String, SubscriptionData&gt; subTable = this.rebalanceImpl.getSubscriptionInner();</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">        if (subTable != null) {</span>
+<span class="nc bnc" id="L405" title="All 2 branches missed.">            if (subTable.containsKey(topic)) {</span>
+<span class="nc" id="L406">                this.rebalanceImpl.getTopicSubscribeInfoTable().put(topic, info);</span>
+            }
+        }
+<span class="nc" id="L409">    }</span>
+
+    @Override
+    public boolean isSubscribeTopicNeedUpdate(String topic) {
+<span class="nc" id="L413">        Map&lt;String, SubscriptionData&gt; subTable = this.rebalanceImpl.getSubscriptionInner();</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">        if (subTable != null) {</span>
+<span class="nc bnc" id="L415" title="All 2 branches missed.">            if (subTable.containsKey(topic)) {</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">                return !this.rebalanceImpl.topicSubscribeInfoTable.containsKey(topic);</span>
+            }
+        }
+
+<span class="nc" id="L420">        return false;</span>
+    }
+
+    @Override
+    public boolean isUnitMode() {
+<span class="fc" id="L425">        return this.defaultMQPullConsumer.isUnitMode();</span>
+    }
+
+    @Override
+    public ConsumerRunningInfo consumerRunningInfo() {
+<span class="nc" id="L430">        ConsumerRunningInfo info = new ConsumerRunningInfo();</span>
+
+<span class="nc" id="L432">        Properties prop = MixAll.object2Properties(this.defaultMQPullConsumer);</span>
+<span class="nc" id="L433">        prop.put(ConsumerRunningInfo.PROP_CONSUMER_START_TIMESTAMP, String.valueOf(this.consumerStartTimestamp));</span>
+<span class="nc" id="L434">        info.setProperties(prop);</span>
+
+<span class="nc" id="L436">        info.getSubscriptionSet().addAll(this.subscriptions());</span>
+<span class="nc" id="L437">        return info;</span>
+    }
+
+    public void pull(MessageQueue mq, String subExpression, long offset, int maxNums, PullCallback pullCallback)
+        throws MQClientException, RemotingException, InterruptedException {
+<span class="fc" id="L442">        pull(mq, subExpression, offset, maxNums, pullCallback, this.defaultMQPullConsumer.getConsumerPullTimeoutMillis());</span>
+<span class="fc" id="L443">    }</span>
+
+    public void pull(MessageQueue mq, String subExpression, long offset, int maxNums, PullCallback pullCallback,
+        long timeout)
+        throws MQClientException, RemotingException, InterruptedException {
+<span class="fc" id="L448">        SubscriptionData subscriptionData = getSubscriptionData(mq, subExpression);</span>
+<span class="fc" id="L449">        this.pullAsyncImpl(mq, subscriptionData, offset, maxNums, pullCallback, false, timeout);</span>
+<span class="fc" id="L450">    }</span>
+
+    public void pull(MessageQueue mq, String subExpression, long offset, int maxNums, int maxSize, PullCallback pullCallback,
+        long timeout)
+        throws MQClientException, RemotingException, InterruptedException {
+<span class="nc" id="L455">        SubscriptionData subscriptionData = getSubscriptionData(mq, subExpression);</span>
+<span class="nc" id="L456">        this.pullAsyncImpl(mq, subscriptionData, offset, maxNums, maxSize, pullCallback, false, timeout);</span>
+<span class="nc" id="L457">    }</span>
+
+    public void pull(MessageQueue mq, MessageSelector messageSelector, long offset, int maxNums,
+        PullCallback pullCallback)
+        throws MQClientException, RemotingException, InterruptedException {
+<span class="nc" id="L462">        pull(mq, messageSelector, offset, maxNums, pullCallback, this.defaultMQPullConsumer.getConsumerPullTimeoutMillis());</span>
+<span class="nc" id="L463">    }</span>
+
+    public void pull(MessageQueue mq, MessageSelector messageSelector, long offset, int maxNums,
+        PullCallback pullCallback,
+        long timeout)
+        throws MQClientException, RemotingException, InterruptedException {
+<span class="nc" id="L469">        SubscriptionData subscriptionData = getSubscriptionData(mq, messageSelector);</span>
+<span class="nc" id="L470">        this.pullAsyncImpl(mq, subscriptionData, offset, maxNums, pullCallback, false, timeout);</span>
+<span class="nc" id="L471">    }</span>
+
+    private void pullAsyncImpl(
+        final MessageQueue mq,
+        final SubscriptionData subscriptionData,
+        final long offset,
+        final int maxNums,
+        final int maxSizeInBytes,
+        final PullCallback pullCallback,
+        final boolean block,
+        final long timeout) throws MQClientException, RemotingException, InterruptedException {
+<span class="fc" id="L482">        this.isRunning();</span>
+
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        if (null == mq) {</span>
+<span class="nc" id="L485">            throw new MQClientException(&quot;mq is null&quot;, null);</span>
+        }
+
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">        if (offset &lt; 0) {</span>
+<span class="nc" id="L489">            throw new MQClientException(&quot;offset &lt; 0&quot;, null);</span>
+        }
+
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">        if (maxNums &lt;= 0) {</span>
+<span class="nc" id="L493">            throw new MQClientException(&quot;maxNums &lt;= 0&quot;, null);</span>
+        }
+
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">        if (maxSizeInBytes &lt;= 0) {</span>
+<span class="nc" id="L497">            throw new MQClientException(&quot;maxSizeInBytes &lt;= 0&quot;, null);</span>
+        }
+
+
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">        if (null == pullCallback) {</span>
+<span class="nc" id="L502">            throw new MQClientException(&quot;pullCallback is null&quot;, null);</span>
+        }
+
+<span class="fc" id="L505">        this.subscriptionAutomatically(mq.getTopic());</span>
+
+        try {
+<span class="fc" id="L508">            int sysFlag = PullSysFlag.buildSysFlag(false, block, true, false);</span>
+
+<span class="pc bpc" id="L510" title="1 of 2 branches missed.">            long timeoutMillis = block ? this.defaultMQPullConsumer.getConsumerTimeoutMillisWhenSuspend() : timeout;</span>
+
+<span class="fc" id="L512">            boolean isTagType = ExpressionType.isTagType(subscriptionData.getExpressionType());</span>
+<span class="fc" id="L513">            this.pullAPIWrapper.pullKernelImpl(</span>
+                mq,
+<span class="fc" id="L515">                subscriptionData.getSubString(),</span>
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">                subscriptionData.getExpressionType(),</span>
+<span class="pc" id="L517">                isTagType ? 0L : subscriptionData.getSubVersion(),</span>
+                offset,
+                maxNums,
+                maxSizeInBytes,
+                sysFlag,
+                0,
+<span class="fc" id="L523">                this.defaultMQPullConsumer.getBrokerSuspendMaxTimeMillis(),</span>
+                timeoutMillis,
+                CommunicationMode.ASYNC,
+<span class="fc" id="L526">                new PullCallback() {</span>
+
+                    @Override
+                    public void onSuccess(PullResult pullResult) {
+<span class="fc" id="L530">                        PullResult userPullResult = DefaultMQPullConsumerImpl.this.pullAPIWrapper.processPullResult(mq, pullResult, subscriptionData);</span>
+<span class="fc" id="L531">                        resetTopic(userPullResult.getMsgFoundList());</span>
+<span class="fc" id="L532">                        pullCallback.onSuccess(userPullResult);</span>
+<span class="fc" id="L533">                    }</span>
+
+                    @Override
+                    public void onException(Throwable e) {
+<span class="nc" id="L537">                        pullCallback.onException(e);</span>
+<span class="nc" id="L538">                    }</span>
+                });
+<span class="nc" id="L540">        } catch (MQBrokerException e) {</span>
+<span class="nc" id="L541">            throw new MQClientException(&quot;pullAsync unknow exception&quot;, e);</span>
+<span class="fc" id="L542">        }</span>
+<span class="fc" id="L543">    }</span>
+
+    private void pullAsyncImpl(
+            final MessageQueue mq,
+            final SubscriptionData subscriptionData,
+            final long offset,
+            final int maxNums,
+            final PullCallback pullCallback,
+            final boolean block,
+            final long timeout) throws MQClientException, RemotingException, InterruptedException {
+<span class="fc" id="L553">        pullAsyncImpl(</span>
+                mq,
+                subscriptionData,
+                offset,
+                maxNums,
+                Integer.MAX_VALUE,
+                pullCallback,
+                block,
+                timeout
+        );
+<span class="fc" id="L563">    }</span>
+
+    public PullResult pullBlockIfNotFound(MessageQueue mq, String subExpression, long offset, int maxNums)
+        throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="nc" id="L567">        SubscriptionData subscriptionData = getSubscriptionData(mq, subExpression);</span>
+<span class="nc" id="L568">        return this.pullSyncImpl(mq, subscriptionData, offset, maxNums, true, this.getDefaultMQPullConsumer().getConsumerPullTimeoutMillis());</span>
+    }
+
+    public DefaultMQPullConsumer getDefaultMQPullConsumer() {
+<span class="nc" id="L572">        return defaultMQPullConsumer;</span>
+    }
+
+    public void pullBlockIfNotFound(MessageQueue mq, String subExpression, long offset, int maxNums,
+        PullCallback pullCallback)
+        throws MQClientException, RemotingException, InterruptedException {
+<span class="nc" id="L578">        SubscriptionData subscriptionData = getSubscriptionData(mq, subExpression);</span>
+<span class="nc" id="L579">        this.pullAsyncImpl(mq, subscriptionData, offset, maxNums, pullCallback, true,</span>
+<span class="nc" id="L580">            this.getDefaultMQPullConsumer().getConsumerPullTimeoutMillis());</span>
+<span class="nc" id="L581">    }</span>
+
+    public QueryResult queryMessage(String topic, String key, int maxNum, long begin, long end)
+        throws MQClientException, InterruptedException {
+<span class="nc" id="L585">        this.isRunning();</span>
+<span class="nc" id="L586">        return this.mQClientFactory.getMQAdminImpl().queryMessage(topic, key, maxNum, begin, end);</span>
+    }
+
+    public MessageExt queryMessageByUniqKey(String topic, String uniqKey)
+        throws MQClientException, InterruptedException {
+<span class="nc" id="L591">        this.isRunning();</span>
+<span class="nc" id="L592">        return this.mQClientFactory.getMQAdminImpl().queryMessageByUniqKey(topic, uniqKey);</span>
+    }
+
+    public long searchOffset(MessageQueue mq, long timestamp) throws MQClientException {
+<span class="nc" id="L596">        this.isRunning();</span>
+<span class="nc" id="L597">        return this.mQClientFactory.getMQAdminImpl().searchOffset(mq, timestamp);</span>
+    }
+
+    public void sendMessageBack(MessageExt msg, int delayLevel, final String brokerName)
+        throws RemotingException, MQBrokerException, InterruptedException, MQClientException {
+<span class="nc" id="L602">        sendMessageBack(msg, delayLevel, brokerName, this.defaultMQPullConsumer.getConsumerGroup());</span>
+<span class="nc" id="L603">    }</span>
+
+    public void updateConsumeOffsetToBroker(MessageQueue mq, long offset, boolean isOneway) throws RemotingException,
+        MQBrokerException, InterruptedException, MQClientException {
+<span class="nc" id="L607">        this.offsetStore.updateConsumeOffsetToBroker(mq, offset, isOneway);</span>
+<span class="nc" id="L608">    }</span>
+
+    @Deprecated
+    public void sendMessageBack(MessageExt msg, int delayLevel, final String brokerName, String consumerGroup)
+        throws RemotingException, MQBrokerException, InterruptedException, MQClientException {
+        try {
+<span class="nc" id="L614">            String destBrokerName = brokerName;</span>
+<span class="nc bnc" id="L615" title="All 4 branches missed.">            if (destBrokerName != null &amp;&amp; destBrokerName.startsWith(MixAll.LOGICAL_QUEUE_MOCK_BROKER_PREFIX)) {</span>
+<span class="nc" id="L616">                destBrokerName = this.mQClientFactory.getBrokerNameFromMessageQueue(this.defaultMQPullConsumer.queueWithNamespace(new MessageQueue(msg.getTopic(), msg.getBrokerName(), msg.getQueueId())));</span>
+            }
+<span class="nc bnc" id="L618" title="All 2 branches missed.">            String brokerAddr = (null != destBrokerName) ? this.mQClientFactory.findBrokerAddressInPublish(destBrokerName)</span>
+<span class="nc" id="L619">                : RemotingHelper.parseSocketAddressAddr(msg.getStoreHost());</span>
+
+<span class="nc bnc" id="L621" title="All 2 branches missed.">            if (UtilAll.isBlank(consumerGroup)) {</span>
+<span class="nc" id="L622">                consumerGroup = this.defaultMQPullConsumer.getConsumerGroup();</span>
+            }
+
+<span class="nc" id="L625">            this.mQClientFactory.getMQClientAPIImpl().consumerSendMessageBack(brokerAddr, msg, consumerGroup, delayLevel, 3000,</span>
+<span class="nc" id="L626">                this.defaultMQPullConsumer.getMaxReconsumeTimes());</span>
+<span class="nc" id="L627">        } catch (Exception e) {</span>
+<span class="nc" id="L628">            log.error(&quot;sendMessageBack Exception, &quot; + this.defaultMQPullConsumer.getConsumerGroup(), e);</span>
+
+<span class="nc" id="L630">            Message newMsg = new Message(MixAll.getRetryTopic(this.defaultMQPullConsumer.getConsumerGroup()), msg.getBody());</span>
+<span class="nc" id="L631">            String originMsgId = MessageAccessor.getOriginMessageId(msg);</span>
+<span class="nc bnc" id="L632" title="All 2 branches missed.">            MessageAccessor.setOriginMessageId(newMsg, UtilAll.isBlank(originMsgId) ? msg.getMsgId() : originMsgId);</span>
+<span class="nc" id="L633">            newMsg.setFlag(msg.getFlag());</span>
+<span class="nc" id="L634">            MessageAccessor.setProperties(newMsg, msg.getProperties());</span>
+<span class="nc" id="L635">            MessageAccessor.putProperty(newMsg, MessageConst.PROPERTY_RETRY_TOPIC, msg.getTopic());</span>
+<span class="nc" id="L636">            MessageAccessor.setReconsumeTime(newMsg, String.valueOf(msg.getReconsumeTimes() + 1));</span>
+<span class="nc" id="L637">            MessageAccessor.setMaxReconsumeTimes(newMsg, String.valueOf(this.defaultMQPullConsumer.getMaxReconsumeTimes()));</span>
+<span class="nc" id="L638">            newMsg.setDelayTimeLevel(3 + msg.getReconsumeTimes());</span>
+<span class="nc" id="L639">            this.mQClientFactory.getDefaultMQProducer().send(newMsg);</span>
+        } finally {
+<span class="nc" id="L641">            msg.setTopic(NamespaceUtil.withoutNamespace(msg.getTopic(), this.defaultMQPullConsumer.getNamespace()));</span>
+        }
+<span class="nc" id="L643">    }</span>
+
+    public synchronized void shutdown() {
+<span class="pc bpc" id="L646" title="3 of 4 branches missed.">        switch (this.serviceState) {</span>
+            case CREATE_JUST:
+<span class="nc" id="L648">                break;</span>
+            case RUNNING:
+<span class="fc" id="L650">                this.persistConsumerOffset();</span>
+<span class="fc" id="L651">                this.mQClientFactory.unregisterConsumer(this.defaultMQPullConsumer.getConsumerGroup());</span>
+<span class="fc" id="L652">                this.mQClientFactory.shutdown();</span>
+<span class="fc" id="L653">                log.info(&quot;the consumer [{}] shutdown OK&quot;, this.defaultMQPullConsumer.getConsumerGroup());</span>
+<span class="fc" id="L654">                this.serviceState = ServiceState.SHUTDOWN_ALREADY;</span>
+<span class="fc" id="L655">                break;</span>
+            case SHUTDOWN_ALREADY:
+<span class="nc" id="L657">                break;</span>
+            default:
+                break;
+        }
+<span class="fc" id="L661">    }</span>
+
+    public synchronized void start() throws MQClientException {
+<span class="pc bpc" id="L664" title="2 of 3 branches missed.">        switch (this.serviceState) {</span>
+            case CREATE_JUST:
+<span class="fc" id="L666">                this.serviceState = ServiceState.START_FAILED;</span>
+
+<span class="fc" id="L668">                this.checkConfig();</span>
+
+<span class="fc" id="L670">                this.copySubscription();</span>
+
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">                if (this.defaultMQPullConsumer.getMessageModel() == MessageModel.CLUSTERING) {</span>
+<span class="fc" id="L673">                    this.defaultMQPullConsumer.changeInstanceNameToPID();</span>
+                }
+
+<span class="fc" id="L676">                this.mQClientFactory = MQClientManager.getInstance().getOrCreateMQClientInstance(this.defaultMQPullConsumer, this.rpcHook);</span>
+
+<span class="fc" id="L678">                this.rebalanceImpl.setConsumerGroup(this.defaultMQPullConsumer.getConsumerGroup());</span>
+<span class="fc" id="L679">                this.rebalanceImpl.setMessageModel(this.defaultMQPullConsumer.getMessageModel());</span>
+<span class="fc" id="L680">                this.rebalanceImpl.setAllocateMessageQueueStrategy(this.defaultMQPullConsumer.getAllocateMessageQueueStrategy());</span>
+<span class="fc" id="L681">                this.rebalanceImpl.setmQClientFactory(this.mQClientFactory);</span>
+
+<span class="fc" id="L683">                this.pullAPIWrapper = new PullAPIWrapper(</span>
+                    mQClientFactory,
+<span class="fc" id="L685">                    this.defaultMQPullConsumer.getConsumerGroup(), isUnitMode());</span>
+<span class="fc" id="L686">                this.pullAPIWrapper.registerFilterMessageHook(filterMessageHookList);</span>
+
+<span class="pc bpc" id="L688" title="1 of 2 branches missed.">                if (this.defaultMQPullConsumer.getOffsetStore() != null) {</span>
+<span class="nc" id="L689">                    this.offsetStore = this.defaultMQPullConsumer.getOffsetStore();</span>
+                } else {
+<span class="pc bpc" id="L691" title="2 of 3 branches missed.">                    switch (this.defaultMQPullConsumer.getMessageModel()) {</span>
+                        case BROADCASTING:
+<span class="nc" id="L693">                            this.offsetStore = new LocalFileOffsetStore(this.mQClientFactory, this.defaultMQPullConsumer.getConsumerGroup());</span>
+<span class="nc" id="L694">                            break;</span>
+                        case CLUSTERING:
+<span class="fc" id="L696">                            this.offsetStore = new RemoteBrokerOffsetStore(this.mQClientFactory, this.defaultMQPullConsumer.getConsumerGroup());</span>
+<span class="fc" id="L697">                            break;</span>
+                        default:
+                            break;
+                    }
+<span class="fc" id="L701">                    this.defaultMQPullConsumer.setOffsetStore(this.offsetStore);</span>
+                }
+
+<span class="fc" id="L704">                this.offsetStore.load();</span>
+
+<span class="fc" id="L706">                boolean registerOK = mQClientFactory.registerConsumer(this.defaultMQPullConsumer.getConsumerGroup(), this);</span>
+<span class="pc bpc" id="L707" title="1 of 2 branches missed.">                if (!registerOK) {</span>
+<span class="nc" id="L708">                    this.serviceState = ServiceState.CREATE_JUST;</span>
+
+<span class="nc" id="L710">                    throw new MQClientException(&quot;The consumer group[&quot; + this.defaultMQPullConsumer.getConsumerGroup()</span>
+<span class="nc" id="L711">                        + &quot;] has been created before, specify another name please.&quot; + FAQUrl.suggestTodo(FAQUrl.GROUP_NAME_DUPLICATE_URL),</span>
+                        null);
+                }
+
+<span class="fc" id="L715">                mQClientFactory.start();</span>
+<span class="fc" id="L716">                log.info(&quot;the consumer [{}] start OK&quot;, this.defaultMQPullConsumer.getConsumerGroup());</span>
+<span class="fc" id="L717">                this.serviceState = ServiceState.RUNNING;</span>
+<span class="fc" id="L718">                break;</span>
+            case RUNNING:
+            case START_FAILED:
+            case SHUTDOWN_ALREADY:
+<span class="nc" id="L722">                throw new MQClientException(&quot;The PullConsumer service state not OK, maybe started once, &quot;</span>
+                    + this.serviceState
+<span class="nc" id="L724">                    + FAQUrl.suggestTodo(FAQUrl.CLIENT_SERVICE_NOT_OK),</span>
+                    null);
+            default:
+                break;
+        }
+
+<span class="fc" id="L730">    }</span>
+
+    private void checkConfig() throws MQClientException {
+        // check consumerGroup
+<span class="fc" id="L734">        Validators.checkGroup(this.defaultMQPullConsumer.getConsumerGroup());</span>
+
+        // consumerGroup
+<span class="pc bpc" id="L737" title="1 of 2 branches missed.">        if (null == this.defaultMQPullConsumer.getConsumerGroup()) {</span>
+<span class="nc" id="L738">            throw new MQClientException(</span>
+                &quot;consumerGroup is null&quot;
+<span class="nc" id="L740">                    + FAQUrl.suggestTodo(FAQUrl.CLIENT_PARAMETER_CHECK_URL),</span>
+                null);
+        }
+
+        // consumerGroup
+<span class="pc bpc" id="L745" title="1 of 2 branches missed.">        if (this.defaultMQPullConsumer.getConsumerGroup().equals(MixAll.DEFAULT_CONSUMER_GROUP)) {</span>
+<span class="nc" id="L746">            throw new MQClientException(</span>
+                &quot;consumerGroup can not equal &quot;
+                    + MixAll.DEFAULT_CONSUMER_GROUP
+                    + &quot;, please specify another one.&quot;
+<span class="nc" id="L750">                    + FAQUrl.suggestTodo(FAQUrl.CLIENT_PARAMETER_CHECK_URL),</span>
+                null);
+        }
+
+        // messageModel
+<span class="pc bpc" id="L755" title="1 of 2 branches missed.">        if (null == this.defaultMQPullConsumer.getMessageModel()) {</span>
+<span class="nc" id="L756">            throw new MQClientException(</span>
+                &quot;messageModel is null&quot;
+<span class="nc" id="L758">                    + FAQUrl.suggestTodo(FAQUrl.CLIENT_PARAMETER_CHECK_URL),</span>
+                null);
+        }
+
+        // allocateMessageQueueStrategy
+<span class="pc bpc" id="L763" title="1 of 2 branches missed.">        if (null == this.defaultMQPullConsumer.getAllocateMessageQueueStrategy()) {</span>
+<span class="nc" id="L764">            throw new MQClientException(</span>
+                &quot;allocateMessageQueueStrategy is null&quot;
+<span class="nc" id="L766">                    + FAQUrl.suggestTodo(FAQUrl.CLIENT_PARAMETER_CHECK_URL),</span>
+                null);
+        }
+
+        // allocateMessageQueueStrategy
+<span class="pc bpc" id="L771" title="1 of 2 branches missed.">        if (this.defaultMQPullConsumer.getConsumerTimeoutMillisWhenSuspend() &lt; this.defaultMQPullConsumer.getBrokerSuspendMaxTimeMillis()) {</span>
+<span class="nc" id="L772">            throw new MQClientException(</span>
+                &quot;Long polling mode, the consumer consumerTimeoutMillisWhenSuspend must greater than brokerSuspendMaxTimeMillis&quot;
+<span class="nc" id="L774">                    + FAQUrl.suggestTodo(FAQUrl.CLIENT_PARAMETER_CHECK_URL),</span>
+                null);
+        }
+<span class="fc" id="L777">    }</span>
+
+    private void copySubscription() throws MQClientException {
+        try {
+<span class="fc" id="L781">            Set&lt;String&gt; registerTopics = this.defaultMQPullConsumer.getRegisterTopics();</span>
+<span class="pc bpc" id="L782" title="1 of 2 branches missed.">            if (registerTopics != null) {</span>
+<span class="pc bpc" id="L783" title="1 of 2 branches missed.">                for (final String topic : registerTopics) {</span>
+<span class="nc" id="L784">                    SubscriptionData subscriptionData = FilterAPI.buildSubscriptionData(topic, SubscriptionData.SUB_ALL);</span>
+<span class="nc" id="L785">                    this.rebalanceImpl.getSubscriptionInner().put(topic, subscriptionData);</span>
+<span class="nc" id="L786">                }</span>
+            }
+<span class="nc" id="L788">        } catch (Exception e) {</span>
+<span class="nc" id="L789">            throw new MQClientException(&quot;subscription exception&quot;, e);</span>
+<span class="fc" id="L790">        }</span>
+<span class="fc" id="L791">    }</span>
+
+    public void updateConsumeOffset(MessageQueue mq, long offset) throws MQClientException {
+<span class="nc" id="L794">        this.isRunning();</span>
+<span class="nc" id="L795">        this.offsetStore.updateOffset(mq, offset, false);</span>
+<span class="nc" id="L796">    }</span>
+
+    public MessageExt viewMessage(String msgId)
+        throws RemotingException, MQBrokerException, InterruptedException, MQClientException {
+<span class="nc" id="L800">        this.isRunning();</span>
+<span class="nc" id="L801">        return this.mQClientFactory.getMQAdminImpl().viewMessage(msgId);</span>
+    }
+
+    public void registerFilterMessageHook(final FilterMessageHook hook) {
+<span class="nc" id="L805">        this.filterMessageHookList.add(hook);</span>
+<span class="nc" id="L806">        log.info(&quot;register FilterMessageHook Hook, {}&quot;, hook.hookName());</span>
+<span class="nc" id="L807">    }</span>
+
+    public OffsetStore getOffsetStore() {
+<span class="nc" id="L810">        return offsetStore;</span>
+    }
+
+    public void setOffsetStore(OffsetStore offsetStore) {
+<span class="nc" id="L814">        this.offsetStore = offsetStore;</span>
+<span class="nc" id="L815">    }</span>
+
+    public PullAPIWrapper getPullAPIWrapper() {
+<span class="fc" id="L818">        return pullAPIWrapper;</span>
+    }
+
+    public void setPullAPIWrapper(PullAPIWrapper pullAPIWrapper) {
+<span class="nc" id="L822">        this.pullAPIWrapper = pullAPIWrapper;</span>
+<span class="nc" id="L823">    }</span>
+
+    public ServiceState getServiceState() {
+<span class="nc" id="L826">        return serviceState;</span>
+    }
+
+    //Don't use this deprecated setter, which will be removed soon.
+    @Deprecated
+    public void setServiceState(ServiceState serviceState) {
+<span class="nc" id="L832">        this.serviceState = serviceState;</span>
+<span class="nc" id="L833">    }</span>
+
+    public long getConsumerStartTimestamp() {
+<span class="nc" id="L836">        return consumerStartTimestamp;</span>
+    }
+
+    public RebalanceImpl getRebalanceImpl() {
+<span class="nc" id="L840">        return rebalanceImpl;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

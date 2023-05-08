@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StatisticsBrief.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.statistics</a> &gt; <span class="el_source">StatisticsBrief.java</span></div><h1>StatisticsBrief.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.statistics;
+
+import org.apache.commons.lang3.ArrayUtils;
+
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+public class StatisticsBrief {
+    public static final int META_RANGE_INDEX = 0;
+    public static final int META_SLOT_NUM_INDEX = 1;
+
+    // TopPercentile
+    private long[][] topPercentileMeta;
+    private AtomicInteger[] counts;
+    private AtomicLong totalCount;
+
+    // max min avg total
+    private long max;
+    private long min;
+    private long total;
+
+<span class="nc" id="L38">    public StatisticsBrief(long[][] topPercentileMeta) {</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        if (!isLegalMeta(topPercentileMeta)) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;illegal topPercentileMeta&quot;);</span>
+        }
+
+<span class="nc" id="L43">        this.topPercentileMeta = topPercentileMeta;</span>
+<span class="nc" id="L44">        this.counts = new AtomicInteger[slotNum(topPercentileMeta)];</span>
+<span class="nc" id="L45">        this.totalCount = new AtomicLong(0);</span>
+<span class="nc" id="L46">        reset();</span>
+<span class="nc" id="L47">    }</span>
+
+    public void reset() {
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        for (int i = 0; i &lt; counts.length; i++) {</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            if (counts[i] == null) {</span>
+<span class="nc" id="L52">                counts[i] = new AtomicInteger(0);</span>
+            } else {
+<span class="nc" id="L54">                counts[i].set(0);</span>
+            }
+        }
+<span class="nc" id="L57">        totalCount.set(0);</span>
+
+<span class="nc" id="L59">        synchronized (this) {</span>
+<span class="nc" id="L60">            max = 0;</span>
+<span class="nc" id="L61">            min = Long.MAX_VALUE;</span>
+<span class="nc" id="L62">            total = 0;</span>
+<span class="nc" id="L63">        }</span>
+<span class="nc" id="L64">    }</span>
+
+    private static boolean isLegalMeta(long[][] meta) {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (ArrayUtils.isEmpty(meta)) {</span>
+<span class="nc" id="L68">            return false;</span>
+        }
+
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        for (long[] line : meta) {</span>
+<span class="nc bnc" id="L72" title="All 4 branches missed.">            if (ArrayUtils.isEmpty(line) || line.length != 2) {</span>
+<span class="nc" id="L73">                return false;</span>
+            }
+        }
+
+<span class="nc" id="L77">        return true;</span>
+    }
+
+    private static int slotNum(long[][] meta) {
+<span class="nc" id="L81">        int ret = 1;</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        for (long[] line : meta) {</span>
+<span class="nc" id="L83">            ret += line[META_SLOT_NUM_INDEX];</span>
+        }
+<span class="nc" id="L85">        return ret;</span>
+    }
+
+    public void sample(long value) {
+<span class="nc" id="L89">        int index = getSlotIndex(value);</span>
+<span class="nc" id="L90">        counts[index].incrementAndGet();</span>
+<span class="nc" id="L91">        totalCount.incrementAndGet();</span>
+
+<span class="nc" id="L93">        synchronized (this) {</span>
+<span class="nc" id="L94">            max = Math.max(max, value);</span>
+<span class="nc" id="L95">            min = Math.min(min, value);</span>
+<span class="nc" id="L96">            total += value;</span>
+<span class="nc" id="L97">        }</span>
+<span class="nc" id="L98">    }</span>
+
+    public long tp999() {
+<span class="nc" id="L101">        return getTPValue(0.999f);</span>
+    }
+
+    public long getTPValue(float ratio) {
+<span class="nc bnc" id="L105" title="All 4 branches missed.">        if (ratio &lt;= 0 || ratio &gt;= 1) {</span>
+<span class="nc" id="L106">            ratio = 0.99f;</span>
+        }
+<span class="nc" id="L108">        long count = totalCount.get();</span>
+<span class="nc" id="L109">        long excludes = (long)(count - count * ratio);</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (excludes == 0) {</span>
+<span class="nc" id="L111">            return getMax();</span>
+        }
+
+<span class="nc" id="L114">        int tmp = 0;</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        for (int i = counts.length - 1; i &gt; 0; i--) {</span>
+<span class="nc" id="L116">            tmp += counts[i].get();</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            if (tmp &gt; excludes) {</span>
+<span class="nc" id="L118">                return Math.min(getSlotTPValue(i), getMax());</span>
+            }
+        }
+<span class="nc" id="L121">        return 0;</span>
+    }
+
+    private long getSlotTPValue(int index) {
+<span class="nc" id="L125">        int slotNumLeft = index;</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        for (int i = 0; i &lt; topPercentileMeta.length; i++) {</span>
+<span class="nc" id="L127">            int slotNum = (int)topPercentileMeta[i][META_SLOT_NUM_INDEX];</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            if (slotNumLeft &lt; slotNum) {</span>
+<span class="nc" id="L129">                long metaRangeMax = topPercentileMeta[i][META_RANGE_INDEX];</span>
+<span class="nc" id="L130">                long metaRangeMin = 0;</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                if (i &gt; 0) {</span>
+<span class="nc" id="L132">                    metaRangeMin = topPercentileMeta[i - 1][META_RANGE_INDEX];</span>
+                }
+
+<span class="nc" id="L135">                return metaRangeMin + (metaRangeMax - metaRangeMin) / slotNum * (slotNumLeft + 1);</span>
+            } else {
+<span class="nc" id="L137">                slotNumLeft -= slotNum;</span>
+            }
+        }
+        // MAX_VALUE: the last slot
+<span class="nc" id="L141">        return Integer.MAX_VALUE;</span>
+    }
+
+    private int getSlotIndex(long num) {
+<span class="nc" id="L145">        int index = 0;</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        for (int i = 0; i &lt; topPercentileMeta.length; i++) {</span>
+<span class="nc" id="L147">            long rangeMax = topPercentileMeta[i][META_RANGE_INDEX];</span>
+<span class="nc" id="L148">            int slotNum = (int)topPercentileMeta[i][META_SLOT_NUM_INDEX];</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            long rangeMin = (i &gt; 0) ? topPercentileMeta[i - 1][META_RANGE_INDEX] : 0;</span>
+<span class="nc bnc" id="L150" title="All 4 branches missed.">            if (rangeMin &lt;= num &amp;&amp; num &lt; rangeMax) {</span>
+<span class="nc" id="L151">                index += (num - rangeMin) / ((rangeMax - rangeMin) / slotNum);</span>
+<span class="nc" id="L152">                break;</span>
+            }
+
+<span class="nc" id="L155">            index += slotNum;</span>
+        }
+<span class="nc" id="L157">        return index;</span>
+    }
+
+    /**
+     * Getters
+     *
+     * @return
+     */
+    public long getMax() {
+<span class="nc" id="L166">        return max;</span>
+    }
+
+    public long getMin() {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        return totalCount.get() &gt; 0 ? min : 0;</span>
+    }
+
+    public long getTotal() {
+<span class="nc" id="L174">        return total;</span>
+    }
+
+    public long getCnt() {
+<span class="nc" id="L178">        return totalCount.get();</span>
+    }
+
+    public double getAvg() {
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        return totalCount.get() != 0 ? ((double)total) / totalCount.get() : 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

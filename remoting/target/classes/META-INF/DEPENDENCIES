@@ -1,0 +1,23 @@
+// ------------------------------------------------------------------
+// Transitive dependencies of this project determined from the
+// maven pom organized by organization.
+// ------------------------------------------------------------------
+
+rocketmq-remoting 5.0.0-SNAPSHOT
+
+
+From: 'Alibaba Group' (https://github.com/alibaba)
+  - fastjson (https://github.com/alibaba/fastjson) com.alibaba:fastjson:jar:1.2.69_noneautotype
+    License: Apache 2  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+
+From: 'Apache Software Foundation' (http://www.apache.org)
+  - rocketmq-logging 5.0.0-SNAPSHOT (http://rocketmq.apache.org/rocketmq-logging/) org.apache.rocketmq:rocketmq-logging:jar:5.0.0-SNAPSHOT
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
+
+From: 'The Netty Project' (https://netty.io/)
+  - Netty/All-in-One (https://netty.io/netty-all/) io.netty:netty-all:jar:4.1.65.Final
+    License: Apache License, Version 2.0  (https://www.apache.org/licenses/LICENSE-2.0)
+
+
+
+

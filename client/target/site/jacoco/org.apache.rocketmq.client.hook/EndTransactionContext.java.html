@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EndTransactionContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.hook</a> &gt; <span class="el_source">EndTransactionContext.java</span></div><h1>EndTransactionContext.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.hook;
+
+import org.apache.rocketmq.client.producer.LocalTransactionState;
+import org.apache.rocketmq.common.message.Message;
+
+<span class="fc" id="L22">public class EndTransactionContext {</span>
+    private String producerGroup;
+    private Message message;
+    private String brokerAddr;
+    private String msgId;
+    private String transactionId;
+    private LocalTransactionState transactionState;
+    private boolean fromTransactionCheck;
+
+    public String getProducerGroup() {
+<span class="fc" id="L32">        return producerGroup;</span>
+    }
+
+    public void setProducerGroup(String producerGroup) {
+<span class="fc" id="L36">        this.producerGroup = producerGroup;</span>
+<span class="fc" id="L37">    }</span>
+
+    public Message getMessage() {
+<span class="fc" id="L40">        return message;</span>
+    }
+
+    public void setMessage(Message message) {
+<span class="fc" id="L44">        this.message = message;</span>
+<span class="fc" id="L45">    }</span>
+
+    public String getBrokerAddr() {
+<span class="fc" id="L48">        return brokerAddr;</span>
+    }
+
+    public void setBrokerAddr(String brokerAddr) {
+<span class="fc" id="L52">        this.brokerAddr = brokerAddr;</span>
+<span class="fc" id="L53">    }</span>
+
+    public String getMsgId() {
+<span class="fc" id="L56">        return msgId;</span>
+    }
+
+    public void setMsgId(String msgId) {
+<span class="fc" id="L60">        this.msgId = msgId;</span>
+<span class="fc" id="L61">    }</span>
+
+    public String getTransactionId() {
+<span class="fc" id="L64">        return transactionId;</span>
+    }
+
+    public void setTransactionId(String transactionId) {
+<span class="fc" id="L68">        this.transactionId = transactionId;</span>
+<span class="fc" id="L69">    }</span>
+
+    public LocalTransactionState getTransactionState() {
+<span class="fc" id="L72">        return transactionState;</span>
+    }
+
+    public void setTransactionState(LocalTransactionState transactionState) {
+<span class="fc" id="L76">        this.transactionState = transactionState;</span>
+<span class="fc" id="L77">    }</span>
+
+    public boolean isFromTransactionCheck() {
+<span class="fc" id="L80">        return fromTransactionCheck;</span>
+    }
+
+    public void setFromTransactionCheck(boolean fromTransactionCheck) {
+<span class="fc" id="L84">        this.fromTransactionCheck = fromTransactionCheck;</span>
+<span class="fc" id="L85">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

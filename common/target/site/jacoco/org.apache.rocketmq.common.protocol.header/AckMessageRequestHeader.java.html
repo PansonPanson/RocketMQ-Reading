@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AckMessageRequestHeader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.header</a> &gt; <span class="el_source">AckMessageRequestHeader.java</span></div><h1>AckMessageRequestHeader.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.protocol.header;
+
+import com.google.common.base.MoreObjects;
+import org.apache.rocketmq.remoting.CommandCustomHeader;
+import org.apache.rocketmq.remoting.annotation.CFNotNull;
+import org.apache.rocketmq.remoting.exception.RemotingCommandException;
+
+<span class="nc" id="L24">public class AckMessageRequestHeader implements CommandCustomHeader {</span>
+    @CFNotNull
+    private String consumerGroup;
+    @CFNotNull
+    private String topic;
+    @CFNotNull
+    private Integer queueId;
+    @CFNotNull
+    private String extraInfo;
+
+    @CFNotNull
+    private Long offset;
+
+
+    @Override
+    public void checkFields() throws RemotingCommandException {
+<span class="nc" id="L40">    }</span>
+
+    public void setOffset(Long offset) {
+<span class="nc" id="L43">        this.offset = offset;</span>
+<span class="nc" id="L44">    }</span>
+
+    public Long getOffset() {
+<span class="nc" id="L47">        return offset;</span>
+    }
+
+    public String getConsumerGroup() {
+<span class="nc" id="L51">        return consumerGroup;</span>
+    }
+
+    public void setExtraInfo(String extraInfo) {
+<span class="nc" id="L55">        this.extraInfo = extraInfo;</span>
+<span class="nc" id="L56">    }</span>
+
+    public String getExtraInfo() {
+<span class="nc" id="L59">        return extraInfo;</span>
+    }
+
+    public void setConsumerGroup(String consumerGroup) {
+<span class="nc" id="L63">        this.consumerGroup = consumerGroup;</span>
+<span class="nc" id="L64">    }</span>
+
+    public String getTopic() {
+<span class="nc" id="L67">        return topic;</span>
+    }
+
+    public void setTopic(String topic) {
+<span class="nc" id="L71">        this.topic = topic;</span>
+<span class="nc" id="L72">    }</span>
+
+    public Integer getQueueId() {
+<span class="nc" id="L75">        return queueId;</span>
+    }
+
+    public void setQueueId(Integer queueId) {
+<span class="nc" id="L79">        this.queueId = queueId;</span>
+<span class="nc" id="L80">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L84">        return MoreObjects.toStringHelper(this)</span>
+<span class="nc" id="L85">            .add(&quot;consumerGroup&quot;, consumerGroup)</span>
+<span class="nc" id="L86">            .add(&quot;topic&quot;, topic)</span>
+<span class="nc" id="L87">            .add(&quot;queueId&quot;, queueId)</span>
+<span class="nc" id="L88">            .add(&quot;extraInfo&quot;, extraInfo)</span>
+<span class="nc" id="L89">            .add(&quot;offset&quot;, offset)</span>
+<span class="nc" id="L90">            .toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

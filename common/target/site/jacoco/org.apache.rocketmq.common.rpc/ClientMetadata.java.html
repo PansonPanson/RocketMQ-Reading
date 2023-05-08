@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClientMetadata.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.rpc</a> &gt; <span class="el_source">ClientMetadata.java</span></div><h1>ClientMetadata.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.rpc;
+
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.statictopic.TopicQueueMappingInfo;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.protocol.body.ClusterInfo;
+import org.apache.rocketmq.common.protocol.route.BrokerData;
+import org.apache.rocketmq.common.protocol.route.TopicRouteData;
+import org.apache.rocketmq.common.statictopic.TopicQueueMappingUtils;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+<span class="nc" id="L39">public class ClientMetadata {</span>
+<span class="nc" id="L40">    private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);</span>
+
+<span class="nc" id="L42">    private final ConcurrentMap&lt;String/* Topic */, TopicRouteData&gt; topicRouteTable = new ConcurrentHashMap&lt;String, TopicRouteData&gt;();</span>
+<span class="nc" id="L43">    private final ConcurrentMap&lt;String/* Topic */, ConcurrentMap&lt;MessageQueue, String/*brokerName*/&gt;&gt; topicEndPointsTable = new ConcurrentHashMap&lt;String, ConcurrentMap&lt;MessageQueue, String&gt;&gt;();</span>
+<span class="nc" id="L44">    private final ConcurrentMap&lt;String/* Broker Name */, HashMap&lt;Long/* brokerId */, String/* address */&gt;&gt; brokerAddrTable =</span>
+            new ConcurrentHashMap&lt;String, HashMap&lt;Long, String&gt;&gt;();
+<span class="nc" id="L46">    private final ConcurrentMap&lt;String/* Broker Name */, HashMap&lt;String/* address */, Integer&gt;&gt; brokerVersionTable =</span>
+            new ConcurrentHashMap&lt;String, HashMap&lt;String, Integer&gt;&gt;();
+
+    public void freshTopicRoute(String topic, TopicRouteData topicRouteData) {
+<span class="nc bnc" id="L50" title="All 4 branches missed.">        if (topic == null</span>
+            || topicRouteData == null) {
+<span class="nc" id="L52">            return;</span>
+        }
+<span class="nc" id="L54">        TopicRouteData old = this.topicRouteTable.get(topic);</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (!topicRouteDataIsChange(old, topicRouteData)) {</span>
+<span class="nc" id="L56">            return ;</span>
+        }
+        {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">            for (BrokerData bd : topicRouteData.getBrokerDatas()) {</span>
+<span class="nc" id="L60">                this.brokerAddrTable.put(bd.getBrokerName(), bd.getBrokerAddrs());</span>
+<span class="nc" id="L61">            }</span>
+        }
+        {
+<span class="nc" id="L64">            ConcurrentMap&lt;MessageQueue, String&gt; mqEndPoints = topicRouteData2EndpointsForStaticTopic(topic, topicRouteData);</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (mqEndPoints != null</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                    &amp;&amp; !mqEndPoints.isEmpty()) {</span>
+<span class="nc" id="L67">                topicEndPointsTable.put(topic, mqEndPoints);</span>
+            }
+        }
+<span class="nc" id="L70">    }</span>
+
+
+    public static boolean topicRouteDataIsChange(TopicRouteData olddata, TopicRouteData nowdata) {
+<span class="nc bnc" id="L74" title="All 4 branches missed.">        if (olddata == null || nowdata == null)</span>
+<span class="nc" id="L75">            return true;</span>
+<span class="nc" id="L76">        TopicRouteData old = new TopicRouteData(olddata);</span>
+<span class="nc" id="L77">        TopicRouteData now = new TopicRouteData(nowdata);</span>
+<span class="nc" id="L78">        Collections.sort(old.getQueueDatas());</span>
+<span class="nc" id="L79">        Collections.sort(old.getBrokerDatas());</span>
+<span class="nc" id="L80">        Collections.sort(now.getQueueDatas());</span>
+<span class="nc" id="L81">        Collections.sort(now.getBrokerDatas());</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        return !old.equals(now);</span>
+
+    }
+
+    public String getBrokerNameFromMessageQueue(final MessageQueue mq) {
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (topicEndPointsTable.get(mq.getTopic()) != null</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                &amp;&amp; !topicEndPointsTable.get(mq.getTopic()).isEmpty()) {</span>
+<span class="nc" id="L89">            return topicEndPointsTable.get(mq.getTopic()).get(mq);</span>
+        }
+<span class="nc" id="L91">        return mq.getBrokerName();</span>
+    }
+
+    public void refreshClusterInfo(ClusterInfo clusterInfo) {
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (clusterInfo == null</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            || clusterInfo.getBrokerAddrTable() == null) {</span>
+<span class="nc" id="L97">            return;</span>
+        }
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        for (Map.Entry&lt;String, BrokerData&gt; entry : clusterInfo.getBrokerAddrTable().entrySet()) {</span>
+<span class="nc" id="L100">            brokerAddrTable.put(entry.getKey(), entry.getValue().getBrokerAddrs());</span>
+<span class="nc" id="L101">        }</span>
+<span class="nc" id="L102">    }</span>
+
+    public String findMasterBrokerAddr(String brokerName) {
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (!brokerAddrTable.containsKey(brokerName)) {</span>
+<span class="nc" id="L106">            return null;</span>
+        }
+<span class="nc" id="L108">        return brokerAddrTable.get(brokerName).get(MixAll.MASTER_ID);</span>
+    }
+
+    public ConcurrentMap&lt;String, HashMap&lt;Long, String&gt;&gt; getBrokerAddrTable() {
+<span class="nc" id="L112">        return brokerAddrTable;</span>
+    }
+
+    public static ConcurrentMap&lt;MessageQueue, String&gt; topicRouteData2EndpointsForStaticTopic(final String topic, final TopicRouteData route) {
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (route.getTopicQueueMappingByBroker() == null</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                || route.getTopicQueueMappingByBroker().isEmpty()) {</span>
+<span class="nc" id="L118">            return new ConcurrentHashMap&lt;MessageQueue, String&gt;();</span>
+        }
+<span class="nc" id="L120">        ConcurrentMap&lt;MessageQueue, String&gt; mqEndPointsOfBroker = new ConcurrentHashMap&lt;MessageQueue, String&gt;();</span>
+
+<span class="nc" id="L122">        Map&lt;String, Map&lt;String, TopicQueueMappingInfo&gt;&gt; mappingInfosByScope = new HashMap&lt;String, Map&lt;String, TopicQueueMappingInfo&gt;&gt;();</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        for (Map.Entry&lt;String, TopicQueueMappingInfo&gt; entry : route.getTopicQueueMappingByBroker().entrySet()) {</span>
+<span class="nc" id="L124">            TopicQueueMappingInfo info = entry.getValue();</span>
+<span class="nc" id="L125">            String scope = info.getScope();</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (scope != null) {</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                if (!mappingInfosByScope.containsKey(scope)) {</span>
+<span class="nc" id="L128">                    mappingInfosByScope.put(scope, new HashMap&lt;String, TopicQueueMappingInfo&gt;());</span>
+                }
+<span class="nc" id="L130">                mappingInfosByScope.get(scope).put(entry.getKey(), entry.getValue());</span>
+            }
+<span class="nc" id="L132">        }</span>
+
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        for (Map.Entry&lt;String, Map&lt;String, TopicQueueMappingInfo&gt;&gt; mapEntry : mappingInfosByScope.entrySet()) {</span>
+<span class="nc" id="L135">            String scope = mapEntry.getKey();</span>
+<span class="nc" id="L136">            Map&lt;String, TopicQueueMappingInfo&gt; topicQueueMappingInfoMap =  mapEntry.getValue();</span>
+<span class="nc" id="L137">            ConcurrentMap&lt;MessageQueue, TopicQueueMappingInfo&gt; mqEndPoints = new ConcurrentHashMap&lt;MessageQueue, TopicQueueMappingInfo&gt;();</span>
+<span class="nc" id="L138">            List&lt;Map.Entry&lt;String, TopicQueueMappingInfo&gt;&gt; mappingInfos = new ArrayList&lt;Map.Entry&lt;String, TopicQueueMappingInfo&gt;&gt;(topicQueueMappingInfoMap.entrySet());</span>
+<span class="nc" id="L139">            Collections.sort(mappingInfos, new Comparator&lt;Map.Entry&lt;String, TopicQueueMappingInfo&gt;&gt;() {</span>
+                @Override
+                public int compare(Map.Entry&lt;String, TopicQueueMappingInfo&gt; o1, Map.Entry&lt;String, TopicQueueMappingInfo&gt; o2) {
+<span class="nc" id="L142">                    return  (int) (o2.getValue().getEpoch() - o1.getValue().getEpoch());</span>
+                }
+            });
+<span class="nc" id="L145">            int maxTotalNums = 0;</span>
+<span class="nc" id="L146">            long maxTotalNumOfEpoch = -1;</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            for (Map.Entry&lt;String, TopicQueueMappingInfo&gt; entry : mappingInfos) {</span>
+<span class="nc" id="L148">                TopicQueueMappingInfo info = entry.getValue();</span>
+<span class="nc bnc" id="L149" title="All 4 branches missed.">                if (info.getEpoch() &gt;= maxTotalNumOfEpoch &amp;&amp; info.getTotalQueues() &gt; maxTotalNums) {</span>
+<span class="nc" id="L150">                    maxTotalNums = info.getTotalQueues();</span>
+                }
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                for (Map.Entry&lt;Integer, Integer&gt; idEntry : entry.getValue().getCurrIdMap().entrySet()) {</span>
+<span class="nc" id="L153">                    int globalId = idEntry.getKey();</span>
+<span class="nc" id="L154">                    MessageQueue mq = new MessageQueue(topic, TopicQueueMappingUtils.getMockBrokerName(info.getScope()), globalId);</span>
+<span class="nc" id="L155">                    TopicQueueMappingInfo oldInfo = mqEndPoints.get(mq);</span>
+<span class="nc bnc" id="L156" title="All 4 branches missed.">                    if (oldInfo == null ||  oldInfo.getEpoch() &lt;= info.getEpoch()) {</span>
+<span class="nc" id="L157">                        mqEndPoints.put(mq, info);</span>
+                    }
+<span class="nc" id="L159">                }</span>
+<span class="nc" id="L160">            }</span>
+
+
+            //accomplish the static logic queues
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            for (int i = 0; i &lt; maxTotalNums; i++) {</span>
+<span class="nc" id="L165">                MessageQueue mq = new MessageQueue(topic, TopicQueueMappingUtils.getMockBrokerName(scope), i);</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                if (!mqEndPoints.containsKey(mq)) {</span>
+<span class="nc" id="L167">                    mqEndPointsOfBroker.put(mq, MixAll.LOGICAL_QUEUE_MOCK_BROKER_NAME_NOT_EXIST);</span>
+                } else {
+<span class="nc" id="L169">                    mqEndPointsOfBroker.put(mq, mqEndPoints.get(mq).getBname());</span>
+                }
+            }
+<span class="nc" id="L172">        }</span>
+<span class="nc" id="L173">        return mqEndPointsOfBroker;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

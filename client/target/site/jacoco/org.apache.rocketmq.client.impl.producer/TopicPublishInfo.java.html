@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TopicPublishInfo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.impl.producer</a> &gt; <span class="el_source">TopicPublishInfo.java</span></div><h1>TopicPublishInfo.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.impl.producer;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.rocketmq.client.common.ThreadLocalIndex;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.protocol.route.QueueData;
+import org.apache.rocketmq.common.protocol.route.TopicRouteData;
+
+<span class="fc" id="L26">public class TopicPublishInfo {</span>
+<span class="fc" id="L27">    private boolean orderTopic = false;</span>
+<span class="fc" id="L28">    private boolean haveTopicRouterInfo = false;</span>
+<span class="fc" id="L29">    private List&lt;MessageQueue&gt; messageQueueList = new ArrayList&lt;MessageQueue&gt;();</span>
+<span class="fc" id="L30">    private volatile ThreadLocalIndex sendWhichQueue = new ThreadLocalIndex();</span>
+    private TopicRouteData topicRouteData;
+
+    public boolean isOrderTopic() {
+<span class="nc" id="L34">        return orderTopic;</span>
+    }
+
+    public void setOrderTopic(boolean orderTopic) {
+<span class="fc" id="L38">        this.orderTopic = orderTopic;</span>
+<span class="fc" id="L39">    }</span>
+
+    public boolean ok() {
+<span class="pc bpc" id="L42" title="1 of 4 branches missed.">        return null != this.messageQueueList &amp;&amp; !this.messageQueueList.isEmpty();</span>
+    }
+
+    public List&lt;MessageQueue&gt; getMessageQueueList() {
+<span class="fc" id="L46">        return messageQueueList;</span>
+    }
+
+    public void setMessageQueueList(List&lt;MessageQueue&gt; messageQueueList) {
+<span class="fc" id="L50">        this.messageQueueList = messageQueueList;</span>
+<span class="fc" id="L51">    }</span>
+
+    public ThreadLocalIndex getSendWhichQueue() {
+<span class="nc" id="L54">        return sendWhichQueue;</span>
+    }
+
+    public void setSendWhichQueue(ThreadLocalIndex sendWhichQueue) {
+<span class="nc" id="L58">        this.sendWhichQueue = sendWhichQueue;</span>
+<span class="nc" id="L59">    }</span>
+
+    public boolean isHaveTopicRouterInfo() {
+<span class="fc" id="L62">        return haveTopicRouterInfo;</span>
+    }
+
+    public void setHaveTopicRouterInfo(boolean haveTopicRouterInfo) {
+<span class="fc" id="L66">        this.haveTopicRouterInfo = haveTopicRouterInfo;</span>
+<span class="fc" id="L67">    }</span>
+
+    public MessageQueue selectOneMessageQueue(final String lastBrokerName) {
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (lastBrokerName == null) {</span>
+<span class="fc" id="L71">            return selectOneMessageQueue();</span>
+        } else {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            for (int i = 0; i &lt; this.messageQueueList.size(); i++) {</span>
+<span class="fc" id="L74">                int index = this.sendWhichQueue.incrementAndGet();</span>
+<span class="fc" id="L75">                int pos = Math.abs(index) % this.messageQueueList.size();</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">                if (pos &lt; 0)</span>
+<span class="nc" id="L77">                    pos = 0;</span>
+<span class="fc" id="L78">                MessageQueue mq = this.messageQueueList.get(pos);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                if (!mq.getBrokerName().equals(lastBrokerName)) {</span>
+<span class="fc" id="L80">                    return mq;</span>
+                }
+            }
+<span class="nc" id="L83">            return selectOneMessageQueue();</span>
+        }
+    }
+
+    public MessageQueue selectOneMessageQueue() {
+<span class="fc" id="L88">        int index = this.sendWhichQueue.incrementAndGet();</span>
+<span class="fc" id="L89">        int pos = Math.abs(index) % this.messageQueueList.size();</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (pos &lt; 0)</span>
+<span class="nc" id="L91">            pos = 0;</span>
+<span class="fc" id="L92">        return this.messageQueueList.get(pos);</span>
+    }
+
+    public int getQueueIdByBroker(final String brokerName) {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        for (int i = 0; i &lt; topicRouteData.getQueueDatas().size(); i++) {</span>
+<span class="nc" id="L97">            final QueueData queueData = this.topicRouteData.getQueueDatas().get(i);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (queueData.getBrokerName().equals(brokerName)) {</span>
+<span class="nc" id="L99">                return queueData.getWriteQueueNums();</span>
+            }
+        }
+
+<span class="nc" id="L103">        return -1;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L108">        return &quot;TopicPublishInfo [orderTopic=&quot; + orderTopic + &quot;, messageQueueList=&quot; + messageQueueList</span>
+            + &quot;, sendWhichQueue=&quot; + sendWhichQueue + &quot;, haveTopicRouterInfo=&quot; + haveTopicRouterInfo + &quot;]&quot;;
+    }
+
+    public TopicRouteData getTopicRouteData() {
+<span class="nc" id="L113">        return topicRouteData;</span>
+    }
+
+    public void setTopicRouteData(final TopicRouteData topicRouteData) {
+<span class="fc" id="L117">        this.topicRouteData = topicRouteData;</span>
+<span class="fc" id="L118">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

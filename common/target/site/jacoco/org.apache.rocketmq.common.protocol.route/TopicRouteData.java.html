@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TopicRouteData.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.route</a> &gt; <span class="el_source">TopicRouteData.java</span></div><h1>TopicRouteData.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * $Id: TopicRouteData.java 1835 2013-05-16 02:00:50Z vintagewang@apache.org $
+ */
+package org.apache.rocketmq.common.protocol.route;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import org.apache.rocketmq.common.statictopic.TopicQueueMappingInfo;
+import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
+
+public class TopicRouteData extends RemotingSerializable {
+    private String orderTopicConf;
+    private List&lt;QueueData&gt; queueDatas;
+    private List&lt;BrokerData&gt; brokerDatas;
+    private HashMap&lt;String/* brokerAddr */, List&lt;String&gt;/* Filter Server */&gt; filterServerTable;
+    //It could be null or empty
+    private Map&lt;String/*brokerName*/, TopicQueueMappingInfo&gt; topicQueueMappingByBroker;
+
+<span class="fc" id="L41">    public TopicRouteData() {</span>
+<span class="fc" id="L42">        queueDatas = new ArrayList&lt;QueueData&gt;();</span>
+<span class="fc" id="L43">        brokerDatas = new ArrayList&lt;BrokerData&gt;();</span>
+<span class="fc" id="L44">        filterServerTable = new HashMap&lt;String, List&lt;String&gt;&gt;();</span>
+<span class="fc" id="L45">    }</span>
+
+<span class="fc" id="L47">    public TopicRouteData(TopicRouteData topicRouteData) {</span>
+<span class="fc" id="L48">        this.queueDatas = new ArrayList&lt;QueueData&gt;();</span>
+<span class="fc" id="L49">        this.brokerDatas = new ArrayList&lt;BrokerData&gt;();</span>
+<span class="fc" id="L50">        this.filterServerTable = new HashMap&lt;String, List&lt;String&gt;&gt;();</span>
+<span class="fc" id="L51">        this.orderTopicConf = topicRouteData.orderTopicConf;</span>
+
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (topicRouteData.queueDatas != null) {</span>
+<span class="fc" id="L54">            this.queueDatas.addAll(topicRouteData.queueDatas);</span>
+        }
+
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (topicRouteData.brokerDatas != null) {</span>
+<span class="fc" id="L58">            this.brokerDatas.addAll(topicRouteData.brokerDatas);</span>
+        }
+
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (topicRouteData.filterServerTable != null) {</span>
+<span class="fc" id="L62">            this.filterServerTable.putAll(topicRouteData.filterServerTable);</span>
+        }
+
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (topicRouteData.topicQueueMappingByBroker != null) {</span>
+<span class="nc" id="L66">            this.topicQueueMappingByBroker = new HashMap&lt;String, TopicQueueMappingInfo&gt;(topicRouteData.topicQueueMappingByBroker);</span>
+        }
+<span class="fc" id="L68">    }</span>
+
+    public TopicRouteData cloneTopicRouteData() {
+<span class="nc" id="L71">        TopicRouteData topicRouteData = new TopicRouteData();</span>
+<span class="nc" id="L72">        topicRouteData.setQueueDatas(new ArrayList&lt;&gt;());</span>
+<span class="nc" id="L73">        topicRouteData.setBrokerDatas(new ArrayList&lt;&gt;());</span>
+<span class="nc" id="L74">        topicRouteData.setFilterServerTable(new HashMap&lt;&gt;());</span>
+<span class="nc" id="L75">        topicRouteData.setOrderTopicConf(this.orderTopicConf);</span>
+
+<span class="nc" id="L77">        topicRouteData.getQueueDatas().addAll(this.queueDatas);</span>
+<span class="nc" id="L78">        topicRouteData.getBrokerDatas().addAll(this.brokerDatas);</span>
+<span class="nc" id="L79">        topicRouteData.getFilterServerTable().putAll(this.filterServerTable);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (this.topicQueueMappingByBroker != null) {</span>
+<span class="nc" id="L81">            Map&lt;String, TopicQueueMappingInfo&gt; cloneMap = new HashMap&lt;&gt;(this.topicQueueMappingByBroker);</span>
+<span class="nc" id="L82">            topicRouteData.setTopicQueueMappingByBroker(cloneMap);</span>
+        }
+<span class="nc" id="L84">        return topicRouteData;</span>
+    }
+
+    public TopicRouteData deepCloneTopicRouteData() {
+<span class="nc" id="L88">        TopicRouteData topicRouteData = new TopicRouteData();</span>
+
+<span class="nc" id="L90">        topicRouteData.setOrderTopicConf(this.orderTopicConf);</span>
+
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        for (final QueueData queueData : this.queueDatas) {</span>
+<span class="nc" id="L93">            topicRouteData.getQueueDatas().add(new QueueData(queueData));</span>
+<span class="nc" id="L94">        }</span>
+
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        for (final BrokerData brokerData : this.brokerDatas) {</span>
+<span class="nc" id="L97">            topicRouteData.getBrokerDatas().add(new BrokerData(brokerData));</span>
+<span class="nc" id="L98">        }</span>
+
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        for (final Map.Entry&lt;String, List&lt;String&gt;&gt; listEntry : this.filterServerTable.entrySet()) {</span>
+<span class="nc" id="L101">            topicRouteData.getFilterServerTable().put(listEntry.getKey(),</span>
+<span class="nc" id="L102">                new ArrayList&lt;String&gt;(listEntry.getValue()));</span>
+<span class="nc" id="L103">        }</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (this.topicQueueMappingByBroker != null) {</span>
+<span class="nc" id="L105">            Map&lt;String, TopicQueueMappingInfo&gt; cloneMap = new HashMap&lt;&gt;(this.topicQueueMappingByBroker.size());</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            for (final Map.Entry&lt;String, TopicQueueMappingInfo&gt; entry : this.getTopicQueueMappingByBroker().entrySet()) {</span>
+<span class="nc" id="L107">                TopicQueueMappingInfo topicQueueMappingInfo = new TopicQueueMappingInfo(entry.getValue().getTopic(), entry.getValue().getTotalQueues(), entry.getValue().getBname(), entry.getValue().getEpoch());</span>
+<span class="nc" id="L108">                topicQueueMappingInfo.setDirty(entry.getValue().isDirty());</span>
+<span class="nc" id="L109">                topicQueueMappingInfo.setScope(entry.getValue().getScope());</span>
+<span class="nc" id="L110">                ConcurrentMap&lt;Integer, Integer&gt; concurrentMap = new ConcurrentHashMap&lt;Integer, Integer&gt;(entry.getValue().getCurrIdMap());</span>
+<span class="nc" id="L111">                topicQueueMappingInfo.setCurrIdMap(concurrentMap);</span>
+<span class="nc" id="L112">                cloneMap.put(entry.getKey(), topicQueueMappingInfo);</span>
+<span class="nc" id="L113">            }</span>
+<span class="nc" id="L114">            topicRouteData.setTopicQueueMappingByBroker(cloneMap);</span>
+        }
+
+<span class="nc" id="L117">        return topicRouteData;</span>
+    }
+
+    public List&lt;QueueData&gt; getQueueDatas() {
+<span class="fc" id="L121">        return queueDatas;</span>
+    }
+
+    public void setQueueDatas(List&lt;QueueData&gt; queueDatas) {
+<span class="fc" id="L125">        this.queueDatas = queueDatas;</span>
+<span class="fc" id="L126">    }</span>
+
+    public List&lt;BrokerData&gt; getBrokerDatas() {
+<span class="fc" id="L129">        return brokerDatas;</span>
+    }
+
+    public void setBrokerDatas(List&lt;BrokerData&gt; brokerDatas) {
+<span class="fc" id="L133">        this.brokerDatas = brokerDatas;</span>
+<span class="fc" id="L134">    }</span>
+
+    public HashMap&lt;String, List&lt;String&gt;&gt; getFilterServerTable() {
+<span class="fc" id="L137">        return filterServerTable;</span>
+    }
+
+    public void setFilterServerTable(HashMap&lt;String, List&lt;String&gt;&gt; filterServerTable) {
+<span class="fc" id="L141">        this.filterServerTable = filterServerTable;</span>
+<span class="fc" id="L142">    }</span>
+
+    public String getOrderTopicConf() {
+<span class="fc" id="L145">        return orderTopicConf;</span>
+    }
+
+    public void setOrderTopicConf(String orderTopicConf) {
+<span class="nc" id="L149">        this.orderTopicConf = orderTopicConf;</span>
+<span class="nc" id="L150">    }</span>
+
+    public Map&lt;String, TopicQueueMappingInfo&gt; getTopicQueueMappingByBroker() {
+<span class="fc" id="L153">        return topicQueueMappingByBroker;</span>
+    }
+
+    public void setTopicQueueMappingByBroker(Map&lt;String, TopicQueueMappingInfo&gt; topicQueueMappingByBroker) {
+<span class="nc" id="L157">        this.topicQueueMappingByBroker = topicQueueMappingByBroker;</span>
+<span class="nc" id="L158">    }</span>
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L162">        final int prime = 31;</span>
+<span class="nc" id="L163">        int result = 1;</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        result = prime * result + ((brokerDatas == null) ? 0 : brokerDatas.hashCode());</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        result = prime * result + ((orderTopicConf == null) ? 0 : orderTopicConf.hashCode());</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        result = prime * result + ((queueDatas == null) ? 0 : queueDatas.hashCode());</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        result = prime * result + ((filterServerTable == null) ? 0 : filterServerTable.hashCode());</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        result = prime * result + ((topicQueueMappingByBroker == null) ? 0 : topicQueueMappingByBroker.hashCode());</span>
+<span class="nc" id="L169">        return result;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (this == obj)</span>
+<span class="nc" id="L175">            return true;</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (obj == null)</span>
+<span class="nc" id="L177">            return false;</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (getClass() != obj.getClass())</span>
+<span class="nc" id="L179">            return false;</span>
+<span class="fc" id="L180">        TopicRouteData other = (TopicRouteData) obj;</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (brokerDatas == null) {</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if (other.brokerDatas != null)</span>
+<span class="nc" id="L183">                return false;</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        } else if (!brokerDatas.equals(other.brokerDatas))</span>
+<span class="nc" id="L185">            return false;</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (orderTopicConf == null) {</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (other.orderTopicConf != null)</span>
+<span class="nc" id="L188">                return false;</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        } else if (!orderTopicConf.equals(other.orderTopicConf))</span>
+<span class="nc" id="L190">            return false;</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (queueDatas == null) {</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            if (other.queueDatas != null)</span>
+<span class="nc" id="L193">                return false;</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        } else if (!queueDatas.equals(other.queueDatas))</span>
+<span class="nc" id="L195">            return false;</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if (filterServerTable == null) {</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">            if (other.filterServerTable != null)</span>
+<span class="nc" id="L198">                return false;</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        } else if (!filterServerTable.equals(other.filterServerTable))</span>
+<span class="nc" id="L200">            return false;</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (topicQueueMappingByBroker == null) {</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            if (other.topicQueueMappingByBroker != null)</span>
+<span class="nc" id="L203">                return false;</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">        } else if (!topicQueueMappingByBroker.equals(other.topicQueueMappingByBroker))</span>
+<span class="nc" id="L205">            return false;</span>
+<span class="fc" id="L206">        return true;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L211">        return &quot;TopicRouteData [orderTopicConf=&quot; + orderTopicConf + &quot;, queueDatas=&quot; + queueDatas</span>
+            + &quot;, brokerDatas=&quot; + brokerDatas + &quot;, filterServerTable=&quot; + filterServerTable + &quot;, topicQueueMappingInfoTable=&quot; + topicQueueMappingByBroker + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

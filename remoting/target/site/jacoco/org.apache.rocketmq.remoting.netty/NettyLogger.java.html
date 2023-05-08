@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NettyLogger.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-remoting 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.remoting.netty</a> &gt; <span class="el_source">NettyLogger.java</span></div><h1>NettyLogger.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.remoting.netty;
+
+
+import io.netty.util.internal.logging.InternalLogLevel;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+
+<span class="nc" id="L27">public class NettyLogger {</span>
+
+<span class="fc" id="L29">    private static AtomicBoolean nettyLoggerSeted = new AtomicBoolean(false);</span>
+    
+<span class="fc" id="L31">    private static InternalLogLevel nettyLogLevel = InternalLogLevel.ERROR;</span>
+
+    public static void initNettyLogger() {
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (!nettyLoggerSeted.get()) {</span>
+            try {
+<span class="fc" id="L36">                io.netty.util.internal.logging.InternalLoggerFactory.setDefaultFactory(new NettyBridgeLoggerFactory());</span>
+<span class="nc" id="L37">            } catch (Throwable e) {</span>
+                //ignore
+<span class="fc" id="L39">            }</span>
+<span class="fc" id="L40">            nettyLoggerSeted.set(true);</span>
+        }
+<span class="fc" id="L42">    }</span>
+
+    private static class NettyBridgeLoggerFactory extends io.netty.util.internal.logging.InternalLoggerFactory {
+        @Override
+        protected io.netty.util.internal.logging.InternalLogger newInstance(String s) {
+<span class="fc" id="L47">            return new NettyBridgeLogger(s);</span>
+        }
+    }
+
+    private static class NettyBridgeLogger implements io.netty.util.internal.logging.InternalLogger {
+
+<span class="fc" id="L53">        private InternalLogger logger = null;</span>
+
+        private static final String EXCEPTION_MESSAGE = &quot;Unexpected exception:&quot;;
+
+<span class="fc" id="L57">        public NettyBridgeLogger(String name) {</span>
+<span class="fc" id="L58">            logger = InternalLoggerFactory.getLogger(name);</span>
+<span class="fc" id="L59">        }</span>
+
+        @Override
+        public String name() {
+<span class="nc" id="L63">            return logger.getName();</span>
+        }
+
+        @Override
+        public boolean isEnabled(InternalLogLevel internalLogLevel) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            return nettyLogLevel.ordinal() &lt;= internalLogLevel.ordinal();</span>
+        }
+
+        @Override
+        public void log(InternalLogLevel internalLogLevel, String s) {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.DEBUG)) {</span>
+<span class="nc" id="L74">                logger.debug(s);</span>
+            }
+<span class="nc bnc" id="L76" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.TRACE)) {</span>
+<span class="nc" id="L77">                logger.info(s);</span>
+            }
+<span class="nc bnc" id="L79" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.INFO)) {</span>
+<span class="nc" id="L80">                logger.info(s);</span>
+            }
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.WARN)) {</span>
+<span class="nc" id="L83">                logger.warn(s);</span>
+            }
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.ERROR)) {</span>
+<span class="nc" id="L86">                logger.error(s);</span>
+            }
+<span class="nc" id="L88">        }</span>
+
+        @Override
+        public void log(InternalLogLevel internalLogLevel, String s, Object o) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.DEBUG)) {</span>
+<span class="nc" id="L93">                logger.debug(s, o);</span>
+            }
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.TRACE)) {</span>
+<span class="nc" id="L96">                logger.info(s, o);</span>
+            }
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.INFO)) {</span>
+<span class="nc" id="L99">                logger.info(s, o);</span>
+            }
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.WARN)) {</span>
+<span class="nc" id="L102">                logger.warn(s, o);</span>
+            }
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.ERROR)) {</span>
+<span class="nc" id="L105">                logger.error(s, o);</span>
+            }
+<span class="nc" id="L107">        }</span>
+
+        @Override
+        public void log(InternalLogLevel internalLogLevel, String s, Object o, Object o1) {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.DEBUG)) {</span>
+<span class="nc" id="L112">                logger.debug(s, o, o1);</span>
+            }
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.TRACE)) {</span>
+<span class="nc" id="L115">                logger.info(s, o, o1);</span>
+            }
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.INFO)) {</span>
+<span class="nc" id="L118">                logger.info(s, o, o1);</span>
+            }
+<span class="nc bnc" id="L120" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.WARN)) {</span>
+<span class="nc" id="L121">                logger.warn(s, o, o1);</span>
+            }
+<span class="nc bnc" id="L123" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.ERROR)) {</span>
+<span class="nc" id="L124">                logger.error(s, o, o1);</span>
+            }
+<span class="nc" id="L126">        }</span>
+
+        @Override
+        public void log(InternalLogLevel internalLogLevel, String s, Object... objects) {
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.DEBUG)) {</span>
+<span class="nc" id="L131">                logger.debug(s, objects);</span>
+            }
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.TRACE)) {</span>
+<span class="nc" id="L134">                logger.info(s, objects);</span>
+            }
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.INFO)) {</span>
+<span class="nc" id="L137">                logger.info(s, objects);</span>
+            }
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.WARN)) {</span>
+<span class="nc" id="L140">                logger.warn(s, objects);</span>
+            }
+<span class="nc bnc" id="L142" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.ERROR)) {</span>
+<span class="nc" id="L143">                logger.error(s, objects);</span>
+            }
+<span class="nc" id="L145">        }</span>
+
+        @Override
+        public void log(InternalLogLevel internalLogLevel, String s, Throwable throwable) {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.DEBUG)) {</span>
+<span class="nc" id="L150">                logger.debug(s, throwable);</span>
+            }
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.TRACE)) {</span>
+<span class="nc" id="L153">                logger.info(s, throwable);</span>
+            }
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.INFO)) {</span>
+<span class="nc" id="L156">                logger.info(s, throwable);</span>
+            }
+<span class="nc bnc" id="L158" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.WARN)) {</span>
+<span class="nc" id="L159">                logger.warn(s, throwable);</span>
+            }
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.ERROR)) {</span>
+<span class="nc" id="L162">                logger.error(s, throwable);</span>
+            }
+<span class="nc" id="L164">        }</span>
+
+        @Override
+        public void log(InternalLogLevel internalLogLevel, Throwable throwable) {
+<span class="nc bnc" id="L168" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.DEBUG)) {</span>
+<span class="nc" id="L169">                logger.debug(EXCEPTION_MESSAGE, throwable);</span>
+            }
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.TRACE)) {</span>
+<span class="nc" id="L172">                logger.info(EXCEPTION_MESSAGE, throwable);</span>
+            }
+<span class="nc bnc" id="L174" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.INFO)) {</span>
+<span class="nc" id="L175">                logger.info(EXCEPTION_MESSAGE, throwable);</span>
+            }
+<span class="nc bnc" id="L177" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.WARN)) {</span>
+<span class="nc" id="L178">                logger.warn(EXCEPTION_MESSAGE, throwable);</span>
+            }
+<span class="nc bnc" id="L180" title="All 2 branches missed.">            if (internalLogLevel.equals(InternalLogLevel.ERROR)) {</span>
+<span class="nc" id="L181">                logger.error(EXCEPTION_MESSAGE, throwable);</span>
+            }
+<span class="nc" id="L183">        }</span>
+
+        @Override
+        public boolean isTraceEnabled() {
+<span class="nc" id="L187">            return isEnabled(InternalLogLevel.TRACE);</span>
+        }
+
+        @Override
+        public void trace(String var1) {
+<span class="nc" id="L192">            logger.info(var1);</span>
+<span class="nc" id="L193">        }</span>
+
+        @Override
+        public void trace(String var1, Object var2) {
+<span class="fc" id="L197">            logger.info(var1, var2);</span>
+<span class="fc" id="L198">        }</span>
+
+        @Override
+        public void trace(String var1, Object var2, Object var3) {
+<span class="nc" id="L202">            logger.info(var1, var2, var3);</span>
+<span class="nc" id="L203">        }</span>
+
+        @Override
+        public void trace(String var1, Object... var2) {
+<span class="nc" id="L207">            logger.info(var1, var2);</span>
+<span class="nc" id="L208">        }</span>
+
+        @Override
+        public void trace(String var1, Throwable var2) {
+<span class="nc" id="L212">            logger.info(var1, var2);</span>
+<span class="nc" id="L213">        }</span>
+
+        @Override
+        public void trace(Throwable var1) {
+<span class="nc" id="L217">            logger.info(EXCEPTION_MESSAGE, var1);</span>
+<span class="nc" id="L218">        }</span>
+
+        @Override
+        public boolean isDebugEnabled() {
+<span class="fc" id="L222">            return isEnabled(InternalLogLevel.DEBUG);</span>
+        }
+
+        @Override
+        public void debug(String var1) {
+<span class="fc" id="L227">            logger.debug(var1);</span>
+<span class="fc" id="L228">        }</span>
+
+        @Override
+        public void debug(String var1, Object var2) {
+<span class="fc" id="L232">            logger.debug(var1, var2);</span>
+<span class="fc" id="L233">        }</span>
+
+        @Override
+        public void debug(String var1, Object var2, Object var3) {
+<span class="fc" id="L237">            logger.debug(var1, var2, var3);</span>
+<span class="fc" id="L238">        }</span>
+
+        @Override
+        public void debug(String var1, Object... var2) {
+<span class="fc" id="L242">            logger.debug(var1, var2);</span>
+<span class="fc" id="L243">        }</span>
+
+        @Override
+        public void debug(String var1, Throwable var2) {
+<span class="nc" id="L247">            logger.debug(var1, var2);</span>
+<span class="nc" id="L248">        }</span>
+
+        @Override
+        public void debug(Throwable var1) {
+<span class="nc" id="L252">            logger.debug(EXCEPTION_MESSAGE, var1);</span>
+<span class="nc" id="L253">        }</span>
+
+        @Override
+        public boolean isInfoEnabled() {
+<span class="nc" id="L257">            return isEnabled(InternalLogLevel.INFO);</span>
+        }
+
+        @Override
+        public void info(String var1) {
+<span class="nc" id="L262">            logger.info(var1);</span>
+<span class="nc" id="L263">        }</span>
+
+        @Override
+        public void info(String var1, Object var2) {
+<span class="nc" id="L267">            logger.info(var1, var2);</span>
+<span class="nc" id="L268">        }</span>
+
+        @Override
+        public void info(String var1, Object var2, Object var3) {
+<span class="nc" id="L272">            logger.info(var1, var2, var3);</span>
+<span class="nc" id="L273">        }</span>
+
+        @Override
+        public void info(String var1, Object... var2) {
+<span class="nc" id="L277">            logger.info(var1, var2);</span>
+<span class="nc" id="L278">        }</span>
+
+        @Override
+        public void info(String var1, Throwable var2) {
+<span class="nc" id="L282">            logger.info(var1, var2);</span>
+<span class="nc" id="L283">        }</span>
+
+        @Override
+        public void info(Throwable var1) {
+<span class="nc" id="L287">            logger.info(EXCEPTION_MESSAGE, var1);</span>
+<span class="nc" id="L288">        }</span>
+
+        @Override
+        public boolean isWarnEnabled() {
+<span class="nc" id="L292">            return isEnabled(InternalLogLevel.WARN);</span>
+        }
+
+        @Override
+        public void warn(String var1) {
+<span class="nc" id="L297">            logger.warn(var1);</span>
+<span class="nc" id="L298">        }</span>
+
+        @Override
+        public void warn(String var1, Object var2) {
+<span class="nc" id="L302">            logger.warn(var1, var2);</span>
+<span class="nc" id="L303">        }</span>
+
+        @Override
+        public void warn(String var1, Object... var2) {
+<span class="nc" id="L307">            logger.warn(var1, var2);</span>
+<span class="nc" id="L308">        }</span>
+
+        @Override
+        public void warn(String var1, Object var2, Object var3) {
+<span class="fc" id="L312">            logger.warn(var1, var2, var3);</span>
+<span class="fc" id="L313">        }</span>
+
+        @Override
+        public void warn(String var1, Throwable var2) {
+<span class="nc" id="L317">            logger.warn(var1, var2);</span>
+<span class="nc" id="L318">        }</span>
+
+        @Override
+        public void warn(Throwable var1) {
+<span class="nc" id="L322">            logger.warn(EXCEPTION_MESSAGE, var1);</span>
+<span class="nc" id="L323">        }</span>
+
+        @Override
+        public boolean isErrorEnabled() {
+<span class="fc" id="L327">            return isEnabled(InternalLogLevel.ERROR);</span>
+        }
+
+        @Override
+        public void error(String var1) {
+<span class="nc" id="L332">            logger.error(var1);</span>
+<span class="nc" id="L333">        }</span>
+
+        @Override
+        public void error(String var1, Object var2) {
+<span class="nc" id="L337">            logger.error(var1, var2);</span>
+<span class="nc" id="L338">        }</span>
+
+        @Override
+        public void error(String var1, Object var2, Object var3) {
+<span class="nc" id="L342">            logger.error(var1, var2, var3);</span>
+<span class="nc" id="L343">        }</span>
+
+        @Override
+        public void error(String var1, Object... var2) {
+<span class="nc" id="L347">            logger.error(var1, var2);</span>
+<span class="nc" id="L348">        }</span>
+
+        @Override
+        public void error(String var1, Throwable var2) {
+<span class="nc" id="L352">            logger.error(var1, var2);</span>
+<span class="nc" id="L353">        }</span>
+
+        @Override
+        public void error(Throwable var1) {
+<span class="nc" id="L357">            logger.error(EXCEPTION_MESSAGE, var1);</span>
+<span class="nc" id="L358">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

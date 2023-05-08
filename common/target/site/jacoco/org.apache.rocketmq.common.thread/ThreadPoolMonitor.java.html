@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ThreadPoolMonitor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.thread</a> &gt; <span class="el_source">ThreadPoolMonitor.java</span></div><h1>ThreadPoolMonitor.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.thread;
+
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+
+<span class="nc" id="L34">public class ThreadPoolMonitor {</span>
+<span class="nc" id="L35">    private static InternalLogger jstackLogger = InternalLoggerFactory.getLogger(ThreadPoolMonitor.class);</span>
+<span class="nc" id="L36">    private static InternalLogger waterMarkLogger = InternalLoggerFactory.getLogger(ThreadPoolMonitor.class);</span>
+
+<span class="nc" id="L38">    private static final List&lt;ThreadPoolWrapper&gt; MONITOR_EXECUTOR = new CopyOnWriteArrayList&lt;&gt;();</span>
+<span class="nc" id="L39">    private static final ScheduledExecutorService MONITOR_SCHEDULED = Executors.newSingleThreadScheduledExecutor(</span>
+<span class="nc" id="L40">        new ThreadFactoryBuilder().setNameFormat(&quot;ThreadPoolMonitor-%d&quot;).build()</span>
+    );
+
+<span class="nc" id="L43">    private static volatile long threadPoolStatusPeriodTime = TimeUnit.SECONDS.toMillis(3);</span>
+<span class="nc" id="L44">    private static volatile boolean enablePrintJstack = true;</span>
+<span class="nc" id="L45">    private static volatile long jstackPeriodTime = 60000;</span>
+<span class="nc" id="L46">    private static volatile long jstackTime = System.currentTimeMillis();</span>
+
+    public static void config(InternalLogger jstackLoggerConfig, InternalLogger waterMarkLoggerConfig,
+        boolean enablePrintJstack, long jstackPeriodTimeConfig, long threadPoolStatusPeriodTimeConfig) {
+<span class="nc" id="L50">        jstackLogger = jstackLoggerConfig;</span>
+<span class="nc" id="L51">        waterMarkLogger = waterMarkLoggerConfig;</span>
+<span class="nc" id="L52">        threadPoolStatusPeriodTime = threadPoolStatusPeriodTimeConfig;</span>
+<span class="nc" id="L53">        ThreadPoolMonitor.enablePrintJstack = enablePrintJstack;</span>
+<span class="nc" id="L54">        jstackPeriodTime = jstackPeriodTimeConfig;</span>
+<span class="nc" id="L55">    }</span>
+
+    public static ThreadPoolExecutor createAndMonitor(int corePoolSize,
+        int maximumPoolSize,
+        long keepAliveTime,
+        TimeUnit unit,
+        String name,
+        int queueCapacity) {
+<span class="nc" id="L63">        return createAndMonitor(corePoolSize, maximumPoolSize, keepAliveTime, unit, name, queueCapacity, Collections.emptyList());</span>
+    }
+
+    public static ThreadPoolExecutor createAndMonitor(int corePoolSize,
+        int maximumPoolSize,
+        long keepAliveTime,
+        TimeUnit unit,
+        String name,
+        int queueCapacity,
+        ThreadPoolStatusMonitor... threadPoolStatusMonitors) {
+<span class="nc" id="L73">        return createAndMonitor(corePoolSize, maximumPoolSize, keepAliveTime, unit, name, queueCapacity,</span>
+<span class="nc" id="L74">            Lists.newArrayList(threadPoolStatusMonitors));</span>
+    }
+
+    public static ThreadPoolExecutor createAndMonitor(int corePoolSize,
+        int maximumPoolSize,
+        long keepAliveTime,
+        TimeUnit unit,
+        String name,
+        int queueCapacity,
+        List&lt;ThreadPoolStatusMonitor&gt; threadPoolStatusMonitors) {
+<span class="nc" id="L84">        ThreadPoolExecutor executor = new ThreadPoolExecutor(</span>
+            corePoolSize,
+            maximumPoolSize,
+            keepAliveTime,
+            unit,
+            new LinkedBlockingQueue&lt;&gt;(queueCapacity),
+<span class="nc" id="L90">            new ThreadFactoryBuilder().setNameFormat(name + &quot;-%d&quot;).build(),</span>
+            new ThreadPoolExecutor.DiscardOldestPolicy());
+<span class="nc" id="L92">        List&lt;ThreadPoolStatusMonitor&gt; printers = Lists.newArrayList(new ThreadPoolQueueSizeMonitor(queueCapacity));</span>
+<span class="nc" id="L93">        printers.addAll(threadPoolStatusMonitors);</span>
+
+<span class="nc" id="L95">        MONITOR_EXECUTOR.add(ThreadPoolWrapper.builder()</span>
+<span class="nc" id="L96">            .name(name)</span>
+<span class="nc" id="L97">            .threadPoolExecutor(executor)</span>
+<span class="nc" id="L98">            .statusPrinters(printers)</span>
+<span class="nc" id="L99">            .build());</span>
+<span class="nc" id="L100">        return executor;</span>
+    }
+
+    public static void logThreadPoolStatus() {
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        for (ThreadPoolWrapper threadPoolWrapper : MONITOR_EXECUTOR) {</span>
+<span class="nc" id="L105">            List&lt;ThreadPoolStatusMonitor&gt; monitors = threadPoolWrapper.getStatusPrinters();</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            for (ThreadPoolStatusMonitor monitor : monitors) {</span>
+<span class="nc" id="L107">                double value = monitor.value(threadPoolWrapper.getThreadPoolExecutor());</span>
+<span class="nc" id="L108">                waterMarkLogger.info(&quot;\t{}\t{}\t{}&quot;, threadPoolWrapper.getName(),</span>
+<span class="nc" id="L109">                    monitor.describe(),</span>
+<span class="nc" id="L110">                    value);</span>
+
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                if (enablePrintJstack) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                    if (monitor.needPrintJstack(threadPoolWrapper.getThreadPoolExecutor(), value) &amp;&amp;</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                        System.currentTimeMillis() - jstackTime &gt; jstackPeriodTime) {</span>
+<span class="nc" id="L115">                        jstackTime = System.currentTimeMillis();</span>
+<span class="nc" id="L116">                        jstackLogger.warn(&quot;jstack start\n{}&quot;, UtilAll.jstack());</span>
+                    }
+                }
+<span class="nc" id="L119">            }</span>
+<span class="nc" id="L120">        }</span>
+<span class="nc" id="L121">    }</span>
+
+    public static void init() {
+<span class="nc" id="L124">        MONITOR_SCHEDULED.scheduleAtFixedRate(ThreadPoolMonitor::logThreadPoolStatus, 20,</span>
+            threadPoolStatusPeriodTime, TimeUnit.MILLISECONDS);
+<span class="nc" id="L126">    }</span>
+
+    public static void shutdown() {
+<span class="nc" id="L129">        MONITOR_SCHEDULED.shutdown();</span>
+<span class="nc" id="L130">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LogicQueueMappingItem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.statictopic</a> &gt; <span class="el_source">LogicQueueMappingItem.java</span></div><h1>LogicQueueMappingItem.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.statictopic;
+
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
+
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">public class LogicQueueMappingItem extends RemotingSerializable {</span>
+
+    private int gen; // immutable
+    private int queueId; //, immutable
+    private String bname; //important, immutable
+    private long logicOffset; // the start of the logic offset, important, can be changed by command only once
+    private long startOffset; // the start of the physical offset, should always be 0, immutable
+<span class="fc" id="L30">    private long endOffset = -1; // the end of the physical offset, excluded, revered -1, mutable</span>
+<span class="fc" id="L31">    private long timeOfStart = -1; // mutable, reserved</span>
+<span class="fc" id="L32">    private long timeOfEnd = -1; // mutable, reserved</span>
+
+    //make sure it has a default constructor
+<span class="fc" id="L35">    public LogicQueueMappingItem() {</span>
+
+<span class="fc" id="L37">    }</span>
+
+<span class="fc" id="L39">    public LogicQueueMappingItem(int gen, int queueId, String bname, long logicOffset, long startOffset, long endOffset, long timeOfStart, long timeOfEnd) {</span>
+<span class="fc" id="L40">        this.gen = gen;</span>
+<span class="fc" id="L41">        this.queueId = queueId;</span>
+<span class="fc" id="L42">        this.bname = bname;</span>
+<span class="fc" id="L43">        this.logicOffset = logicOffset;</span>
+<span class="fc" id="L44">        this.startOffset = startOffset;</span>
+<span class="fc" id="L45">        this.endOffset = endOffset;</span>
+<span class="fc" id="L46">        this.timeOfStart = timeOfStart;</span>
+<span class="fc" id="L47">        this.timeOfEnd = timeOfEnd;</span>
+<span class="fc" id="L48">    }</span>
+
+
+    //should only be user in sendMessage and getMinOffset
+    public long computeStaticQueueOffsetLoosely(long physicalQueueOffset) {
+        //consider the newly mapped item
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (logicOffset &lt; 0) {</span>
+<span class="nc" id="L55">            return -1;</span>
+        }
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (physicalQueueOffset &lt; startOffset) {</span>
+<span class="nc" id="L58">            return logicOffset;</span>
+        }
+<span class="nc bnc" id="L60" title="All 4 branches missed.">        if (endOffset &gt;= startOffset</span>
+            &amp;&amp; endOffset &lt; physicalQueueOffset) {
+<span class="nc" id="L62">            return logicOffset + (endOffset - startOffset);</span>
+        }
+<span class="nc" id="L64">        return  logicOffset + (physicalQueueOffset - startOffset);</span>
+    }
+
+    public long computeStaticQueueOffsetStrictly(long physicalQueueOffset) {
+<span class="nc bnc" id="L68" title="All 4 branches missed.">        assert logicOffset &gt;= 0;</span>
+
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (physicalQueueOffset &lt; startOffset) {</span>
+<span class="nc" id="L71">            return logicOffset;</span>
+        }
+<span class="nc" id="L73">        return  logicOffset + (physicalQueueOffset - startOffset);</span>
+    }
+
+    public long computePhysicalQueueOffset(long staticQueueOffset) {
+<span class="nc" id="L77">        return  (staticQueueOffset - logicOffset) + startOffset;</span>
+    }
+
+    public long computeMaxStaticQueueOffset() {
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (endOffset &gt;= startOffset) {</span>
+<span class="nc" id="L82">            return logicOffset + endOffset - startOffset;</span>
+        } else {
+<span class="fc" id="L84">            return logicOffset;</span>
+        }
+    }
+    public boolean checkIfEndOffsetDecided() {
+        //if the endOffset == startOffset, then the item should be deleted
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        return endOffset &gt; startOffset;</span>
+    }
+
+    public boolean checkIfLogicoffsetDecided() {
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        return logicOffset &gt;= 0;</span>
+    }
+
+    public long computeOffsetDelta() {
+<span class="nc" id="L97">        return logicOffset - startOffset;</span>
+    }
+
+    public int getGen() {
+<span class="fc" id="L101">        return gen;</span>
+    }
+
+    public int getQueueId() {
+<span class="fc" id="L105">        return queueId;</span>
+    }
+
+    public String getBname() {
+<span class="fc" id="L109">        return bname;</span>
+    }
+
+    public long getLogicOffset() {
+<span class="fc" id="L113">        return logicOffset;</span>
+    }
+
+    public long getStartOffset() {
+<span class="fc" id="L117">        return startOffset;</span>
+    }
+
+    public long getEndOffset() {
+<span class="fc" id="L121">        return endOffset;</span>
+    }
+
+    public long getTimeOfStart() {
+<span class="fc" id="L125">        return timeOfStart;</span>
+    }
+
+    public long getTimeOfEnd() {
+<span class="fc" id="L129">        return timeOfEnd;</span>
+    }
+
+    public void setLogicOffset(long logicOffset) {
+<span class="fc" id="L133">        this.logicOffset = logicOffset;</span>
+<span class="fc" id="L134">    }</span>
+
+    public void setEndOffset(long endOffset) {
+<span class="fc" id="L137">        this.endOffset = endOffset;</span>
+<span class="fc" id="L138">    }</span>
+
+    public void setTimeOfStart(long timeOfStart) {
+<span class="fc" id="L141">        this.timeOfStart = timeOfStart;</span>
+<span class="fc" id="L142">    }</span>
+
+    public void setTimeOfEnd(long timeOfEnd) {
+<span class="fc" id="L145">        this.timeOfEnd = timeOfEnd;</span>
+<span class="fc" id="L146">    }</span>
+
+    public void setGen(int gen) {
+<span class="fc" id="L149">        this.gen = gen;</span>
+<span class="fc" id="L150">    }</span>
+
+    public void setQueueId(int queueId) {
+<span class="fc" id="L153">        this.queueId = queueId;</span>
+<span class="fc" id="L154">    }</span>
+
+    public void setBname(String bname) {
+<span class="fc" id="L157">        this.bname = bname;</span>
+<span class="fc" id="L158">    }</span>
+
+    public void setStartOffset(long startOffset) {
+<span class="fc" id="L161">        this.startOffset = startOffset;</span>
+<span class="fc" id="L162">    }</span>
+
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (this == o) return true;</span>
+
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (!(o instanceof LogicQueueMappingItem)) return false;</span>
+
+<span class="fc" id="L171">        LogicQueueMappingItem item = (LogicQueueMappingItem) o;</span>
+
+<span class="fc" id="L173">        return new EqualsBuilder()</span>
+<span class="fc" id="L174">                .append(gen, item.gen)</span>
+<span class="fc" id="L175">                .append(queueId, item.queueId)</span>
+<span class="fc" id="L176">                .append(logicOffset, item.logicOffset)</span>
+<span class="fc" id="L177">                .append(startOffset, item.startOffset)</span>
+<span class="fc" id="L178">                .append(endOffset, item.endOffset)</span>
+<span class="fc" id="L179">                .append(timeOfStart, item.timeOfStart)</span>
+<span class="fc" id="L180">                .append(timeOfEnd, item.timeOfEnd)</span>
+<span class="fc" id="L181">                .append(bname, item.bname)</span>
+<span class="fc" id="L182">                .isEquals();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L187">        return new HashCodeBuilder(17, 37)</span>
+<span class="nc" id="L188">                .append(gen)</span>
+<span class="nc" id="L189">                .append(queueId)</span>
+<span class="nc" id="L190">                .append(bname)</span>
+<span class="nc" id="L191">                .append(logicOffset)</span>
+<span class="nc" id="L192">                .append(startOffset)</span>
+<span class="nc" id="L193">                .append(endOffset)</span>
+<span class="nc" id="L194">                .append(timeOfStart)</span>
+<span class="nc" id="L195">                .append(timeOfEnd)</span>
+<span class="nc" id="L196">                .toHashCode();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L201">        return &quot;LogicQueueMappingItem{&quot; +</span>
+                &quot;gen=&quot; + gen +
+                &quot;, queueId=&quot; + queueId +
+                &quot;, bname='&quot; + bname + '\'' +
+                &quot;, logicOffset=&quot; + logicOffset +
+                &quot;, startOffset=&quot; + startOffset +
+                &quot;, endOffset=&quot; + endOffset +
+                &quot;, timeOfStart=&quot; + timeOfStart +
+                &quot;, timeOfEnd=&quot; + timeOfEnd +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

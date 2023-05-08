@@ -1,0 +1,16 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv.routeinfo,BrokerStatusChangeInfo,21,12,0,0,9,5,6,1,6,1
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv.routeinfo,BatchUnRegisterService,0,66,0,4,0,19,0,8,0,6
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv.routeinfo,RouteInfoManager,618,1971,105,226,149,461,90,118,7,35
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv.routeinfo,BrokerHousekeepingService,7,22,0,0,3,8,2,4,2,4
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv.routeinfo,BrokerLiveInfo,20,60,0,0,10,13,5,7,5,7
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv.processor,DefaultRequestProcessor,470,810,40,46,121,232,41,43,8,22
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv.processor,ClusterTestRequestProcessor,38,79,2,2,14,21,2,3,0,3
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv.processor,ClientRequestProcessor,81,71,8,4,20,20,6,4,1,3
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv,NamesrvController,95,354,10,4,22,72,11,14,4,14
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv,NamesrvController.new ThreadPoolExecutor() {...},6,12,0,0,1,1,1,1,1,1
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv,NamesrvController.new FileWatchService.Listener() {...},47,9,10,0,14,2,7,1,2,1
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv,NamesrvStartup,338,70,18,2,96,22,22,5,12,5
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv,NamesrvController.new ThreadPoolExecutor() {...},6,12,0,0,1,1,1,1,1,1
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv.kvconfig,KVConfigManager,135,241,9,11,29,63,8,11,1,8
+rocketmq-namesrv 5.0.0-SNAPSHOT,org.apache.rocketmq.namesrv.kvconfig,KVConfigSerializeWrapper,0,10,0,0,0,4,0,3,0,3

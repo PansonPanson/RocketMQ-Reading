@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.apache.rocketmq.namesrv.routeinfo.RouteInfoManager_NewTest
+-------------------------------------------------------------------------------
+Tests run: 24, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.892 sec - in org.apache.rocketmq.namesrv.routeinfo.RouteInfoManager_NewTest

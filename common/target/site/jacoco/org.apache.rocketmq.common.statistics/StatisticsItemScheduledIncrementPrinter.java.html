@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StatisticsItemScheduledIncrementPrinter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.statistics</a> &gt; <span class="el_source">StatisticsItemScheduledIncrementPrinter.java</span></div><h1>StatisticsItemScheduledIncrementPrinter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.statistics;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
+public class StatisticsItemScheduledIncrementPrinter extends StatisticsItemScheduledPrinter {
+
+    private String[] tpsItemNames;
+
+    public static final int TPS_INITIAL_DELAY = 0;
+    public static final int TPS_INTREVAL = 1000;
+    public static final String SEPERATOR = &quot;|&quot;;
+
+    /**
+     * last snapshots of all scheduled items
+     */
+<span class="nc" id="L35">    private final ConcurrentHashMap&lt;String, ConcurrentHashMap&lt;String, StatisticsItem&gt;&gt; lastItemSnapshots</span>
+        = new ConcurrentHashMap&lt;String, ConcurrentHashMap&lt;String, StatisticsItem&gt;&gt;();
+
+<span class="nc" id="L38">    private final ConcurrentHashMap&lt;String, ConcurrentHashMap&lt;String, StatisticsItemSampleBrief&gt;&gt; sampleBriefs</span>
+        = new ConcurrentHashMap&lt;String, ConcurrentHashMap&lt;String, StatisticsItemSampleBrief&gt;&gt;();
+
+    public StatisticsItemScheduledIncrementPrinter(String name, StatisticsItemPrinter printer,
+                                                   ScheduledExecutorService executor, InitialDelay initialDelay,
+                                                   long interval, String[] tpsItemNames, Valve valve) {
+<span class="nc" id="L44">        super(name, printer, executor, initialDelay, interval, valve);</span>
+<span class="nc" id="L45">        this.tpsItemNames = tpsItemNames;</span>
+<span class="nc" id="L46">    }</span>
+
+    /**
+     * schedule a StatisticsItem to print the Increments periodically
+     */
+    @Override
+    public void schedule(final StatisticsItem item) {
+<span class="nc" id="L53">        setItemSampleBrief(item.getStatKind(), item.getStatObject(), new StatisticsItemSampleBrief(item, tpsItemNames));</span>
+
+        // print log every ${interval} miliseconds
+<span class="nc" id="L56">        ScheduledFuture future = executor.scheduleAtFixedRate(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">                if (!enabled()) {</span>
+<span class="nc" id="L60">                    return;</span>
+                }
+
+<span class="nc" id="L63">                StatisticsItem snapshot = item.snapshot();</span>
+<span class="nc" id="L64">                StatisticsItem lastSnapshot = getItemSnapshot(lastItemSnapshots, item.getStatKind(),</span>
+<span class="nc" id="L65">                    item.getStatObject());</span>
+<span class="nc" id="L66">                StatisticsItem increment = snapshot.subtract(lastSnapshot);</span>
+
+<span class="nc" id="L68">                Interceptor inteceptor = item.getInterceptor();</span>
+<span class="nc" id="L69">                String inteceptorStr = formatInterceptor(inteceptor);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">                if (inteceptor != null) {</span>
+<span class="nc" id="L71">                    inteceptor.reset();</span>
+                }
+
+<span class="nc" id="L74">                StatisticsItemSampleBrief brief = getSampleBrief(item.getStatKind(), item.getStatObject());</span>
+<span class="nc bnc" id="L75" title="All 6 branches missed.">                if (brief != null &amp;&amp; (!increment.allZeros() || printZeroLine())) {</span>
+<span class="nc" id="L76">                    printer.print(name, increment, inteceptorStr, brief.toString());</span>
+                }
+
+<span class="nc" id="L79">                setItemSnapshot(lastItemSnapshots, snapshot);</span>
+
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                if (brief != null) {</span>
+<span class="nc" id="L82">                    brief.reset();</span>
+                }
+<span class="nc" id="L84">            }</span>
+<span class="nc" id="L85">        }, getInitialDelay(), interval, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L86">        addFuture(item, future);</span>
+
+        // sample every TPS_INTREVAL
+<span class="nc" id="L89">        ScheduledFuture futureSample = executor.scheduleAtFixedRate(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                if (!enabled()) {</span>
+<span class="nc" id="L93">                    return;</span>
+                }
+
+<span class="nc" id="L96">                StatisticsItem snapshot = item.snapshot();</span>
+<span class="nc" id="L97">                StatisticsItemSampleBrief brief = getSampleBrief(item.getStatKind(), item.getStatObject());</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                if (brief != null) {</span>
+<span class="nc" id="L99">                    brief.sample(snapshot);</span>
+                }
+<span class="nc" id="L101">            }</span>
+        }, TPS_INTREVAL, TPS_INTREVAL, TimeUnit.MILLISECONDS);
+<span class="nc" id="L103">        addFuture(item, futureSample);</span>
+<span class="nc" id="L104">    }</span>
+
+    @Override
+    public void remove(StatisticsItem item) {
+        // remove task
+<span class="nc" id="L109">        removeAllFuture(item);</span>
+
+<span class="nc" id="L111">        String kind = item.getStatKind();</span>
+<span class="nc" id="L112">        String key = item.getStatObject();</span>
+
+<span class="nc" id="L114">        ConcurrentHashMap&lt;String, StatisticsItem&gt; lastItemMap = lastItemSnapshots.get(kind);</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (lastItemMap != null) {</span>
+<span class="nc" id="L116">            lastItemMap.remove(key);</span>
+        }
+
+<span class="nc" id="L119">        ConcurrentHashMap&lt;String, StatisticsItemSampleBrief&gt; briefMap = sampleBriefs.get(kind);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (briefMap != null) {</span>
+<span class="nc" id="L121">            briefMap.remove(key);</span>
+        }
+<span class="nc" id="L123">    }</span>
+
+    private StatisticsItem getItemSnapshot(
+        ConcurrentHashMap&lt;String, ConcurrentHashMap&lt;String, StatisticsItem&gt;&gt; snapshots,
+        String kind, String key) {
+<span class="nc" id="L128">        ConcurrentHashMap&lt;String, StatisticsItem&gt; itemMap = snapshots.get(kind);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        return (itemMap != null) ? itemMap.get(key) : null;</span>
+    }
+
+    private StatisticsItemSampleBrief getSampleBrief(String kind, String key) {
+<span class="nc" id="L133">        ConcurrentHashMap&lt;String, StatisticsItemSampleBrief&gt; itemMap = sampleBriefs.get(kind);</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        return (itemMap != null) ? itemMap.get(key) : null;</span>
+    }
+
+    private void setItemSnapshot(ConcurrentHashMap&lt;String, ConcurrentHashMap&lt;String, StatisticsItem&gt;&gt; snapshots,
+                                 StatisticsItem item) {
+<span class="nc" id="L139">        String kind = item.getStatKind();</span>
+<span class="nc" id="L140">        String key = item.getStatObject();</span>
+<span class="nc" id="L141">        ConcurrentHashMap&lt;String, StatisticsItem&gt; itemMap = snapshots.get(kind);</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (itemMap == null) {</span>
+<span class="nc" id="L143">            itemMap = new ConcurrentHashMap&lt;String, StatisticsItem&gt;();</span>
+<span class="nc" id="L144">            ConcurrentHashMap&lt;String, StatisticsItem&gt; oldItemMap = snapshots.putIfAbsent(kind, itemMap);</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            if (oldItemMap != null) {</span>
+<span class="nc" id="L146">                itemMap = oldItemMap;</span>
+            }
+        }
+
+<span class="nc" id="L150">        itemMap.put(key, item);</span>
+<span class="nc" id="L151">    }</span>
+
+    private void setItemSampleBrief(String kind, String key,
+                                    StatisticsItemSampleBrief brief) {
+<span class="nc" id="L155">        ConcurrentHashMap&lt;String, StatisticsItemSampleBrief&gt; itemMap = sampleBriefs.get(kind);</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (itemMap == null) {</span>
+<span class="nc" id="L157">            itemMap = new ConcurrentHashMap&lt;String, StatisticsItemSampleBrief&gt;();</span>
+<span class="nc" id="L158">            ConcurrentHashMap&lt;String, StatisticsItemSampleBrief&gt; oldItemMap = sampleBriefs.putIfAbsent(kind, itemMap);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            if (oldItemMap != null) {</span>
+<span class="nc" id="L160">                itemMap = oldItemMap;</span>
+            }
+        }
+
+<span class="nc" id="L164">        itemMap.put(key, brief);</span>
+<span class="nc" id="L165">    }</span>
+
+    private String formatInterceptor(Interceptor interceptor) {
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (interceptor == null) {</span>
+<span class="nc" id="L169">            return &quot;&quot;;</span>
+        }
+
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (interceptor instanceof StatisticsBriefInterceptor) {</span>
+<span class="nc" id="L173">            StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L174">            StatisticsBriefInterceptor briefInterceptor = (StatisticsBriefInterceptor)interceptor;</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            for (StatisticsBrief brief : briefInterceptor.getStatisticsBriefs()) {</span>
+<span class="nc" id="L176">                long max = brief.getMax();</span>
+<span class="nc" id="L177">                long tp999 = Math.min(brief.tp999(), max);</span>
+                //sb.append(SEPERATOR).append(brief.getTotal());
+<span class="nc" id="L179">                sb.append(SEPERATOR).append(max);</span>
+                //sb.append(SEPERATOR).append(brief.getMin());
+<span class="nc" id="L181">                sb.append(SEPERATOR).append(String.format(&quot;%.2f&quot;, brief.getAvg()));</span>
+<span class="nc" id="L182">                sb.append(SEPERATOR).append(tp999);</span>
+            }
+<span class="nc" id="L184">            return sb.toString();</span>
+        }
+<span class="nc" id="L186">        return &quot;&quot;;</span>
+    }
+
+    public static class StatisticsItemSampleBrief {
+        private StatisticsItem lastSnapshot;
+
+        public String[] itemNames;
+        public ItemSampleBrief[] briefs;
+
+<span class="nc" id="L195">        public StatisticsItemSampleBrief(StatisticsItem statItem, String[] itemNames) {</span>
+<span class="nc" id="L196">            this.lastSnapshot = statItem.snapshot();</span>
+<span class="nc" id="L197">            this.itemNames = itemNames;</span>
+<span class="nc" id="L198">            this.briefs = new ItemSampleBrief[itemNames.length];</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">            for (int i = 0; i &lt; itemNames.length; i++) {</span>
+<span class="nc" id="L200">                this.briefs[i] = new ItemSampleBrief();</span>
+            }
+<span class="nc" id="L202">        }</span>
+
+        public synchronized void reset() {
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            for (ItemSampleBrief brief : briefs) {</span>
+<span class="nc" id="L206">                brief.reset();</span>
+            }
+<span class="nc" id="L208">        }</span>
+
+        public synchronized void sample(StatisticsItem snapshot) {
+<span class="nc bnc" id="L211" title="All 2 branches missed.">            if (snapshot == null) {</span>
+<span class="nc" id="L212">                return;</span>
+            }
+
+<span class="nc bnc" id="L215" title="All 2 branches missed.">            for (int i = 0; i &lt; itemNames.length; i++) {</span>
+<span class="nc" id="L216">                String name = itemNames[i];</span>
+
+<span class="nc bnc" id="L218" title="All 2 branches missed.">                long lastValue = lastSnapshot != null ? lastSnapshot.getItemAccumulate(name).get() : 0;</span>
+<span class="nc" id="L219">                long increment = snapshot.getItemAccumulate(name).get() - lastValue;</span>
+<span class="nc" id="L220">                briefs[i].sample(increment);</span>
+            }
+<span class="nc" id="L222">            lastSnapshot = snapshot;</span>
+<span class="nc" id="L223">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L227">            StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">            for (int i = 0; i &lt; briefs.length; i++) {</span>
+<span class="nc" id="L229">                ItemSampleBrief brief = briefs[i];</span>
+<span class="nc" id="L230">                sb.append(SEPERATOR).append(brief.getMax());</span>
+                //sb.append(SEPERATOR).append(brief.getMin());
+<span class="nc" id="L232">                sb.append(SEPERATOR).append(String.format(&quot;%.2f&quot;, brief.getAvg()));</span>
+            }
+<span class="nc" id="L234">            return sb.toString();</span>
+        }
+    }
+
+    /**
+     * sample brief of a item for a period of time
+     */
+    public static class ItemSampleBrief {
+        private long max;
+        private long min;
+        private long total;
+        private long cnt;
+
+<span class="nc" id="L247">        public ItemSampleBrief() {</span>
+<span class="nc" id="L248">            reset();</span>
+<span class="nc" id="L249">        }</span>
+
+        public void sample(long value) {
+<span class="nc" id="L252">            max = Math.max(max, value);</span>
+<span class="nc" id="L253">            min = Math.min(min, value);</span>
+<span class="nc" id="L254">            total += value;</span>
+<span class="nc" id="L255">            cnt++;</span>
+<span class="nc" id="L256">        }</span>
+
+        public void reset() {
+<span class="nc" id="L259">            max = 0;</span>
+<span class="nc" id="L260">            min = Long.MAX_VALUE;</span>
+<span class="nc" id="L261">            total = 0;</span>
+<span class="nc" id="L262">            cnt = 0;</span>
+<span class="nc" id="L263">        }</span>
+
+        /**
+         * Getters
+         *
+         * @return
+         */
+        public long getMax() {
+<span class="nc" id="L271">            return max;</span>
+        }
+
+        public long getMin() {
+<span class="nc bnc" id="L275" title="All 2 branches missed.">            return cnt &gt; 0 ? min : 0;</span>
+        }
+
+        public long getTotal() {
+<span class="nc" id="L279">            return total;</span>
+        }
+
+        public long getCnt() {
+<span class="nc" id="L283">            return cnt;</span>
+        }
+
+        public double getAvg() {
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            return cnt != 0 ? ((double)total) / cnt : 0;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

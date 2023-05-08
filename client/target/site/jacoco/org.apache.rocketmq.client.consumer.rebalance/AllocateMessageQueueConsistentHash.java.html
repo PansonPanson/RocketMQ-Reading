@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AllocateMessageQueueConsistentHash.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.consumer.rebalance</a> &gt; <span class="el_source">AllocateMessageQueueConsistentHash.java</span></div><h1>AllocateMessageQueueConsistentHash.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.consumer.rebalance;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import org.apache.rocketmq.common.consistenthash.ConsistentHashRouter;
+import org.apache.rocketmq.common.consistenthash.HashFunction;
+import org.apache.rocketmq.common.consistenthash.Node;
+import org.apache.rocketmq.common.message.MessageQueue;
+
+/**
+ * Consistent Hashing queue algorithm
+ */
+public class AllocateMessageQueueConsistentHash extends AbstractAllocateMessageQueueStrategy {
+
+    private final int virtualNodeCnt;
+    private final HashFunction customHashFunction;
+
+    public AllocateMessageQueueConsistentHash() {
+<span class="fc" id="L36">        this(10);</span>
+<span class="fc" id="L37">    }</span>
+
+    public AllocateMessageQueueConsistentHash(int virtualNodeCnt) {
+<span class="fc" id="L40">        this(virtualNodeCnt, null);</span>
+<span class="fc" id="L41">    }</span>
+
+<span class="fc" id="L43">    public AllocateMessageQueueConsistentHash(int virtualNodeCnt, HashFunction customHashFunction) {</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (virtualNodeCnt &lt; 0) {</span>
+<span class="nc" id="L45">            throw new IllegalArgumentException(&quot;illegal virtualNodeCnt :&quot; + virtualNodeCnt);</span>
+        }
+<span class="fc" id="L47">        this.virtualNodeCnt = virtualNodeCnt;</span>
+<span class="fc" id="L48">        this.customHashFunction = customHashFunction;</span>
+<span class="fc" id="L49">    }</span>
+
+    @Override
+    public List&lt;MessageQueue&gt; allocate(String consumerGroup, String currentCID, List&lt;MessageQueue&gt; mqAll,
+        List&lt;String&gt; cidAll) {
+
+<span class="fc" id="L55">        List&lt;MessageQueue&gt; result = new ArrayList&lt;MessageQueue&gt;();</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (!check(consumerGroup, currentCID, mqAll, cidAll)) {</span>
+<span class="fc" id="L57">            return result;</span>
+        }
+
+<span class="fc" id="L60">        Collection&lt;ClientNode&gt; cidNodes = new ArrayList&lt;ClientNode&gt;();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (String cid : cidAll) {</span>
+<span class="fc" id="L62">            cidNodes.add(new ClientNode(cid));</span>
+<span class="fc" id="L63">        }</span>
+
+        final ConsistentHashRouter&lt;ClientNode&gt; router; //for building hash ring
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (customHashFunction != null) {</span>
+<span class="nc" id="L67">            router = new ConsistentHashRouter&lt;ClientNode&gt;(cidNodes, virtualNodeCnt, customHashFunction);</span>
+        } else {
+<span class="fc" id="L69">            router = new ConsistentHashRouter&lt;ClientNode&gt;(cidNodes, virtualNodeCnt);</span>
+        }
+
+<span class="fc" id="L72">        List&lt;MessageQueue&gt; results = new ArrayList&lt;MessageQueue&gt;();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (MessageQueue mq : mqAll) {</span>
+<span class="fc" id="L74">            ClientNode clientNode = router.routeNode(mq.toString());</span>
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">            if (clientNode != null &amp;&amp; currentCID.equals(clientNode.getKey())) {</span>
+<span class="fc" id="L76">                results.add(mq);</span>
+            }
+<span class="fc" id="L78">        }</span>
+
+<span class="fc" id="L80">        return results;</span>
+
+    }
+
+    @Override
+    public String getName() {
+<span class="nc" id="L86">        return &quot;CONSISTENT_HASH&quot;;</span>
+    }
+
+    private static class ClientNode implements Node {
+        private final String clientID;
+
+<span class="fc" id="L92">        public ClientNode(String clientID) {</span>
+<span class="fc" id="L93">            this.clientID = clientID;</span>
+<span class="fc" id="L94">        }</span>
+
+        @Override
+        public String getKey() {
+<span class="fc" id="L98">            return clientID;</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

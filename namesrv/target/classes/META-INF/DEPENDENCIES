@@ -1,0 +1,105 @@
+// ------------------------------------------------------------------
+// Transitive dependencies of this project determined from the
+// maven pom organized by organization.
+// ------------------------------------------------------------------
+
+rocketmq-namesrv 5.0.0-SNAPSHOT
+
+
+From: 'Alibaba Group' (https://github.com/alibaba)
+  - fastjson (https://github.com/alibaba/fastjson) com.alibaba:fastjson:jar:1.2.69_noneautotype
+    License: Apache 2  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+
+From: 'an unknown organization'
+  - jcommander (http://jcommander.org) com.beust:jcommander:jar:1.72
+    License: Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
+  - FindBugs-jsr305 (http://findbugs.sourceforge.net/) com.google.code.findbugs:jsr305:jar:3.0.2
+    License: The Apache Software License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+  - error-prone annotations (http://nexus.sonatype.org/oss-repository-hosting.html/error_prone_parent/error_prone_annotations) com.google.errorprone:error_prone_annotations:jar:2.7.1
+    License: Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+  - Guava InternalFutureFailureAccess and InternalFutures (https://github.com/google/guava/failureaccess) com.google.guava:failureaccess:bundle:1.0.1
+    License: The Apache Software License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+  - Guava: Google Core Libraries for Java (https://github.com/google/guava) com.google.guava:guava:bundle:31.0.1-jre
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+  - Guava ListenableFuture only (https://github.com/google/guava/listenablefuture) com.google.guava:listenablefuture:jar:9999.0-empty-to-avoid-conflict-with-guava
+    License: The Apache Software License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+  - J2ObjC Annotations (https://github.com/google/j2objc/) com.google.j2objc:j2objc-annotations:jar:1.3
+    License: The Apache Software License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+  - ConcurrentLinkedHashMap (http://code.google.com/p/concurrentlinkedhashmap) com.googlecode.concurrentlinkedhashmap:concurrentlinkedhashmap-lru:jar:1.4.2
+    License: The Apache Software License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+  - openmessaging-dledger (http://nexus.sonatype.org/oss-repository-hosting.html/dledger) io.openmessaging.storage:dledger:jar:0.2.7
+
+  - Awaitility (http://awaitility.org) org.awaitility:awaitility:jar:4.1.0
+    License: Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+  - Bouncy Castle PKIX, CMS, EAC, TSP, PKCS, OCSP, CMP, and CRMF APIs (https://www.bouncycastle.org/java.html) org.bouncycastle:bcpkix-jdk15on:jar:1.69
+    License: Bouncy Castle Licence  (https://www.bouncycastle.org/licence.html)
+  - Bouncy Castle Provider (https://www.bouncycastle.org/java.html) org.bouncycastle:bcprov-jdk15on:jar:1.69
+    License: Bouncy Castle Licence  (https://www.bouncycastle.org/licence.html)
+  - Bouncy Castle ASN.1 Extension and Utility APIs (https://www.bouncycastle.org/java.html) org.bouncycastle:bcutil-jdk15on:jar:1.69
+    License: Bouncy Castle Licence  (https://www.bouncycastle.org/licence.html)
+  - Checker Qual (https://checkerframework.org) org.checkerframework:checker-qual:jar:3.12.0
+    License: The MIT License  (http://opensource.org/licenses/MIT)
+  - Hamcrest (http://hamcrest.org/JavaHamcrest/) org.hamcrest:hamcrest:jar:2.1
+    License: BSD Licence 3  (http://opensource.org/licenses/BSD-3-Clause)
+  - LZ4 and xxHash (https://github.com/lz4/lz4-java) org.lz4:lz4-java:jar:1.8.0
+    License: The Apache Software License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+  - SnakeYAML (https://bitbucket.org/snakeyaml/snakeyaml) org.yaml:snakeyaml:bundle:1.30
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+
+From: 'Apache Software Foundation' (http://www.apache.org)
+  - rocketmq-acl 5.0.0-SNAPSHOT (http://rocketmq.apache.org/rocketmq-acl/) org.apache.rocketmq:rocketmq-acl:jar:5.0.0-SNAPSHOT
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
+  - rocketmq-client 5.0.0-SNAPSHOT (http://rocketmq.apache.org/rocketmq-client/) org.apache.rocketmq:rocketmq-client:jar:5.0.0-SNAPSHOT
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
+  - rocketmq-common 5.0.0-SNAPSHOT (http://rocketmq.apache.org/rocketmq-common/) org.apache.rocketmq:rocketmq-common:jar:5.0.0-SNAPSHOT
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
+  - rocketmq-controller 5.0.0-SNAPSHOT (http://rocketmq.apache.org/rocketmq-controller/) org.apache.rocketmq:rocketmq-controller:jar:5.0.0-SNAPSHOT
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
+  - rocketmq-logging 5.0.0-SNAPSHOT (http://rocketmq.apache.org/rocketmq-logging/) org.apache.rocketmq:rocketmq-logging:jar:5.0.0-SNAPSHOT
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
+  - rocketmq-remoting 5.0.0-SNAPSHOT (http://rocketmq.apache.org/rocketmq-remoting/) org.apache.rocketmq:rocketmq-remoting:jar:5.0.0-SNAPSHOT
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
+  - rocketmq-srvutil 5.0.0-SNAPSHOT (http://rocketmq.apache.org/rocketmq-srvutil/) org.apache.rocketmq:rocketmq-srvutil:jar:5.0.0-SNAPSHOT
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
+  - rocketmq-tools 5.0.0-SNAPSHOT (http://rocketmq.apache.org/rocketmq-tools/) org.apache.rocketmq:rocketmq-tools:jar:5.0.0-SNAPSHOT
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
+
+From: 'com.github.luben'
+  - zstd-jni (https://github.com/luben/zstd-jni) com.github.luben:zstd-jni:jar:1.5.2-2
+    License: BSD 2-Clause License  (https://opensource.org/licenses/BSD-2-Clause)
+
+From: 'QOS.ch' (http://www.qos.ch)
+  - Logback Classic Module (http://logback.qos.ch/logback-classic) ch.qos.logback:logback-classic:jar:1.2.10
+    License: Eclipse Public License - v 1.0  (http://www.eclipse.org/legal/epl-v10.html)    License: GNU Lesser General Public License  (http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
+  - Logback Core Module (http://logback.qos.ch/logback-core) ch.qos.logback:logback-core:jar:1.2.10
+    License: Eclipse Public License - v 1.0  (http://www.eclipse.org/legal/epl-v10.html)    License: GNU Lesser General Public License  (http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
+  - SLF4J API Module (http://www.slf4j.org) org.slf4j:slf4j-api:jar:1.7.7
+    License: MIT License  (http://www.opensource.org/licenses/mit-license.php)
+
+From: 'The Apache Software Foundation' (http://www.apache.org/)
+  - Apache Commons Collections (http://commons.apache.org/collections/) commons-collections:commons-collections:jar:3.2.2
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+  - Commons Digester (http://commons.apache.org/digester/) commons-digester:commons-digester:jar:2.1
+    License: The Apache Software License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+  - Apache Commons Logging (http://commons.apache.org/proper/commons-logging/) commons-logging:commons-logging:jar:1.2
+    License: The Apache Software License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+  - Apache Commons Lang (http://commons.apache.org/proper/commons-lang/) org.apache.commons:commons-lang3:jar:3.4
+    License: Apache License, Version 2.0  (http://www.apache.org/licenses/LICENSE-2.0.txt)
+
+From: 'The Apache Software Foundation' (https://www.apache.org/)
+  - Apache Commons BeanUtils (https://commons.apache.org/proper/commons-beanutils/) commons-beanutils:commons-beanutils:jar:1.9.4
+    License: Apache License, Version 2.0  (https://www.apache.org/licenses/LICENSE-2.0.txt)
+  - Apache Commons CLI (http://commons.apache.org/proper/commons-cli/) commons-cli:commons-cli:jar:1.4
+    License: Apache License, Version 2.0  (https://www.apache.org/licenses/LICENSE-2.0.txt)
+  - Apache Commons Codec (https://commons.apache.org/proper/commons-codec/) commons-codec:commons-codec:jar:1.13
+    License: Apache License, Version 2.0  (https://www.apache.org/licenses/LICENSE-2.0.txt)
+  - Apache Commons Validator (http://commons.apache.org/proper/commons-validator/) commons-validator:commons-validator:jar:1.7
+    License: Apache License, Version 2.0  (https://www.apache.org/licenses/LICENSE-2.0.txt)
+
+From: 'The Netty Project' (https://netty.io/)
+  - Netty/All-in-One (https://netty.io/netty-all/) io.netty:netty-all:jar:4.1.65.Final
+    License: Apache License, Version 2.0  (https://www.apache.org/licenses/LICENSE-2.0)
+
+
+
+

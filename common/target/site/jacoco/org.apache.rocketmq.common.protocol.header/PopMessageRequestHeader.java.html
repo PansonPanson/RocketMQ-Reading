@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PopMessageRequestHeader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.header</a> &gt; <span class="el_source">PopMessageRequestHeader.java</span></div><h1>PopMessageRequestHeader.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.protocol.header;
+
+import com.google.common.base.MoreObjects;
+import org.apache.rocketmq.remoting.CommandCustomHeader;
+import org.apache.rocketmq.remoting.annotation.CFNotNull;
+import org.apache.rocketmq.remoting.exception.RemotingCommandException;
+
+<span class="nc" id="L24">public class PopMessageRequestHeader implements CommandCustomHeader {</span>
+    @CFNotNull
+    private String consumerGroup;
+    @CFNotNull
+    private String topic;
+    @CFNotNull
+    private int queueId;
+    @CFNotNull
+    private int maxMsgNums;
+    @CFNotNull
+    private long invisibleTime;
+    @CFNotNull
+    private long pollTime;
+    @CFNotNull
+    private long bornTime;
+    @CFNotNull
+    private int initMode;
+
+    private String expType;
+    private String exp;
+
+    /**
+     * marked as order consume, if true
+     * 1. not commit offset
+     * 2. not pop retry, because no retry
+     * 3. not append check point, because no retry
+     */
+<span class="nc" id="L51">    private Boolean order = Boolean.FALSE;</span>
+
+    @Override
+    public void checkFields() throws RemotingCommandException {
+<span class="nc" id="L55">    }</span>
+
+    public void setInitMode(int initMode) {
+<span class="nc" id="L58">        this.initMode = initMode;</span>
+<span class="nc" id="L59">    }</span>
+
+    public int getInitMode() {
+<span class="nc" id="L62">        return initMode;</span>
+    }
+
+    public long getInvisibleTime() {
+<span class="nc" id="L66">        return invisibleTime;</span>
+    }
+
+    public void setInvisibleTime(long invisibleTime) {
+<span class="nc" id="L70">        this.invisibleTime = invisibleTime;</span>
+<span class="nc" id="L71">    }</span>
+
+    public long getPollTime() {
+<span class="nc" id="L74">        return pollTime;</span>
+    }
+
+    public void setPollTime(long pollTime) {
+<span class="nc" id="L78">        this.pollTime = pollTime;</span>
+<span class="nc" id="L79">    }</span>
+
+    public String getConsumerGroup() {
+<span class="nc" id="L82">        return consumerGroup;</span>
+    }
+
+    public void setConsumerGroup(String consumerGroup) {
+<span class="nc" id="L86">        this.consumerGroup = consumerGroup;</span>
+<span class="nc" id="L87">    }</span>
+
+    public long getBornTime() {
+<span class="nc" id="L90">        return bornTime;</span>
+    }
+
+    public void setBornTime(long bornTime) {
+<span class="nc" id="L94">        this.bornTime = bornTime;</span>
+<span class="nc" id="L95">    }</span>
+
+    public String getTopic() {
+<span class="nc" id="L98">        return topic;</span>
+    }
+
+    public void setTopic(String topic) {
+<span class="nc" id="L102">        this.topic = topic;</span>
+<span class="nc" id="L103">    }</span>
+
+    public int getQueueId() {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (queueId &lt; 0) {</span>
+<span class="nc" id="L107">            return -1;</span>
+        }
+<span class="nc" id="L109">        return queueId;</span>
+    }
+
+    public void setQueueId(int queueId) {
+<span class="nc" id="L113">        this.queueId = queueId;</span>
+<span class="nc" id="L114">    }</span>
+
+
+    public int getMaxMsgNums() {
+<span class="nc" id="L118">        return maxMsgNums;</span>
+    }
+
+    public void setMaxMsgNums(int maxMsgNums) {
+<span class="nc" id="L122">        this.maxMsgNums = maxMsgNums;</span>
+<span class="nc" id="L123">    }</span>
+
+    public boolean isTimeoutTooMuch() {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        return System.currentTimeMillis() - bornTime - pollTime &gt; 500;</span>
+    }
+
+    public String getExpType() {
+<span class="nc" id="L130">        return expType;</span>
+    }
+
+    public void setExpType(String expType) {
+<span class="nc" id="L134">        this.expType = expType;</span>
+<span class="nc" id="L135">    }</span>
+
+    public String getExp() {
+<span class="nc" id="L138">        return exp;</span>
+    }
+
+    public void setExp(String exp) {
+<span class="nc" id="L142">        this.exp = exp;</span>
+<span class="nc" id="L143">    }</span>
+
+    public Boolean getOrder() {
+<span class="nc" id="L146">        return order;</span>
+    }
+
+    public void setOrder(Boolean order) {
+<span class="nc" id="L150">        this.order = order;</span>
+<span class="nc" id="L151">    }</span>
+
+    public boolean isOrder() {
+<span class="nc bnc" id="L154" title="All 4 branches missed.">        return this.order != null &amp;&amp; this.order.booleanValue();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L159">        return MoreObjects.toStringHelper(this)</span>
+<span class="nc" id="L160">            .add(&quot;consumerGroup&quot;, consumerGroup)</span>
+<span class="nc" id="L161">            .add(&quot;topic&quot;, topic)</span>
+<span class="nc" id="L162">            .add(&quot;queueId&quot;, queueId)</span>
+<span class="nc" id="L163">            .add(&quot;maxMsgNums&quot;, maxMsgNums)</span>
+<span class="nc" id="L164">            .add(&quot;invisibleTime&quot;, invisibleTime)</span>
+<span class="nc" id="L165">            .add(&quot;pollTime&quot;, pollTime)</span>
+<span class="nc" id="L166">            .add(&quot;bornTime&quot;, bornTime)</span>
+<span class="nc" id="L167">            .add(&quot;initMode&quot;, initMode)</span>
+<span class="nc" id="L168">            .add(&quot;expType&quot;, expType)</span>
+<span class="nc" id="L169">            .add(&quot;exp&quot;, exp)</span>
+<span class="nc" id="L170">            .add(&quot;order&quot;, order)</span>
+<span class="nc" id="L171">            .toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

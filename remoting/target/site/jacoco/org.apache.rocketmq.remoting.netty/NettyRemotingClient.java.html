@@ -1,0 +1,909 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NettyRemotingClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-remoting 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.remoting.netty</a> &gt; <span class="el_source">NettyRemotingClient.java</span></div><h1>NettyRemotingClient.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.remoting.netty;
+
+import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.ChannelPromise;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.WriteBufferWaterMark;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.timeout.IdleState;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.util.concurrent.DefaultEventExecutorGroup;
+import io.netty.util.concurrent.EventExecutorGroup;
+import java.io.IOException;
+import java.net.SocketAddress;
+import java.security.cert.CertificateException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.Map;
+import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+import org.apache.rocketmq.remoting.ChannelEventListener;
+import org.apache.rocketmq.remoting.InvokeCallback;
+import org.apache.rocketmq.remoting.RemotingClient;
+import org.apache.rocketmq.remoting.common.Pair;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
+import org.apache.rocketmq.remoting.common.RemotingUtil;
+import org.apache.rocketmq.remoting.exception.RemotingConnectException;
+import org.apache.rocketmq.remoting.exception.RemotingSendRequestException;
+import org.apache.rocketmq.remoting.exception.RemotingTimeoutException;
+import org.apache.rocketmq.remoting.exception.RemotingTooMuchRequestException;
+import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+
+public class NettyRemotingClient extends NettyRemotingAbstract implements RemotingClient {
+<span class="fc" id="L79">    private static final InternalLogger LOGGER = InternalLoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);</span>
+
+    private static final long LOCK_TIMEOUT_MILLIS = 3000;
+
+    private final NettyClientConfig nettyClientConfig;
+<span class="fc" id="L84">    private final Bootstrap bootstrap = new Bootstrap();</span>
+    private final EventLoopGroup eventLoopGroupWorker;
+<span class="fc" id="L86">    private final Lock lockChannelTables = new ReentrantLock();</span>
+<span class="fc" id="L87">    private final ConcurrentMap&lt;String /* addr */, ChannelWrapper&gt; channelTables = new ConcurrentHashMap&lt;String, ChannelWrapper&gt;();</span>
+
+<span class="fc" id="L89">    private final Timer timer = new Timer(&quot;ClientHouseKeepingService&quot;, true);</span>
+
+<span class="fc" id="L91">    private final AtomicReference&lt;List&lt;String&gt;&gt; namesrvAddrList = new AtomicReference&lt;List&lt;String&gt;&gt;();</span>
+<span class="fc" id="L92">    private final ConcurrentMap&lt;String, Boolean&gt; availableNamesrvAddrMap = new ConcurrentHashMap&lt;String, Boolean&gt;();</span>
+<span class="fc" id="L93">    private final AtomicReference&lt;String&gt; namesrvAddrChoosed = new AtomicReference&lt;String&gt;();</span>
+<span class="fc" id="L94">    private final AtomicInteger namesrvIndex = new AtomicInteger(initValueIndex());</span>
+<span class="fc" id="L95">    private final Lock namesrvChannelLock = new ReentrantLock();</span>
+
+    private final ExecutorService publicExecutor;
+    private final ExecutorService scanExecutor;
+
+    /**
+     * Invoke the callback methods in this executor when process response.
+     */
+    private ExecutorService callbackExecutor;
+    private final ChannelEventListener channelEventListener;
+    private EventExecutorGroup defaultEventExecutorGroup;
+
+    public NettyRemotingClient(final NettyClientConfig nettyClientConfig) {
+<span class="fc" id="L108">        this(nettyClientConfig, null);</span>
+<span class="fc" id="L109">    }</span>
+
+    public NettyRemotingClient(final NettyClientConfig nettyClientConfig,
+        final ChannelEventListener channelEventListener) {
+<span class="fc" id="L113">        this(nettyClientConfig, channelEventListener, null, null);</span>
+<span class="fc" id="L114">    }</span>
+
+    public NettyRemotingClient(final NettyClientConfig nettyClientConfig,
+        final ChannelEventListener channelEventListener,
+        final EventLoopGroup eventLoopGroup,
+        final EventExecutorGroup eventExecutorGroup) {
+<span class="fc" id="L120">        super(nettyClientConfig.getClientOnewaySemaphoreValue(), nettyClientConfig.getClientAsyncSemaphoreValue());</span>
+<span class="fc" id="L121">        this.nettyClientConfig = nettyClientConfig;</span>
+<span class="fc" id="L122">        this.channelEventListener = channelEventListener;</span>
+
+<span class="fc" id="L124">        int publicThreadNums = nettyClientConfig.getClientCallbackExecutorThreads();</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (publicThreadNums &lt;= 0) {</span>
+<span class="nc" id="L126">            publicThreadNums = 4;</span>
+        }
+
+<span class="fc" id="L129">        this.publicExecutor = Executors.newFixedThreadPool(publicThreadNums, new ThreadFactory() {</span>
+<span class="fc" id="L130">            private final AtomicInteger threadIndex = new AtomicInteger(0);</span>
+
+            @Override
+            public Thread newThread(Runnable r) {
+<span class="fc" id="L134">                return new Thread(r, &quot;NettyClientPublicExecutor_&quot; + this.threadIndex.incrementAndGet());</span>
+            }
+        });
+
+<span class="fc" id="L138">        this.scanExecutor = new ThreadPoolExecutor(4, 10, 60, TimeUnit.SECONDS,</span>
+<span class="fc" id="L139">            new ArrayBlockingQueue&lt;Runnable&gt;(32), new ThreadFactory() {</span>
+<span class="fc" id="L140">                private final AtomicInteger threadIndex = new AtomicInteger(0);</span>
+
+                @Override
+                public Thread newThread(Runnable r) {
+<span class="nc" id="L144">                    return new Thread(r, &quot;NettyClientScan_thread_&quot; + this.threadIndex.incrementAndGet());</span>
+                }
+            }
+        );
+
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (eventLoopGroup != null) {</span>
+<span class="nc" id="L150">            this.eventLoopGroupWorker = eventLoopGroup;</span>
+        } else {
+<span class="fc" id="L152">            this.eventLoopGroupWorker = new NioEventLoopGroup(1, new ThreadFactory() {</span>
+<span class="fc" id="L153">                private final AtomicInteger threadIndex = new AtomicInteger(0);</span>
+
+                @Override
+                public Thread newThread(Runnable r) {
+<span class="fc" id="L157">                    return new Thread(r, String.format(&quot;NettyClientSelector_%d&quot;, this.threadIndex.incrementAndGet()));</span>
+                }
+            });
+        }
+<span class="fc" id="L161">        this.defaultEventExecutorGroup = eventExecutorGroup;</span>
+
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (nettyClientConfig.isUseTLS()) {</span>
+            try {
+<span class="fc" id="L165">                sslContext = TlsHelper.buildSslContext(true);</span>
+<span class="fc" id="L166">                LOGGER.info(&quot;SSL enabled for client&quot;);</span>
+<span class="nc" id="L167">            } catch (IOException e) {</span>
+<span class="nc" id="L168">                LOGGER.error(&quot;Failed to create SSLContext&quot;, e);</span>
+<span class="nc" id="L169">            } catch (CertificateException e) {</span>
+<span class="nc" id="L170">                LOGGER.error(&quot;Failed to create SSLContext&quot;, e);</span>
+<span class="nc" id="L171">                throw new RuntimeException(&quot;Failed to create SSLContext&quot;, e);</span>
+<span class="pc" id="L172">            }</span>
+        }
+<span class="fc" id="L174">    }</span>
+
+    private static int initValueIndex() {
+<span class="fc" id="L177">        Random r = new Random();</span>
+
+<span class="fc" id="L179">        return Math.abs(r.nextInt() % 999) % 999;</span>
+    }
+
+    @Override
+    public void start() {
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (this.defaultEventExecutorGroup == null) {</span>
+<span class="fc" id="L185">            this.defaultEventExecutorGroup = new DefaultEventExecutorGroup(</span>
+<span class="fc" id="L186">                nettyClientConfig.getClientWorkerThreads(),</span>
+<span class="fc" id="L187">                new ThreadFactory() {</span>
+
+<span class="fc" id="L189">                    private AtomicInteger threadIndex = new AtomicInteger(0);</span>
+
+                    @Override
+                    public Thread newThread(Runnable r) {
+<span class="fc" id="L193">                        return new Thread(r, &quot;NettyClientWorkerThread_&quot; + this.threadIndex.incrementAndGet());</span>
+                    }
+                });
+        }
+<span class="fc" id="L197">        Bootstrap handler = this.bootstrap.group(this.eventLoopGroupWorker).channel(NioSocketChannel.class)</span>
+<span class="fc" id="L198">            .option(ChannelOption.TCP_NODELAY, true)</span>
+<span class="fc" id="L199">            .option(ChannelOption.SO_KEEPALIVE, false)</span>
+<span class="fc" id="L200">            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, nettyClientConfig.getConnectTimeoutMillis())</span>
+<span class="fc" id="L201">            .handler(new ChannelInitializer&lt;SocketChannel&gt;() {</span>
+                @Override
+                public void initChannel(SocketChannel ch) throws Exception {
+<span class="fc" id="L204">                    ChannelPipeline pipeline = ch.pipeline();</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                    if (nettyClientConfig.isUseTLS()) {</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                        if (null != sslContext) {</span>
+<span class="fc" id="L207">                            pipeline.addFirst(defaultEventExecutorGroup, &quot;sslHandler&quot;, sslContext.newHandler(ch.alloc()));</span>
+<span class="fc" id="L208">                            LOGGER.info(&quot;Prepend SSL handler&quot;);</span>
+                        } else {
+<span class="nc" id="L210">                            LOGGER.warn(&quot;Connections are insecure as SSLContext is null!&quot;);</span>
+                        }
+                    }
+<span class="fc" id="L213">                    pipeline.addLast(</span>
+<span class="fc" id="L214">                        defaultEventExecutorGroup,</span>
+                        new NettyEncoder(),
+                        new NettyDecoder(),
+<span class="fc" id="L217">                        new IdleStateHandler(0, 0, nettyClientConfig.getClientChannelMaxIdleTimeSeconds()),</span>
+                        new NettyConnectManageHandler(),
+                        new NettyClientHandler());
+<span class="fc" id="L220">                }</span>
+            });
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (nettyClientConfig.getClientSocketSndBufSize() &gt; 0) {</span>
+<span class="fc" id="L223">            LOGGER.info(&quot;client set SO_SNDBUF to {}&quot;, nettyClientConfig.getClientSocketSndBufSize());</span>
+<span class="fc" id="L224">            handler.option(ChannelOption.SO_SNDBUF, nettyClientConfig.getClientSocketSndBufSize());</span>
+        }
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (nettyClientConfig.getClientSocketRcvBufSize() &gt; 0) {</span>
+<span class="fc" id="L227">            LOGGER.info(&quot;client set SO_RCVBUF to {}&quot;, nettyClientConfig.getClientSocketRcvBufSize());</span>
+<span class="fc" id="L228">            handler.option(ChannelOption.SO_RCVBUF, nettyClientConfig.getClientSocketRcvBufSize());</span>
+        }
+<span class="pc bpc" id="L230" title="3 of 4 branches missed.">        if (nettyClientConfig.getWriteBufferLowWaterMark() &gt; 0 &amp;&amp; nettyClientConfig.getWriteBufferHighWaterMark() &gt; 0) {</span>
+<span class="nc" id="L231">            LOGGER.info(&quot;client set netty WRITE_BUFFER_WATER_MARK to {},{}&quot;,</span>
+<span class="nc" id="L232">                    nettyClientConfig.getWriteBufferLowWaterMark(), nettyClientConfig.getWriteBufferHighWaterMark());</span>
+<span class="nc" id="L233">            handler.option(ChannelOption.WRITE_BUFFER_WATER_MARK, new WriteBufferWaterMark(</span>
+<span class="nc" id="L234">                    nettyClientConfig.getWriteBufferLowWaterMark(), nettyClientConfig.getWriteBufferHighWaterMark()));</span>
+        }
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (nettyClientConfig.isClientPooledByteBufAllocatorEnable()) {</span>
+<span class="nc" id="L237">            handler.option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);</span>
+        }
+
+<span class="fc" id="L240">        this.timer.scheduleAtFixedRate(new TimerTask() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L244">                    NettyRemotingClient.this.scanResponseTable();</span>
+<span class="nc" id="L245">                } catch (Throwable e) {</span>
+<span class="nc" id="L246">                    LOGGER.error(&quot;scanResponseTable exception&quot;, e);</span>
+<span class="fc" id="L247">                }</span>
+<span class="fc" id="L248">            }</span>
+        }, 1000 * 3, 1000);
+
+//        this.timer.scheduleAtFixedRate(new TimerTask() {
+//            @Override
+//            public void run() {
+//                try {
+//                    NettyRemotingClient.this.scanChannelTablesOfNameServer();
+//                } catch (Exception e) {
+//                    LOGGER.error(&quot;scanChannelTablesOfNameServer exception&quot;, e);
+//                }
+//            }
+//        }, 1000 * 3, 10 * 1000);
+
+<span class="fc" id="L262">        this.timer.scheduleAtFixedRate(new TimerTask() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L266">                    NettyRemotingClient.this.scanAvailableNameSrv();</span>
+<span class="nc" id="L267">                } catch (Exception e) {</span>
+<span class="nc" id="L268">                    LOGGER.error(&quot;scanAvailableNameSrv exception&quot;, e);</span>
+<span class="fc" id="L269">                }</span>
+<span class="fc" id="L270">            }</span>
+<span class="fc" id="L271">        }, 1000 * 3, this.nettyClientConfig.getConnectTimeoutMillis());</span>
+
+<span class="fc" id="L273">    }</span>
+
+    @Override
+    public void shutdown() {
+        try {
+<span class="fc" id="L278">            this.timer.cancel();</span>
+
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            for (String addr : this.channelTables.keySet()) {</span>
+<span class="fc" id="L281">                this.closeChannel(addr, this.channelTables.get(addr).getChannel());</span>
+<span class="fc" id="L282">            }</span>
+
+<span class="fc" id="L284">            this.channelTables.clear();</span>
+
+<span class="fc" id="L286">            this.eventLoopGroupWorker.shutdownGracefully();</span>
+
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">            if (this.nettyEventExecutor != null) {</span>
+<span class="fc" id="L289">                this.nettyEventExecutor.shutdown();</span>
+            }
+
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            if (this.defaultEventExecutorGroup != null) {</span>
+<span class="fc" id="L293">                this.defaultEventExecutorGroup.shutdownGracefully();</span>
+            }
+<span class="nc" id="L295">        } catch (Exception e) {</span>
+<span class="nc" id="L296">            LOGGER.error(&quot;NettyRemotingClient shutdown exception, &quot;, e);</span>
+<span class="fc" id="L297">        }</span>
+
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        if (this.publicExecutor != null) {</span>
+            try {
+<span class="fc" id="L301">                this.publicExecutor.shutdown();</span>
+<span class="nc" id="L302">            } catch (Exception e) {</span>
+<span class="nc" id="L303">                LOGGER.error(&quot;NettyRemotingServer shutdown exception, &quot;, e);</span>
+<span class="fc" id="L304">            }</span>
+        }
+
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        if (this.scanExecutor != null) {</span>
+            try {
+<span class="fc" id="L309">                this.scanExecutor.shutdown();</span>
+<span class="nc" id="L310">            } catch (Exception e) {</span>
+<span class="nc" id="L311">                LOGGER.error(&quot;NettyRemotingServer shutdown exception, &quot;, e);</span>
+<span class="fc" id="L312">            }</span>
+        }
+<span class="fc" id="L314">    }</span>
+
+    public void closeChannel(final String addr, final Channel channel) {
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        if (null == channel) {</span>
+<span class="nc" id="L318">            return;</span>
+        }
+
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">        final String addrRemote = null == addr ? RemotingHelper.parseChannelRemoteAddr(channel) : addr;</span>
+
+        try {
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            if (this.lockChannelTables.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {</span>
+                try {
+<span class="fc" id="L326">                    boolean removeItemFromTable = true;</span>
+<span class="fc" id="L327">                    final ChannelWrapper prevCW = this.channelTables.get(addrRemote);</span>
+
+<span class="fc bfc" id="L329" title="All 2 branches covered.">                    LOGGER.info(&quot;closeChannel: begin close the channel[{}] Found: {}&quot;, addrRemote, prevCW != null);</span>
+
+<span class="fc bfc" id="L331" title="All 2 branches covered.">                    if (null == prevCW) {</span>
+<span class="fc" id="L332">                        LOGGER.info(&quot;closeChannel: the channel[{}] has been removed from the channel table before&quot;, addrRemote);</span>
+<span class="fc" id="L333">                        removeItemFromTable = false;</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                    } else if (prevCW.getChannel() != channel) {</span>
+<span class="nc" id="L335">                        LOGGER.info(&quot;closeChannel: the channel[{}] has been closed before, and has been created again, nothing to do.&quot;,</span>
+                            addrRemote);
+<span class="nc" id="L337">                        removeItemFromTable = false;</span>
+                    }
+
+<span class="fc bfc" id="L340" title="All 2 branches covered.">                    if (removeItemFromTable) {</span>
+<span class="fc" id="L341">                        this.channelTables.remove(addrRemote);</span>
+<span class="fc" id="L342">                        LOGGER.info(&quot;closeChannel: the channel[{}] was removed from channel table&quot;, addrRemote);</span>
+                    }
+
+<span class="fc" id="L345">                    RemotingUtil.closeChannel(channel);</span>
+<span class="nc" id="L346">                } catch (Exception e) {</span>
+<span class="nc" id="L347">                    LOGGER.error(&quot;closeChannel: close the channel exception&quot;, e);</span>
+                } finally {
+<span class="fc" id="L349">                    this.lockChannelTables.unlock();</span>
+<span class="fc" id="L350">                }</span>
+            } else {
+<span class="nc" id="L352">                LOGGER.warn(&quot;closeChannel: try to lock channel table, but timeout, {}ms&quot;, LOCK_TIMEOUT_MILLIS);</span>
+            }
+<span class="nc" id="L354">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L355">            LOGGER.error(&quot;closeChannel exception&quot;, e);</span>
+<span class="fc" id="L356">        }</span>
+<span class="fc" id="L357">    }</span>
+
+    public void closeChannel(final Channel channel) {
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">        if (null == channel) {</span>
+<span class="nc" id="L361">            return;</span>
+        }
+
+        try {
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">            if (this.lockChannelTables.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {</span>
+                try {
+<span class="fc" id="L367">                    boolean removeItemFromTable = true;</span>
+<span class="fc" id="L368">                    ChannelWrapper prevCW = null;</span>
+<span class="fc" id="L369">                    String addrRemote = null;</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">                    for (Map.Entry&lt;String, ChannelWrapper&gt; entry : channelTables.entrySet()) {</span>
+<span class="fc" id="L371">                        String key = entry.getKey();</span>
+<span class="fc" id="L372">                        ChannelWrapper prev = entry.getValue();</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">                        if (prev.getChannel() != null) {</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">                            if (prev.getChannel() == channel) {</span>
+<span class="fc" id="L375">                                prevCW = prev;</span>
+<span class="fc" id="L376">                                addrRemote = key;</span>
+<span class="fc" id="L377">                                break;</span>
+                            }
+                        }
+<span class="nc" id="L380">                    }</span>
+
+<span class="fc bfc" id="L382" title="All 2 branches covered.">                    if (null == prevCW) {</span>
+<span class="fc" id="L383">                        LOGGER.info(&quot;eventCloseChannel: the channel[{}] has been removed from the channel table before&quot;, addrRemote);</span>
+<span class="fc" id="L384">                        removeItemFromTable = false;</span>
+                    }
+
+<span class="fc bfc" id="L387" title="All 2 branches covered.">                    if (removeItemFromTable) {</span>
+<span class="fc" id="L388">                        this.channelTables.remove(addrRemote);</span>
+<span class="fc" id="L389">                        LOGGER.info(&quot;closeChannel: the channel[{}] was removed from channel table&quot;, addrRemote);</span>
+<span class="fc" id="L390">                        RemotingUtil.closeChannel(channel);</span>
+                    }
+<span class="nc" id="L392">                } catch (Exception e) {</span>
+<span class="nc" id="L393">                    LOGGER.error(&quot;closeChannel: close the channel exception&quot;, e);</span>
+                } finally {
+<span class="fc" id="L395">                    this.lockChannelTables.unlock();</span>
+<span class="fc" id="L396">                }</span>
+            } else {
+<span class="nc" id="L398">                LOGGER.warn(&quot;closeChannel: try to lock channel table, but timeout, {}ms&quot;, LOCK_TIMEOUT_MILLIS);</span>
+            }
+<span class="nc" id="L400">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L401">            LOGGER.error(&quot;closeChannel exception&quot;, e);</span>
+<span class="fc" id="L402">        }</span>
+<span class="fc" id="L403">    }</span>
+
+    @Override
+    public void updateNameServerAddressList(List&lt;String&gt; addrs) {
+<span class="nc" id="L407">        List&lt;String&gt; old = this.namesrvAddrList.get();</span>
+<span class="nc" id="L408">        boolean update = false;</span>
+
+<span class="nc bnc" id="L410" title="All 2 branches missed.">        if (!addrs.isEmpty()) {</span>
+<span class="nc bnc" id="L411" title="All 2 branches missed.">            if (null == old) {</span>
+<span class="nc" id="L412">                update = true;</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">            } else if (addrs.size() != old.size()) {</span>
+<span class="nc" id="L414">                update = true;</span>
+            } else {
+<span class="nc bnc" id="L416" title="All 4 branches missed.">                for (int i = 0; i &lt; addrs.size() &amp;&amp; !update; i++) {</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">                    if (!old.contains(addrs.get(i))) {</span>
+<span class="nc" id="L418">                        update = true;</span>
+                    }
+                }
+            }
+
+<span class="nc bnc" id="L423" title="All 2 branches missed.">            if (update) {</span>
+<span class="nc" id="L424">                Collections.shuffle(addrs);</span>
+<span class="nc" id="L425">                LOGGER.info(&quot;name server address updated. NEW : {} , OLD: {}&quot;, addrs, old);</span>
+<span class="nc" id="L426">                this.namesrvAddrList.set(addrs);</span>
+
+                // should close the channel if choosed addr is not exist.
+<span class="nc bnc" id="L429" title="All 4 branches missed.">                if (this.namesrvAddrChoosed.get() != null &amp;&amp; !addrs.contains(this.namesrvAddrChoosed.get())) {</span>
+<span class="nc" id="L430">                    String namesrvAddr = this.namesrvAddrChoosed.get();</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">                    for (String addr : this.channelTables.keySet()) {</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">                        if (addr.contains(namesrvAddr)) {</span>
+<span class="nc" id="L433">                            ChannelWrapper channelWrapper = this.channelTables.get(addr);</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">                            if (channelWrapper != null) {</span>
+<span class="nc" id="L435">                                closeChannel(channelWrapper.getChannel());</span>
+                            }
+                        }
+<span class="nc" id="L438">                    }</span>
+                }
+            }
+        }
+<span class="nc" id="L442">    }</span>
+
+    @Override
+    public RemotingCommand invokeSync(String addr, final RemotingCommand request, long timeoutMillis)
+        throws InterruptedException, RemotingConnectException, RemotingSendRequestException, RemotingTimeoutException {
+<span class="fc" id="L447">        long beginStartTime = System.currentTimeMillis();</span>
+<span class="fc" id="L448">        final Channel channel = this.getAndCreateChannel(addr);</span>
+<span class="pc bpc" id="L449" title="2 of 4 branches missed.">        if (channel != null &amp;&amp; channel.isActive()) {</span>
+            try {
+<span class="fc" id="L451">                doBeforeRpcHooks(addr, request);</span>
+<span class="fc" id="L452">                long costTime = System.currentTimeMillis() - beginStartTime;</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">                if (timeoutMillis &lt; costTime) {</span>
+<span class="nc" id="L454">                    throw new RemotingTimeoutException(&quot;invokeSync call the addr[&quot; + addr + &quot;] timeout&quot;);</span>
+                }
+<span class="fc" id="L456">                RemotingCommand response = this.invokeSyncImpl(channel, request, timeoutMillis - costTime);</span>
+<span class="fc" id="L457">                doAfterRpcHooks(RemotingHelper.parseChannelRemoteAddr(channel), request, response);</span>
+<span class="fc" id="L458">                this.updateChannelLastResponseTime(addr);</span>
+<span class="fc" id="L459">                return response;</span>
+<span class="fc" id="L460">            } catch (RemotingSendRequestException e) {</span>
+<span class="fc" id="L461">                LOGGER.warn(&quot;invokeSync: send request exception, so close the channel[{}]&quot;, addr);</span>
+<span class="fc" id="L462">                this.closeChannel(addr, channel);</span>
+<span class="fc" id="L463">                throw e;</span>
+<span class="fc" id="L464">            } catch (RemotingTimeoutException e) {</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">                if (nettyClientConfig.isClientCloseSocketIfTimeout()) {</span>
+<span class="fc" id="L466">                    this.closeChannel(addr, channel);</span>
+<span class="fc" id="L467">                    LOGGER.warn(&quot;invokeSync: close socket because of timeout, {}ms, {}&quot;, timeoutMillis, addr);</span>
+                }
+<span class="fc" id="L469">                LOGGER.warn(&quot;invokeSync: wait response timeout exception, the channel[{}]&quot;, addr);</span>
+<span class="fc" id="L470">                throw e;</span>
+            }
+        } else {
+<span class="nc" id="L473">            this.closeChannel(addr, channel);</span>
+<span class="nc" id="L474">            throw new RemotingConnectException(addr);</span>
+        }
+    }
+
+    @Override
+    public void closeChannels(List&lt;String&gt; addrList) {
+<span class="nc bnc" id="L480" title="All 2 branches missed.">        for (String addr : addrList) {</span>
+<span class="nc" id="L481">            ChannelWrapper cw = this.channelTables.get(addr);</span>
+<span class="nc bnc" id="L482" title="All 2 branches missed.">            if (cw == null) {</span>
+<span class="nc" id="L483">                continue;</span>
+            }
+<span class="nc" id="L485">            this.closeChannel(addr, cw.getChannel());</span>
+<span class="nc" id="L486">        }</span>
+<span class="nc" id="L487">        interruptPullRequests(new HashSet&lt;String&gt;(addrList));</span>
+<span class="nc" id="L488">    }</span>
+
+    private void interruptPullRequests(Set&lt;String&gt; brokerAddrSet) {
+<span class="nc bnc" id="L491" title="All 2 branches missed.">        for (ResponseFuture responseFuture : responseTable.values()) {</span>
+<span class="nc" id="L492">            RemotingCommand cmd = responseFuture.getRequestCommand();</span>
+<span class="nc bnc" id="L493" title="All 2 branches missed.">            if (cmd == null) {</span>
+<span class="nc" id="L494">                continue;</span>
+            }
+<span class="nc" id="L496">            String remoteAddr = RemotingHelper.parseChannelRemoteAddr(responseFuture.getChannel());</span>
+            // interrupt only pull message request
+<span class="nc bnc" id="L498" title="All 6 branches missed.">            if (brokerAddrSet.contains(remoteAddr) &amp;&amp; (cmd.getCode() == 11 || cmd.getCode() == 361)) {</span>
+<span class="nc" id="L499">                LOGGER.info(&quot;interrupt {}&quot;, cmd);</span>
+<span class="nc" id="L500">                responseFuture.interrupt();</span>
+            }
+<span class="nc" id="L502">        }</span>
+<span class="nc" id="L503">    }</span>
+
+    private void updateChannelLastResponseTime(final String addr) {
+<span class="fc" id="L506">        String address = addr;</span>
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">        if (address == null) {</span>
+<span class="nc" id="L508">            address = this.namesrvAddrChoosed.get();</span>
+        }
+<span class="pc bpc" id="L510" title="1 of 2 branches missed.">        if (address == null) {</span>
+<span class="nc" id="L511">            LOGGER.warn(&quot;[updateChannelLastResponseTime] could not find address!!&quot;);</span>
+<span class="nc" id="L512">            return;</span>
+        }
+<span class="fc" id="L514">        ChannelWrapper channelWrapper = this.channelTables.get(address);</span>
+<span class="pc bpc" id="L515" title="2 of 4 branches missed.">        if (channelWrapper != null &amp;&amp; channelWrapper.isOK()) {</span>
+<span class="fc" id="L516">            channelWrapper.updateLastResponseTime();</span>
+        }
+<span class="fc" id="L518">    }</span>
+
+    private Channel getAndCreateChannel(final String addr) throws InterruptedException {
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">        if (null == addr) {</span>
+<span class="nc" id="L522">            return getAndCreateNameserverChannel();</span>
+        }
+
+<span class="fc" id="L525">        ChannelWrapper cw = this.channelTables.get(addr);</span>
+<span class="pc bpc" id="L526" title="1 of 4 branches missed.">        if (cw != null &amp;&amp; cw.isOK()) {</span>
+<span class="fc" id="L527">            return cw.getChannel();</span>
+        }
+
+<span class="fc" id="L530">        return this.createChannel(addr);</span>
+    }
+
+    private Channel getAndCreateNameserverChannel() throws InterruptedException {
+<span class="nc" id="L534">        String addr = this.namesrvAddrChoosed.get();</span>
+<span class="nc bnc" id="L535" title="All 2 branches missed.">        if (addr != null) {</span>
+<span class="nc" id="L536">            ChannelWrapper cw = this.channelTables.get(addr);</span>
+<span class="nc bnc" id="L537" title="All 4 branches missed.">            if (cw != null &amp;&amp; cw.isOK()) {</span>
+<span class="nc" id="L538">                return cw.getChannel();</span>
+            }
+        }
+
+<span class="nc" id="L542">        final List&lt;String&gt; addrList = this.namesrvAddrList.get();</span>
+<span class="nc bnc" id="L543" title="All 2 branches missed.">        if (this.namesrvChannelLock.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {</span>
+            try {
+<span class="nc" id="L545">                addr = this.namesrvAddrChoosed.get();</span>
+<span class="nc bnc" id="L546" title="All 2 branches missed.">                if (addr != null) {</span>
+<span class="nc" id="L547">                    ChannelWrapper cw = this.channelTables.get(addr);</span>
+<span class="nc bnc" id="L548" title="All 4 branches missed.">                    if (cw != null &amp;&amp; cw.isOK()) {</span>
+<span class="nc" id="L549">                        return cw.getChannel();</span>
+                    }
+                }
+
+<span class="nc bnc" id="L553" title="All 4 branches missed.">                if (addrList != null &amp;&amp; !addrList.isEmpty()) {</span>
+<span class="nc bnc" id="L554" title="All 2 branches missed.">                    for (int i = 0; i &lt; addrList.size(); i++) {</span>
+<span class="nc" id="L555">                        int index = this.namesrvIndex.incrementAndGet();</span>
+<span class="nc" id="L556">                        index = Math.abs(index);</span>
+<span class="nc" id="L557">                        index = index % addrList.size();</span>
+<span class="nc" id="L558">                        String newAddr = addrList.get(index);</span>
+
+<span class="nc" id="L560">                        this.namesrvAddrChoosed.set(newAddr);</span>
+<span class="nc" id="L561">                        LOGGER.info(&quot;new name server is chosen. OLD: {} , NEW: {}. namesrvIndex = {}&quot;, addr, newAddr, namesrvIndex);</span>
+<span class="nc" id="L562">                        Channel channelNew = this.createChannel(newAddr);</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">                        if (channelNew != null) {</span>
+<span class="nc" id="L564">                            return channelNew;</span>
+                        }
+                    }
+<span class="nc" id="L567">                    throw new RemotingConnectException(addrList.toString());</span>
+                }
+<span class="nc" id="L569">            } catch (Exception e) {</span>
+<span class="nc" id="L570">                LOGGER.error(&quot;getAndCreateNameserverChannel: create name server channel exception&quot;, e);</span>
+            } finally {
+<span class="nc" id="L572">                this.namesrvChannelLock.unlock();</span>
+<span class="nc" id="L573">            }</span>
+        } else {
+<span class="nc" id="L575">            LOGGER.warn(&quot;getAndCreateNameserverChannel: try to lock name server, but timeout, {}ms&quot;, LOCK_TIMEOUT_MILLIS);</span>
+        }
+
+<span class="nc" id="L578">        return null;</span>
+    }
+
+    private Channel createChannel(final String addr) throws InterruptedException {
+<span class="fc" id="L582">        ChannelWrapper cw = this.channelTables.get(addr);</span>
+<span class="pc bpc" id="L583" title="3 of 4 branches missed.">        if (cw != null &amp;&amp; cw.isOK()) {</span>
+<span class="nc" id="L584">            return cw.getChannel();</span>
+        }
+
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">        if (this.lockChannelTables.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {</span>
+            try {
+                boolean createNewConnection;
+<span class="fc" id="L590">                cw = this.channelTables.get(addr);</span>
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">                if (cw != null) {</span>
+
+<span class="nc bnc" id="L593" title="All 2 branches missed.">                    if (cw.isOK()) {</span>
+<span class="nc" id="L594">                        return cw.getChannel();</span>
+<span class="nc bnc" id="L595" title="All 2 branches missed.">                    } else if (!cw.getChannelFuture().isDone()) {</span>
+<span class="nc" id="L596">                        createNewConnection = false;</span>
+                    } else {
+<span class="nc" id="L598">                        this.channelTables.remove(addr);</span>
+<span class="nc" id="L599">                        createNewConnection = true;</span>
+                    }
+                } else {
+<span class="fc" id="L602">                    createNewConnection = true;</span>
+                }
+
+<span class="pc bpc" id="L605" title="1 of 2 branches missed.">                if (createNewConnection) {</span>
+<span class="fc" id="L606">                    ChannelFuture channelFuture = this.bootstrap.connect(RemotingHelper.string2SocketAddress(addr));</span>
+<span class="fc" id="L607">                    LOGGER.info(&quot;createChannel: begin to connect remote host[{}] asynchronously&quot;, addr);</span>
+<span class="fc" id="L608">                    cw = new ChannelWrapper(channelFuture);</span>
+<span class="fc" id="L609">                    this.channelTables.put(addr, cw);</span>
+                }
+<span class="nc" id="L611">            } catch (Exception e) {</span>
+<span class="nc" id="L612">                LOGGER.error(&quot;createChannel: create channel exception&quot;, e);</span>
+            } finally {
+<span class="fc" id="L614">                this.lockChannelTables.unlock();</span>
+<span class="fc" id="L615">            }</span>
+        } else {
+<span class="nc" id="L617">            LOGGER.warn(&quot;createChannel: try to lock channel table, but timeout, {}ms&quot;, LOCK_TIMEOUT_MILLIS);</span>
+        }
+
+<span class="pc bpc" id="L620" title="1 of 2 branches missed.">        if (cw != null) {</span>
+<span class="fc" id="L621">            ChannelFuture channelFuture = cw.getChannelFuture();</span>
+<span class="pc bpc" id="L622" title="1 of 2 branches missed.">            if (channelFuture.awaitUninterruptibly(this.nettyClientConfig.getConnectTimeoutMillis())) {</span>
+<span class="pc bpc" id="L623" title="1 of 2 branches missed.">                if (cw.isOK()) {</span>
+<span class="fc" id="L624">                    LOGGER.info(&quot;createChannel: connect remote host[{}] success, {}&quot;, addr, channelFuture.toString());</span>
+<span class="fc" id="L625">                    return cw.getChannel();</span>
+                } else {
+<span class="nc" id="L627">                    LOGGER.warn(&quot;createChannel: connect remote host[&quot; + addr + &quot;] failed, &quot; + channelFuture.toString());</span>
+                }
+            } else {
+<span class="nc" id="L630">                LOGGER.warn(&quot;createChannel: connect remote host[{}] timeout {}ms, {}&quot;, addr, this.nettyClientConfig.getConnectTimeoutMillis(),</span>
+<span class="nc" id="L631">                    channelFuture.toString());</span>
+            }
+        }
+
+<span class="nc" id="L635">        return null;</span>
+    }
+
+    @Override
+    public void invokeAsync(String addr, RemotingCommand request, long timeoutMillis, InvokeCallback invokeCallback)
+        throws InterruptedException, RemotingConnectException, RemotingTooMuchRequestException, RemotingTimeoutException,
+        RemotingSendRequestException {
+<span class="fc" id="L642">        long beginStartTime = System.currentTimeMillis();</span>
+<span class="fc" id="L643">        final Channel channel = this.getAndCreateChannel(addr);</span>
+<span class="pc bpc" id="L644" title="2 of 4 branches missed.">        if (channel != null &amp;&amp; channel.isActive()) {</span>
+            try {
+<span class="fc" id="L646">                doBeforeRpcHooks(addr, request);</span>
+<span class="fc" id="L647">                long costTime = System.currentTimeMillis() - beginStartTime;</span>
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">                if (timeoutMillis &lt; costTime) {</span>
+<span class="nc" id="L649">                    throw new RemotingTooMuchRequestException(&quot;invokeAsync call the addr[&quot; + addr + &quot;] timeout&quot;);</span>
+                }
+<span class="fc" id="L651">                this.invokeAsyncImpl(channel, request, timeoutMillis - costTime, new InvokeCallbackWrapper(invokeCallback, addr));</span>
+<span class="nc" id="L652">            } catch (RemotingSendRequestException e) {</span>
+<span class="nc" id="L653">                LOGGER.warn(&quot;invokeAsync: send request exception, so close the channel[{}]&quot;, addr);</span>
+<span class="nc" id="L654">                this.closeChannel(addr, channel);</span>
+<span class="nc" id="L655">                throw e;</span>
+<span class="fc" id="L656">            }</span>
+        } else {
+<span class="nc" id="L658">            this.closeChannel(addr, channel);</span>
+<span class="nc" id="L659">            throw new RemotingConnectException(addr);</span>
+        }
+<span class="fc" id="L661">    }</span>
+
+    @Override
+    public void invokeOneway(String addr, RemotingCommand request, long timeoutMillis) throws InterruptedException,
+        RemotingConnectException, RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException {
+<span class="fc" id="L666">        final Channel channel = this.getAndCreateChannel(addr);</span>
+<span class="pc bpc" id="L667" title="2 of 4 branches missed.">        if (channel != null &amp;&amp; channel.isActive()) {</span>
+            try {
+<span class="fc" id="L669">                doBeforeRpcHooks(addr, request);</span>
+<span class="fc" id="L670">                this.invokeOnewayImpl(channel, request, timeoutMillis);</span>
+<span class="nc" id="L671">            } catch (RemotingSendRequestException e) {</span>
+<span class="nc" id="L672">                LOGGER.warn(&quot;invokeOneway: send request exception, so close the channel[{}]&quot;, addr);</span>
+<span class="nc" id="L673">                this.closeChannel(addr, channel);</span>
+<span class="nc" id="L674">                throw e;</span>
+<span class="fc" id="L675">            }</span>
+        } else {
+<span class="nc" id="L677">            this.closeChannel(addr, channel);</span>
+<span class="nc" id="L678">            throw new RemotingConnectException(addr);</span>
+        }
+<span class="fc" id="L680">    }</span>
+
+    @Override
+    public void registerProcessor(int requestCode, NettyRequestProcessor processor, ExecutorService executor) {
+<span class="nc" id="L684">        ExecutorService executorThis = executor;</span>
+<span class="nc bnc" id="L685" title="All 2 branches missed.">        if (null == executor) {</span>
+<span class="nc" id="L686">            executorThis = this.publicExecutor;</span>
+        }
+
+<span class="nc" id="L689">        Pair&lt;NettyRequestProcessor, ExecutorService&gt; pair = new Pair&lt;NettyRequestProcessor, ExecutorService&gt;(processor, executorThis);</span>
+<span class="nc" id="L690">        this.processorTable.put(requestCode, pair);</span>
+<span class="nc" id="L691">    }</span>
+
+    @Override
+    public boolean isChannelWritable(String addr) {
+<span class="nc" id="L695">        ChannelWrapper cw = this.channelTables.get(addr);</span>
+<span class="nc bnc" id="L696" title="All 4 branches missed.">        if (cw != null &amp;&amp; cw.isOK()) {</span>
+<span class="nc" id="L697">            return cw.isWritable();</span>
+        }
+<span class="nc" id="L699">        return true;</span>
+    }
+
+    @Override
+    public List&lt;String&gt; getNameServerAddressList() {
+<span class="nc" id="L704">        return this.namesrvAddrList.get();</span>
+    }
+
+    @Override
+    public List&lt;String&gt; getAvailableNameSrvList() {
+<span class="nc" id="L709">        return new ArrayList&lt;String&gt;(this.availableNamesrvAddrMap.keySet());</span>
+    }
+
+    @Override
+    public ChannelEventListener getChannelEventListener() {
+<span class="nc" id="L714">        return channelEventListener;</span>
+    }
+
+    @Override
+    public ExecutorService getCallbackExecutor() {
+<span class="pc bpc" id="L719" title="1 of 2 branches missed.">        if (nettyClientConfig.isDisableCallbackExecutor()) {</span>
+<span class="nc" id="L720">            return null;</span>
+        }
+<span class="fc bfc" id="L722" title="All 2 branches covered.">        return callbackExecutor != null ? callbackExecutor : publicExecutor;</span>
+    }
+
+    @Override
+    public void setCallbackExecutor(final ExecutorService callbackExecutor) {
+<span class="fc" id="L727">        this.callbackExecutor = callbackExecutor;</span>
+<span class="fc" id="L728">    }</span>
+
+    protected void scanChannelTablesOfNameServer() {
+<span class="nc" id="L731">        List&lt;String&gt; nameServerList = this.namesrvAddrList.get();</span>
+<span class="nc bnc" id="L732" title="All 2 branches missed.">        if (nameServerList == null) {</span>
+<span class="nc" id="L733">            LOGGER.warn(&quot;[SCAN] Addresses of name server is empty!&quot;);</span>
+<span class="nc" id="L734">            return;</span>
+        }
+
+<span class="nc bnc" id="L737" title="All 2 branches missed.">        for (String addr : this.channelTables.keySet()) {</span>
+<span class="nc" id="L738">            ChannelWrapper channelWrapper = this.channelTables.get(addr);</span>
+<span class="nc bnc" id="L739" title="All 2 branches missed.">            if (channelWrapper == null) {</span>
+<span class="nc" id="L740">                continue;</span>
+            }
+
+<span class="nc bnc" id="L743" title="All 2 branches missed.">            if ((System.currentTimeMillis() - channelWrapper.getLastResponseTime()) &gt; this.nettyClientConfig.getChannelNotActiveInterval()) {</span>
+<span class="nc" id="L744">                LOGGER.warn(&quot;[SCAN] No response after {} from name server {}, so close it!&quot;, channelWrapper.getLastResponseTime(),</span>
+                    addr);
+<span class="nc" id="L746">                closeChannel(addr, channelWrapper.getChannel());</span>
+            }
+<span class="nc" id="L748">        }</span>
+<span class="nc" id="L749">    }</span>
+
+    private void scanAvailableNameSrv() {
+<span class="fc" id="L752">        List&lt;String&gt; nameServerList = this.namesrvAddrList.get();</span>
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">        if (nameServerList == null) {</span>
+<span class="fc" id="L754">            LOGGER.warn(&quot;scanAvailableNameSrv Addresses of name server is empty!&quot;);</span>
+<span class="fc" id="L755">            return;</span>
+        }
+
+<span class="nc bnc" id="L758" title="All 2 branches missed.">        for (final String namesrvAddr : nameServerList) {</span>
+<span class="nc" id="L759">            scanExecutor.execute(new Runnable() {</span>
+                @Override
+                public void run() {
+                    try {
+<span class="nc" id="L763">                        Channel channel = NettyRemotingClient.this.getAndCreateChannel(namesrvAddr);</span>
+<span class="nc bnc" id="L764" title="All 2 branches missed.">                        if (channel != null) {</span>
+<span class="nc" id="L765">                            NettyRemotingClient.this.availableNamesrvAddrMap.putIfAbsent(namesrvAddr, true);</span>
+                        } else {
+<span class="nc" id="L767">                            NettyRemotingClient.this.availableNamesrvAddrMap.remove(namesrvAddr);</span>
+                        }
+<span class="nc" id="L769">                    } catch (Exception e) {</span>
+<span class="nc" id="L770">                        LOGGER.error(&quot;scanAvailableNameSrv get channel of {} failed, &quot;, namesrvAddr, e);</span>
+<span class="nc" id="L771">                    }</span>
+<span class="nc" id="L772">                }</span>
+            });
+<span class="nc" id="L774">        }</span>
+
+<span class="nc" id="L776">    }</span>
+
+    static class ChannelWrapper {
+        private final ChannelFuture channelFuture;
+        // only affected by sync or async request, oneway is not included.
+        private long lastResponseTime;
+
+<span class="fc" id="L783">        public ChannelWrapper(ChannelFuture channelFuture) {</span>
+<span class="fc" id="L784">            this.channelFuture = channelFuture;</span>
+<span class="fc" id="L785">            this.lastResponseTime = System.currentTimeMillis();</span>
+<span class="fc" id="L786">        }</span>
+
+        public boolean isOK() {
+<span class="pc bpc" id="L789" title="2 of 4 branches missed.">            return this.channelFuture.channel() != null &amp;&amp; this.channelFuture.channel().isActive();</span>
+        }
+
+        public boolean isWritable() {
+<span class="nc" id="L793">            return this.channelFuture.channel().isWritable();</span>
+        }
+
+        private Channel getChannel() {
+<span class="fc" id="L797">            return this.channelFuture.channel();</span>
+        }
+
+        public ChannelFuture getChannelFuture() {
+<span class="fc" id="L801">            return channelFuture;</span>
+        }
+
+        public long getLastResponseTime() {
+<span class="nc" id="L805">            return this.lastResponseTime;</span>
+        }
+
+        public void updateLastResponseTime() {
+<span class="fc" id="L809">            this.lastResponseTime = System.currentTimeMillis();</span>
+<span class="fc" id="L810">        }</span>
+    }
+
+    class InvokeCallbackWrapper implements InvokeCallback {
+
+        private final InvokeCallback invokeCallback;
+        private final String addr;
+
+<span class="fc" id="L818">        public InvokeCallbackWrapper(InvokeCallback invokeCallback, String addr) {</span>
+<span class="fc" id="L819">            this.invokeCallback = invokeCallback;</span>
+<span class="fc" id="L820">            this.addr = addr;</span>
+<span class="fc" id="L821">        }</span>
+
+        @Override
+        public void operationComplete(ResponseFuture responseFuture) {
+<span class="pc bpc" id="L825" title="3 of 6 branches missed.">            if (responseFuture != null &amp;&amp; responseFuture.isSendRequestOK() &amp;&amp; responseFuture.getResponseCommand() != null) {</span>
+<span class="fc" id="L826">                NettyRemotingClient.this.updateChannelLastResponseTime(addr);</span>
+            }
+<span class="nc" id="L828">            this.invokeCallback.operationComplete(responseFuture);</span>
+<span class="nc" id="L829">        }</span>
+    }
+
+<span class="fc" id="L832">    class NettyClientHandler extends SimpleChannelInboundHandler&lt;RemotingCommand&gt; {</span>
+
+        @Override
+        protected void channelRead0(ChannelHandlerContext ctx, RemotingCommand msg) throws Exception {
+<span class="fc" id="L836">            processMessageReceived(ctx, msg);</span>
+<span class="fc" id="L837">        }</span>
+    }
+
+<span class="fc" id="L840">    class NettyConnectManageHandler extends ChannelDuplexHandler {</span>
+        @Override
+        public void connect(ChannelHandlerContext ctx, SocketAddress remoteAddress, SocketAddress localAddress,
+            ChannelPromise promise) throws Exception {
+<span class="pc bpc" id="L844" title="1 of 2 branches missed.">            final String local = localAddress == null ? &quot;UNKNOWN&quot; : RemotingHelper.parseSocketAddressAddr(localAddress);</span>
+<span class="pc bpc" id="L845" title="1 of 2 branches missed.">            final String remote = remoteAddress == null ? &quot;UNKNOWN&quot; : RemotingHelper.parseSocketAddressAddr(remoteAddress);</span>
+<span class="fc" id="L846">            LOGGER.info(&quot;NETTY CLIENT PIPELINE: CONNECT  {} =&gt; {}&quot;, local, remote);</span>
+
+<span class="fc" id="L848">            super.connect(ctx, remoteAddress, localAddress, promise);</span>
+
+<span class="pc bpc" id="L850" title="1 of 2 branches missed.">            if (NettyRemotingClient.this.channelEventListener != null) {</span>
+<span class="nc" id="L851">                NettyRemotingClient.this.putNettyEvent(new NettyEvent(NettyEventType.CONNECT, remote, ctx.channel()));</span>
+            }
+<span class="fc" id="L853">        }</span>
+
+        @Override
+        public void disconnect(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
+<span class="nc" id="L857">            final String remoteAddress = RemotingHelper.parseChannelRemoteAddr(ctx.channel());</span>
+<span class="nc" id="L858">            LOGGER.info(&quot;NETTY CLIENT PIPELINE: DISCONNECT {}&quot;, remoteAddress);</span>
+<span class="nc" id="L859">            closeChannel(ctx.channel());</span>
+<span class="nc" id="L860">            super.disconnect(ctx, promise);</span>
+
+<span class="nc bnc" id="L862" title="All 2 branches missed.">            if (NettyRemotingClient.this.channelEventListener != null) {</span>
+<span class="nc" id="L863">                NettyRemotingClient.this.putNettyEvent(new NettyEvent(NettyEventType.CLOSE, remoteAddress, ctx.channel()));</span>
+            }
+<span class="nc" id="L865">        }</span>
+
+        @Override
+        public void close(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
+<span class="fc" id="L869">            final String remoteAddress = RemotingHelper.parseChannelRemoteAddr(ctx.channel());</span>
+<span class="fc" id="L870">            LOGGER.info(&quot;NETTY CLIENT PIPELINE: CLOSE {}&quot;, remoteAddress);</span>
+<span class="fc" id="L871">            closeChannel(ctx.channel());</span>
+<span class="fc" id="L872">            super.close(ctx, promise);</span>
+<span class="fc" id="L873">            NettyRemotingClient.this.failFast(ctx.channel());</span>
+<span class="pc bpc" id="L874" title="1 of 2 branches missed.">            if (NettyRemotingClient.this.channelEventListener != null) {</span>
+<span class="nc" id="L875">                NettyRemotingClient.this.putNettyEvent(new NettyEvent(NettyEventType.CLOSE, remoteAddress, ctx.channel()));</span>
+            }
+<span class="fc" id="L877">        }</span>
+
+        @Override
+        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+<span class="pc bpc" id="L881" title="1 of 2 branches missed.">            if (evt instanceof IdleStateEvent) {</span>
+<span class="nc" id="L882">                IdleStateEvent event = (IdleStateEvent) evt;</span>
+<span class="nc bnc" id="L883" title="All 2 branches missed.">                if (event.state().equals(IdleState.ALL_IDLE)) {</span>
+<span class="nc" id="L884">                    final String remoteAddress = RemotingHelper.parseChannelRemoteAddr(ctx.channel());</span>
+<span class="nc" id="L885">                    LOGGER.warn(&quot;NETTY CLIENT PIPELINE: IDLE exception [{}]&quot;, remoteAddress);</span>
+<span class="nc" id="L886">                    closeChannel(ctx.channel());</span>
+<span class="nc bnc" id="L887" title="All 2 branches missed.">                    if (NettyRemotingClient.this.channelEventListener != null) {</span>
+<span class="nc" id="L888">                        NettyRemotingClient.this</span>
+<span class="nc" id="L889">                            .putNettyEvent(new NettyEvent(NettyEventType.IDLE, remoteAddress, ctx.channel()));</span>
+                    }
+                }
+            }
+
+<span class="fc" id="L894">            ctx.fireUserEventTriggered(evt);</span>
+<span class="fc" id="L895">        }</span>
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+<span class="fc" id="L899">            final String remoteAddress = RemotingHelper.parseChannelRemoteAddr(ctx.channel());</span>
+<span class="fc" id="L900">            LOGGER.warn(&quot;NETTY CLIENT PIPELINE: exceptionCaught {}&quot;, remoteAddress);</span>
+<span class="fc" id="L901">            LOGGER.warn(&quot;NETTY CLIENT PIPELINE: exceptionCaught exception.&quot;, cause);</span>
+<span class="fc" id="L902">            closeChannel(ctx.channel());</span>
+<span class="pc bpc" id="L903" title="1 of 2 branches missed.">            if (NettyRemotingClient.this.channelEventListener != null) {</span>
+<span class="nc" id="L904">                NettyRemotingClient.this.putNettyEvent(new NettyEvent(NettyEventType.EXCEPTION, remoteAddress, ctx.channel()));</span>
+            }
+<span class="fc" id="L906">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CheckForbiddenContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.hook</a> &gt; <span class="el_source">CheckForbiddenContext.java</span></div><h1>CheckForbiddenContext.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.hook;
+
+import org.apache.rocketmq.client.impl.CommunicationMode;
+import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.common.message.MessageQueue;
+
+<span class="nc" id="L24">public class CheckForbiddenContext {</span>
+    private String nameSrvAddr;
+    private String group;
+    private Message message;
+    private MessageQueue mq;
+    private String brokerAddr;
+    private CommunicationMode communicationMode;
+    private SendResult sendResult;
+    private Exception exception;
+    private Object arg;
+<span class="nc" id="L34">    private boolean unitMode = false;</span>
+
+    public String getGroup() {
+<span class="nc" id="L37">        return group;</span>
+    }
+
+    public void setGroup(String group) {
+<span class="nc" id="L41">        this.group = group;</span>
+<span class="nc" id="L42">    }</span>
+
+    public Message getMessage() {
+<span class="nc" id="L45">        return message;</span>
+    }
+
+    public void setMessage(Message message) {
+<span class="nc" id="L49">        this.message = message;</span>
+<span class="nc" id="L50">    }</span>
+
+    public MessageQueue getMq() {
+<span class="nc" id="L53">        return mq;</span>
+    }
+
+    public void setMq(MessageQueue mq) {
+<span class="nc" id="L57">        this.mq = mq;</span>
+<span class="nc" id="L58">    }</span>
+
+    public String getBrokerAddr() {
+<span class="nc" id="L61">        return brokerAddr;</span>
+    }
+
+    public void setBrokerAddr(String brokerAddr) {
+<span class="nc" id="L65">        this.brokerAddr = brokerAddr;</span>
+<span class="nc" id="L66">    }</span>
+
+    public CommunicationMode getCommunicationMode() {
+<span class="nc" id="L69">        return communicationMode;</span>
+    }
+
+    public void setCommunicationMode(CommunicationMode communicationMode) {
+<span class="nc" id="L73">        this.communicationMode = communicationMode;</span>
+<span class="nc" id="L74">    }</span>
+
+    public SendResult getSendResult() {
+<span class="nc" id="L77">        return sendResult;</span>
+    }
+
+    public void setSendResult(SendResult sendResult) {
+<span class="nc" id="L81">        this.sendResult = sendResult;</span>
+<span class="nc" id="L82">    }</span>
+
+    public Exception getException() {
+<span class="nc" id="L85">        return exception;</span>
+    }
+
+    public void setException(Exception exception) {
+<span class="nc" id="L89">        this.exception = exception;</span>
+<span class="nc" id="L90">    }</span>
+
+    public Object getArg() {
+<span class="nc" id="L93">        return arg;</span>
+    }
+
+    public void setArg(Object arg) {
+<span class="nc" id="L97">        this.arg = arg;</span>
+<span class="nc" id="L98">    }</span>
+
+    public boolean isUnitMode() {
+<span class="nc" id="L101">        return unitMode;</span>
+    }
+
+    public void setUnitMode(boolean isUnitMode) {
+<span class="nc" id="L105">        this.unitMode = isUnitMode;</span>
+<span class="nc" id="L106">    }</span>
+
+    public String getNameSrvAddr() {
+<span class="nc" id="L109">        return nameSrvAddr;</span>
+    }
+
+    public void setNameSrvAddr(String nameSrvAddr) {
+<span class="nc" id="L113">        this.nameSrvAddr = nameSrvAddr;</span>
+<span class="nc" id="L114">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L118">        return &quot;SendMessageContext [nameSrvAddr=&quot; + nameSrvAddr + &quot;, group=&quot; + group + &quot;, message=&quot; + message</span>
+            + &quot;, mq=&quot; + mq + &quot;, brokerAddr=&quot; + brokerAddr + &quot;, communicationMode=&quot; + communicationMode
+            + &quot;, sendResult=&quot; + sendResult + &quot;, exception=&quot; + exception + &quot;, unitMode=&quot; + unitMode
+            + &quot;, arg=&quot; + arg + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

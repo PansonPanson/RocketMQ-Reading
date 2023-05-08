@@ -1,0 +1,353 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClientConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client</a> &gt; <span class="el_source">ClientConfig.java</span></div><h1>ClientConfig.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client;
+
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.protocol.NamespaceUtil;
+import org.apache.rocketmq.common.utils.NameServerAddressUtils;
+import org.apache.rocketmq.remoting.common.RemotingUtil;
+import org.apache.rocketmq.remoting.netty.TlsSystemConfig;
+import org.apache.rocketmq.remoting.protocol.LanguageCode;
+import org.apache.rocketmq.remoting.protocol.RequestType;
+
+/**
+ * Client Common configuration
+ */
+<span class="fc" id="L36">public class ClientConfig {</span>
+    public static final String SEND_MESSAGE_WITH_VIP_CHANNEL_PROPERTY = &quot;com.rocketmq.sendMessageWithVIPChannel&quot;;
+<span class="fc" id="L38">    private String namesrvAddr = NameServerAddressUtils.getNameServerAddresses();</span>
+<span class="fc" id="L39">    private String clientIP = RemotingUtil.getLocalAddress();</span>
+<span class="fc" id="L40">    private String instanceName = System.getProperty(&quot;rocketmq.client.name&quot;, &quot;DEFAULT&quot;);</span>
+<span class="fc" id="L41">    private int clientCallbackExecutorThreads = Runtime.getRuntime().availableProcessors();</span>
+    protected String namespace;
+<span class="fc" id="L43">    private boolean namespaceInitialized = false;</span>
+<span class="fc" id="L44">    protected AccessChannel accessChannel = AccessChannel.LOCAL;</span>
+
+    /**
+     * Pulling topic information interval from the named server
+     */
+<span class="fc" id="L49">    private int pollNameServerInterval = 1000 * 30;</span>
+    /**
+     * Heartbeat interval in microseconds with message broker
+     */
+<span class="fc" id="L53">    private int heartbeatBrokerInterval = 1000 * 30;</span>
+    /**
+     * Offset persistent interval for consumer
+     */
+<span class="fc" id="L57">    private int persistConsumerOffsetInterval = 1000 * 5;</span>
+<span class="fc" id="L58">    private long pullTimeDelayMillsWhenException = 1000;</span>
+<span class="fc" id="L59">    private boolean unitMode = false;</span>
+    private String unitName;
+<span class="fc" id="L61">    private boolean vipChannelEnabled = Boolean.parseBoolean(System.getProperty(SEND_MESSAGE_WITH_VIP_CHANNEL_PROPERTY, &quot;false&quot;));</span>
+
+<span class="fc" id="L63">    private boolean useTLS = TlsSystemConfig.tlsEnable;</span>
+
+<span class="fc" id="L65">    private int mqClientApiTimeout = 3 * 1000;</span>
+
+<span class="fc" id="L67">    private LanguageCode language = LanguageCode.JAVA;</span>
+
+    /**
+     * Enable stream request type will inject a RPCHook to add corresponding request type to remoting layer.
+     * And it will also generate a different client id to prevent unexpected reuses of MQClientInstance.
+     */
+<span class="fc" id="L73">    protected boolean enableStreamRequestType = false;</span>
+
+    public String buildMQClientId() {
+<span class="fc" id="L76">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L77">        sb.append(this.getClientIP());</span>
+
+<span class="fc" id="L79">        sb.append(&quot;@&quot;);</span>
+<span class="fc" id="L80">        sb.append(this.getInstanceName());</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (!UtilAll.isBlank(this.unitName)) {</span>
+<span class="nc" id="L82">            sb.append(&quot;@&quot;);</span>
+<span class="nc" id="L83">            sb.append(this.unitName);</span>
+        }
+
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (enableStreamRequestType) {</span>
+<span class="fc" id="L87">            sb.append(&quot;@&quot;);</span>
+<span class="fc" id="L88">            sb.append(RequestType.STREAM);</span>
+        }
+
+<span class="fc" id="L91">        return sb.toString();</span>
+    }
+
+    public String getClientIP() {
+<span class="fc" id="L95">        return clientIP;</span>
+    }
+
+    public void setClientIP(String clientIP) {
+<span class="nc" id="L99">        this.clientIP = clientIP;</span>
+<span class="nc" id="L100">    }</span>
+
+    public String getInstanceName() {
+<span class="fc" id="L103">        return instanceName;</span>
+    }
+
+    public void setInstanceName(String instanceName) {
+<span class="fc" id="L107">        this.instanceName = instanceName;</span>
+<span class="fc" id="L108">    }</span>
+
+    public void changeInstanceNameToPID() {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (this.instanceName.equals(&quot;DEFAULT&quot;)) {</span>
+<span class="fc" id="L112">            this.instanceName = UtilAll.getPid() + &quot;#&quot; + System.nanoTime();</span>
+        }
+<span class="fc" id="L114">    }</span>
+
+    public String withNamespace(String resource) {
+<span class="fc" id="L117">        return NamespaceUtil.wrapNamespace(this.getNamespace(), resource);</span>
+    }
+
+    public Set&lt;String&gt; withNamespace(Set&lt;String&gt; resourceSet) {
+<span class="nc" id="L121">        Set&lt;String&gt; resourceWithNamespace = new HashSet&lt;String&gt;();</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        for (String resource : resourceSet) {</span>
+<span class="nc" id="L123">            resourceWithNamespace.add(withNamespace(resource));</span>
+<span class="nc" id="L124">        }</span>
+<span class="nc" id="L125">        return resourceWithNamespace;</span>
+    }
+
+    public String withoutNamespace(String resource) {
+<span class="nc" id="L129">        return NamespaceUtil.withoutNamespace(resource, this.getNamespace());</span>
+    }
+
+    public Set&lt;String&gt; withoutNamespace(Set&lt;String&gt; resourceSet) {
+<span class="nc" id="L133">        Set&lt;String&gt; resourceWithoutNamespace = new HashSet&lt;String&gt;();</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        for (String resource : resourceSet) {</span>
+<span class="nc" id="L135">            resourceWithoutNamespace.add(withoutNamespace(resource));</span>
+<span class="nc" id="L136">        }</span>
+<span class="nc" id="L137">        return resourceWithoutNamespace;</span>
+    }
+
+    public MessageQueue queueWithNamespace(MessageQueue queue) {
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (StringUtils.isEmpty(this.getNamespace())) {</span>
+<span class="fc" id="L142">            return queue;</span>
+        }
+<span class="nc" id="L144">        return new MessageQueue(withNamespace(queue.getTopic()), queue.getBrokerName(), queue.getQueueId());</span>
+    }
+
+    public Collection&lt;MessageQueue&gt; queuesWithNamespace(Collection&lt;MessageQueue&gt; queues) {
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (StringUtils.isEmpty(this.getNamespace())) {</span>
+<span class="fc" id="L149">            return queues;</span>
+        }
+<span class="nc" id="L151">        Iterator&lt;MessageQueue&gt; iter = queues.iterator();</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        while (iter.hasNext()) {</span>
+<span class="nc" id="L153">            MessageQueue queue = iter.next();</span>
+<span class="nc" id="L154">            queue.setTopic(withNamespace(queue.getTopic()));</span>
+<span class="nc" id="L155">        }</span>
+<span class="nc" id="L156">        return queues;</span>
+    }
+
+    public void resetClientConfig(final ClientConfig cc) {
+<span class="fc" id="L160">        this.namesrvAddr = cc.namesrvAddr;</span>
+<span class="fc" id="L161">        this.clientIP = cc.clientIP;</span>
+<span class="fc" id="L162">        this.instanceName = cc.instanceName;</span>
+<span class="fc" id="L163">        this.clientCallbackExecutorThreads = cc.clientCallbackExecutorThreads;</span>
+<span class="fc" id="L164">        this.pollNameServerInterval = cc.pollNameServerInterval;</span>
+<span class="fc" id="L165">        this.heartbeatBrokerInterval = cc.heartbeatBrokerInterval;</span>
+<span class="fc" id="L166">        this.persistConsumerOffsetInterval = cc.persistConsumerOffsetInterval;</span>
+<span class="fc" id="L167">        this.pullTimeDelayMillsWhenException = cc.pullTimeDelayMillsWhenException;</span>
+<span class="fc" id="L168">        this.unitMode = cc.unitMode;</span>
+<span class="fc" id="L169">        this.unitName = cc.unitName;</span>
+<span class="fc" id="L170">        this.vipChannelEnabled = cc.vipChannelEnabled;</span>
+<span class="fc" id="L171">        this.useTLS = cc.useTLS;</span>
+<span class="fc" id="L172">        this.namespace = cc.namespace;</span>
+<span class="fc" id="L173">        this.language = cc.language;</span>
+<span class="fc" id="L174">        this.mqClientApiTimeout = cc.mqClientApiTimeout;</span>
+<span class="fc" id="L175">        this.enableStreamRequestType = cc.enableStreamRequestType;</span>
+<span class="fc" id="L176">    }</span>
+
+    public ClientConfig cloneClientConfig() {
+<span class="fc" id="L179">        ClientConfig cc = new ClientConfig();</span>
+<span class="fc" id="L180">        cc.namesrvAddr = namesrvAddr;</span>
+<span class="fc" id="L181">        cc.clientIP = clientIP;</span>
+<span class="fc" id="L182">        cc.instanceName = instanceName;</span>
+<span class="fc" id="L183">        cc.clientCallbackExecutorThreads = clientCallbackExecutorThreads;</span>
+<span class="fc" id="L184">        cc.pollNameServerInterval = pollNameServerInterval;</span>
+<span class="fc" id="L185">        cc.heartbeatBrokerInterval = heartbeatBrokerInterval;</span>
+<span class="fc" id="L186">        cc.persistConsumerOffsetInterval = persistConsumerOffsetInterval;</span>
+<span class="fc" id="L187">        cc.pullTimeDelayMillsWhenException = pullTimeDelayMillsWhenException;</span>
+<span class="fc" id="L188">        cc.unitMode = unitMode;</span>
+<span class="fc" id="L189">        cc.unitName = unitName;</span>
+<span class="fc" id="L190">        cc.vipChannelEnabled = vipChannelEnabled;</span>
+<span class="fc" id="L191">        cc.useTLS = useTLS;</span>
+<span class="fc" id="L192">        cc.namespace = namespace;</span>
+<span class="fc" id="L193">        cc.language = language;</span>
+<span class="fc" id="L194">        cc.mqClientApiTimeout = mqClientApiTimeout;</span>
+<span class="fc" id="L195">        cc.enableStreamRequestType = enableStreamRequestType;</span>
+<span class="fc" id="L196">        return cc;</span>
+    }
+
+    public String getNamesrvAddr() {
+<span class="pc bpc" id="L200" title="1 of 4 branches missed.">        if (StringUtils.isNotEmpty(namesrvAddr) &amp;&amp; NameServerAddressUtils.NAMESRV_ENDPOINT_PATTERN.matcher(namesrvAddr.trim()).matches()) {</span>
+<span class="nc" id="L201">            return NameServerAddressUtils.getNameSrvAddrFromNamesrvEndpoint(namesrvAddr);</span>
+        }
+<span class="fc" id="L203">        return namesrvAddr;</span>
+    }
+
+    /**
+     * Domain name mode access way does not support the delimiter(;), and only one domain name can be set.
+     *
+     * @param namesrvAddr name server address
+     */
+    public void setNamesrvAddr(String namesrvAddr) {
+<span class="fc" id="L212">        this.namesrvAddr = namesrvAddr;</span>
+<span class="fc" id="L213">        this.namespaceInitialized = false;</span>
+<span class="fc" id="L214">    }</span>
+
+    public int getClientCallbackExecutorThreads() {
+<span class="fc" id="L217">        return clientCallbackExecutorThreads;</span>
+    }
+
+    public void setClientCallbackExecutorThreads(int clientCallbackExecutorThreads) {
+<span class="nc" id="L221">        this.clientCallbackExecutorThreads = clientCallbackExecutorThreads;</span>
+<span class="nc" id="L222">    }</span>
+
+    public int getPollNameServerInterval() {
+<span class="fc" id="L225">        return pollNameServerInterval;</span>
+    }
+
+    public void setPollNameServerInterval(int pollNameServerInterval) {
+<span class="nc" id="L229">        this.pollNameServerInterval = pollNameServerInterval;</span>
+<span class="nc" id="L230">    }</span>
+
+    public int getHeartbeatBrokerInterval() {
+<span class="fc" id="L233">        return heartbeatBrokerInterval;</span>
+    }
+
+    public void setHeartbeatBrokerInterval(int heartbeatBrokerInterval) {
+<span class="nc" id="L237">        this.heartbeatBrokerInterval = heartbeatBrokerInterval;</span>
+<span class="nc" id="L238">    }</span>
+
+    public int getPersistConsumerOffsetInterval() {
+<span class="fc" id="L241">        return persistConsumerOffsetInterval;</span>
+    }
+
+    public void setPersistConsumerOffsetInterval(int persistConsumerOffsetInterval) {
+<span class="nc" id="L245">        this.persistConsumerOffsetInterval = persistConsumerOffsetInterval;</span>
+<span class="nc" id="L246">    }</span>
+
+    public long getPullTimeDelayMillsWhenException() {
+<span class="fc" id="L249">        return pullTimeDelayMillsWhenException;</span>
+    }
+
+    public void setPullTimeDelayMillsWhenException(long pullTimeDelayMillsWhenException) {
+<span class="nc" id="L253">        this.pullTimeDelayMillsWhenException = pullTimeDelayMillsWhenException;</span>
+<span class="nc" id="L254">    }</span>
+
+    public String getUnitName() {
+<span class="fc" id="L257">        return unitName;</span>
+    }
+
+    public void setUnitName(String unitName) {
+<span class="nc" id="L261">        this.unitName = unitName;</span>
+<span class="nc" id="L262">    }</span>
+
+    public boolean isUnitMode() {
+<span class="fc" id="L265">        return unitMode;</span>
+    }
+
+    public void setUnitMode(boolean unitMode) {
+<span class="nc" id="L269">        this.unitMode = unitMode;</span>
+<span class="nc" id="L270">    }</span>
+
+    public boolean isVipChannelEnabled() {
+<span class="fc" id="L273">        return vipChannelEnabled;</span>
+    }
+
+    public void setVipChannelEnabled(final boolean vipChannelEnabled) {
+<span class="fc" id="L277">        this.vipChannelEnabled = vipChannelEnabled;</span>
+<span class="fc" id="L278">    }</span>
+
+    public boolean isUseTLS() {
+<span class="fc" id="L281">        return useTLS;</span>
+    }
+
+    public void setUseTLS(boolean useTLS) {
+<span class="fc" id="L285">        this.useTLS = useTLS;</span>
+<span class="fc" id="L286">    }</span>
+
+    public LanguageCode getLanguage() {
+<span class="nc" id="L289">        return language;</span>
+    }
+
+    public void setLanguage(LanguageCode language) {
+<span class="nc" id="L293">        this.language = language;</span>
+<span class="nc" id="L294">    }</span>
+
+    public String getNamespace() {
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (namespaceInitialized) {</span>
+<span class="fc" id="L298">            return namespace;</span>
+        }
+
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (StringUtils.isNotEmpty(namespace)) {</span>
+<span class="nc" id="L302">            return namespace;</span>
+        }
+
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (StringUtils.isNotEmpty(this.namesrvAddr)) {</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">            if (NameServerAddressUtils.validateInstanceEndpoint(namesrvAddr)) {</span>
+<span class="nc" id="L307">                namespace = NameServerAddressUtils.parseInstanceIdFromEndpoint(namesrvAddr);</span>
+            }
+        }
+<span class="fc" id="L310">        namespaceInitialized = true;</span>
+<span class="fc" id="L311">        return namespace;</span>
+    }
+
+    public void setNamespace(String namespace) {
+<span class="nc" id="L315">        this.namespace = namespace;</span>
+<span class="nc" id="L316">        this.namespaceInitialized = true;</span>
+<span class="nc" id="L317">    }</span>
+
+    public AccessChannel getAccessChannel() {
+<span class="fc" id="L320">        return this.accessChannel;</span>
+    }
+
+    public void setAccessChannel(AccessChannel accessChannel) {
+<span class="nc" id="L324">        this.accessChannel = accessChannel;</span>
+<span class="nc" id="L325">    }</span>
+
+    public int getMqClientApiTimeout() {
+<span class="fc" id="L328">        return mqClientApiTimeout;</span>
+    }
+
+    public void setMqClientApiTimeout(int mqClientApiTimeout) {
+<span class="nc" id="L332">        this.mqClientApiTimeout = mqClientApiTimeout;</span>
+<span class="nc" id="L333">    }</span>
+
+    public boolean isEnableStreamRequestType() {
+<span class="fc" id="L336">        return enableStreamRequestType;</span>
+    }
+
+    public void setEnableStreamRequestType(boolean enableStreamRequestType) {
+<span class="nc" id="L340">        this.enableStreamRequestType = enableStreamRequestType;</span>
+<span class="nc" id="L341">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L345">        return &quot;ClientConfig [namesrvAddr=&quot; + namesrvAddr + &quot;, clientIP=&quot; + clientIP + &quot;, instanceName=&quot; + instanceName</span>
+            + &quot;, clientCallbackExecutorThreads=&quot; + clientCallbackExecutorThreads + &quot;, pollNameServerInterval=&quot; + pollNameServerInterval
+            + &quot;, heartbeatBrokerInterval=&quot; + heartbeatBrokerInterval + &quot;, persistConsumerOffsetInterval=&quot; + persistConsumerOffsetInterval
+            + &quot;, pullTimeDelayMillsWhenException=&quot; + pullTimeDelayMillsWhenException + &quot;, unitMode=&quot; + unitMode + &quot;, unitName=&quot; + unitName + &quot;, vipChannelEnabled=&quot;
+<span class="fc" id="L349">            + vipChannelEnabled + &quot;, useTLS=&quot; + useTLS + &quot;, language=&quot; + language.name() + &quot;, namespace=&quot; + namespace + &quot;, mqClientApiTimeout=&quot; + mqClientApiTimeout</span>
+            + &quot;, enableStreamRequestType=&quot; + enableStreamRequestType + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

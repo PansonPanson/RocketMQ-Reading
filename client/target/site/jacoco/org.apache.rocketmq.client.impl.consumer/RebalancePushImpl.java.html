@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RebalancePushImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.impl.consumer</a> &gt; <span class="el_source">RebalancePushImpl.java</span></div><h1>RebalancePushImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.impl.consumer;
+
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import org.apache.rocketmq.client.consumer.AllocateMessageQueueStrategy;
+import org.apache.rocketmq.client.consumer.store.OffsetStore;
+import org.apache.rocketmq.client.consumer.store.ReadOffsetType;
+import org.apache.rocketmq.client.exception.MQClientException;
+import org.apache.rocketmq.client.impl.factory.MQClientInstance;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.constant.ConsumeInitMode;
+import org.apache.rocketmq.common.consumer.ConsumeFromWhere;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.protocol.ResponseCode;
+import org.apache.rocketmq.common.protocol.heartbeat.ConsumeType;
+import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
+import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
+
+public class RebalancePushImpl extends RebalanceImpl {
+<span class="fc" id="L38">    private final static long UNLOCK_DELAY_TIME_MILLS = Long.parseLong(System.getProperty(&quot;rocketmq.client.unlockDelayTimeMills&quot;, &quot;20000&quot;));</span>
+    private final DefaultMQPushConsumerImpl defaultMQPushConsumerImpl;
+
+
+    public RebalancePushImpl(DefaultMQPushConsumerImpl defaultMQPushConsumerImpl) {
+<span class="fc" id="L43">        this(null, null, null, null, defaultMQPushConsumerImpl);</span>
+<span class="fc" id="L44">    }</span>
+
+    public RebalancePushImpl(String consumerGroup, MessageModel messageModel,
+        AllocateMessageQueueStrategy allocateMessageQueueStrategy,
+        MQClientInstance mQClientFactory, DefaultMQPushConsumerImpl defaultMQPushConsumerImpl) {
+<span class="fc" id="L49">        super(consumerGroup, messageModel, allocateMessageQueueStrategy, mQClientFactory);</span>
+<span class="fc" id="L50">        this.defaultMQPushConsumerImpl = defaultMQPushConsumerImpl;</span>
+<span class="fc" id="L51">    }</span>
+
+    @Override
+    public void messageQueueChanged(String topic, Set&lt;MessageQueue&gt; mqAll, Set&lt;MessageQueue&gt; mqDivided) {
+        /**
+         * When rebalance result changed, should update subscription's version to notify broker.
+         * Fix: inconsistency subscription may lead to consumer miss messages.
+         */
+<span class="fc" id="L59">        SubscriptionData subscriptionData = this.subscriptionInner.get(topic);</span>
+<span class="fc" id="L60">        long newVersion = System.currentTimeMillis();</span>
+<span class="fc" id="L61">        log.info(&quot;{} Rebalance changed, also update version: {}, {}&quot;, topic, subscriptionData.getSubVersion(), newVersion);</span>
+<span class="fc" id="L62">        subscriptionData.setSubVersion(newVersion);</span>
+
+<span class="fc" id="L64">        int currentQueueCount = this.processQueueTable.size();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (currentQueueCount != 0) {</span>
+<span class="fc" id="L66">            int pullThresholdForTopic = this.defaultMQPushConsumerImpl.getDefaultMQPushConsumer().getPullThresholdForTopic();</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (pullThresholdForTopic != -1) {</span>
+<span class="fc" id="L68">                int newVal = Math.max(1, pullThresholdForTopic / currentQueueCount);</span>
+<span class="fc" id="L69">                log.info(&quot;The pullThresholdForQueue is changed from {} to {}&quot;,</span>
+<span class="fc" id="L70">                    this.defaultMQPushConsumerImpl.getDefaultMQPushConsumer().getPullThresholdForQueue(), newVal);</span>
+<span class="fc" id="L71">                this.defaultMQPushConsumerImpl.getDefaultMQPushConsumer().setPullThresholdForQueue(newVal);</span>
+            }
+
+<span class="fc" id="L74">            int pullThresholdSizeForTopic = this.defaultMQPushConsumerImpl.getDefaultMQPushConsumer().getPullThresholdSizeForTopic();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (pullThresholdSizeForTopic != -1) {</span>
+<span class="fc" id="L76">                int newVal = Math.max(1, pullThresholdSizeForTopic / currentQueueCount);</span>
+<span class="fc" id="L77">                log.info(&quot;The pullThresholdSizeForQueue is changed from {} to {}&quot;,</span>
+<span class="fc" id="L78">                    this.defaultMQPushConsumerImpl.getDefaultMQPushConsumer().getPullThresholdSizeForQueue(), newVal);</span>
+<span class="fc" id="L79">                this.defaultMQPushConsumerImpl.getDefaultMQPushConsumer().setPullThresholdSizeForQueue(newVal);</span>
+            }
+        }
+
+        // notify broker
+<span class="fc" id="L84">        this.getmQClientFactory().sendHeartbeatToAllBrokerWithLock();</span>
+<span class="fc" id="L85">    }</span>
+
+    @Override
+    public boolean removeUnnecessaryMessageQueue(MessageQueue mq, ProcessQueue pq) {
+<span class="nc" id="L89">        this.defaultMQPushConsumerImpl.getOffsetStore().persist(mq);</span>
+<span class="nc" id="L90">        this.defaultMQPushConsumerImpl.getOffsetStore().removeOffset(mq);</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (this.defaultMQPushConsumerImpl.isConsumeOrderly()</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            &amp;&amp; MessageModel.CLUSTERING.equals(this.defaultMQPushConsumerImpl.messageModel())) {</span>
+            try {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                if (pq.getConsumeLock().tryLock(1000, TimeUnit.MILLISECONDS)) {</span>
+                    try {
+<span class="nc" id="L96">                        return this.unlockDelay(mq, pq);</span>
+                    } finally {
+<span class="nc" id="L98">                        pq.getConsumeLock().unlock();</span>
+                    }
+                } else {
+<span class="nc" id="L101">                    log.warn(&quot;[WRONG]mq is consuming, so can not unlock it, {}. maybe hanged for a while, {}&quot;,</span>
+                        mq,
+<span class="nc" id="L103">                        pq.getTryUnlockTimes());</span>
+
+<span class="nc" id="L105">                    pq.incTryUnlockTimes();</span>
+                }
+<span class="nc" id="L107">            } catch (Exception e) {</span>
+<span class="nc" id="L108">                log.error(&quot;removeUnnecessaryMessageQueue Exception&quot;, e);</span>
+<span class="nc" id="L109">            }</span>
+
+<span class="nc" id="L111">            return false;</span>
+        }
+<span class="nc" id="L113">        return true;</span>
+    }
+
+    @Override
+    public boolean clientRebalance(String topic) {
+        // POPTODO order pop consume not implement yet
+<span class="pc bpc" id="L119" title="1 of 6 branches missed.">        return defaultMQPushConsumerImpl.getDefaultMQPushConsumer().isClientRebalance() || defaultMQPushConsumerImpl.isConsumeOrderly() || MessageModel.BROADCASTING.equals(messageModel);</span>
+    }
+
+    public boolean removeUnnecessaryPopMessageQueue(final MessageQueue mq, final PopProcessQueue pq) {
+<span class="nc" id="L123">        return true;</span>
+    }
+
+    private boolean unlockDelay(final MessageQueue mq, final ProcessQueue pq) {
+
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (pq.hasTempMessage()) {</span>
+<span class="nc" id="L129">            log.info(&quot;[{}]unlockDelay, begin {} &quot;, mq.hashCode(), mq);</span>
+<span class="nc" id="L130">            this.defaultMQPushConsumerImpl.getmQClientFactory().getScheduledExecutorService().schedule(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L133">                    log.info(&quot;[{}]unlockDelay, execute at once {}&quot;, mq.hashCode(), mq);</span>
+<span class="nc" id="L134">                    RebalancePushImpl.this.unlock(mq, true);</span>
+<span class="nc" id="L135">                }</span>
+            }, UNLOCK_DELAY_TIME_MILLS, TimeUnit.MILLISECONDS);
+        } else {
+<span class="nc" id="L138">            this.unlock(mq, true);</span>
+        }
+<span class="nc" id="L140">        return true;</span>
+    }
+
+    @Override
+    public ConsumeType consumeType() {
+<span class="nc" id="L145">        return ConsumeType.CONSUME_PASSIVELY;</span>
+    }
+
+    @Override
+    public void removeDirtyOffset(final MessageQueue mq) {
+<span class="fc" id="L150">        this.defaultMQPushConsumerImpl.getOffsetStore().removeOffset(mq);</span>
+<span class="fc" id="L151">    }</span>
+
+    @Deprecated
+    @Override
+    public long computePullFromWhere(MessageQueue mq) {
+<span class="fc" id="L156">        long result = -1L;</span>
+        try {
+<span class="fc" id="L158">            result = computePullFromWhereWithException(mq);</span>
+<span class="nc" id="L159">        } catch (MQClientException e) {</span>
+<span class="nc" id="L160">            log.warn(&quot;Compute consume offset exception, mq={}&quot;, mq);</span>
+<span class="fc" id="L161">        }</span>
+<span class="fc" id="L162">        return result;</span>
+    }
+
+    @Override
+    public long computePullFromWhereWithException(MessageQueue mq) throws MQClientException {
+<span class="fc" id="L167">        long result = -1;</span>
+<span class="fc" id="L168">        final ConsumeFromWhere consumeFromWhere = this.defaultMQPushConsumerImpl.getDefaultMQPushConsumer().getConsumeFromWhere();</span>
+<span class="fc" id="L169">        final OffsetStore offsetStore = this.defaultMQPushConsumerImpl.getOffsetStore();</span>
+<span class="pc bpc" id="L170" title="1 of 4 branches missed.">        switch (consumeFromWhere) {</span>
+            case CONSUME_FROM_LAST_OFFSET_AND_FROM_MIN_WHEN_BOOT_FIRST:
+            case CONSUME_FROM_MIN_OFFSET:
+            case CONSUME_FROM_MAX_OFFSET:
+            case CONSUME_FROM_LAST_OFFSET: {
+<span class="fc" id="L175">                long lastOffset = offsetStore.readOffset(mq, ReadOffsetType.READ_FROM_STORE);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">                if (lastOffset &gt;= 0) {</span>
+<span class="fc" id="L177">                    result = lastOffset;</span>
+                }
+                // First start,no offset
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                else if (-1 == lastOffset) {</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">                    if (mq.getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {</span>
+<span class="fc" id="L182">                        result = 0L;</span>
+                    } else {
+                        try {
+<span class="fc" id="L185">                            result = this.mQClientFactory.getMQAdminImpl().maxOffset(mq);</span>
+<span class="nc" id="L186">                        } catch (MQClientException e) {</span>
+<span class="nc" id="L187">                            log.warn(&quot;Compute consume offset from last offset exception, mq={}, exception={}&quot;, mq, e);</span>
+<span class="nc" id="L188">                            throw e;</span>
+<span class="fc" id="L189">                        }</span>
+                    }
+                } else {
+<span class="nc" id="L192">                    throw new MQClientException(ResponseCode.QUERY_NOT_FOUND, &quot;Failed to query consume offset from &quot; +</span>
+                            &quot;offset store&quot;);
+                }
+                break;
+            }
+            case CONSUME_FROM_FIRST_OFFSET: {
+<span class="fc" id="L198">                long lastOffset = offsetStore.readOffset(mq, ReadOffsetType.READ_FROM_STORE);</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                if (lastOffset &gt;= 0) {</span>
+<span class="fc" id="L200">                    result = lastOffset;</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                } else if (-1 == lastOffset) {</span>
+                    //the offset will be fixed by the OFFSET_ILLEGAL process
+<span class="fc" id="L203">                    result = 0L;</span>
+                } else {
+<span class="nc" id="L205">                    throw new MQClientException(ResponseCode.QUERY_NOT_FOUND, &quot;Failed to query offset from offset &quot; +</span>
+                            &quot;store&quot;);
+                }
+                break;
+            }
+            case CONSUME_FROM_TIMESTAMP: {
+<span class="fc" id="L211">                long lastOffset = offsetStore.readOffset(mq, ReadOffsetType.READ_FROM_STORE);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                if (lastOffset &gt;= 0) {</span>
+<span class="fc" id="L213">                    result = lastOffset;</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                } else if (-1 == lastOffset) {</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                    if (mq.getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {</span>
+                        try {
+<span class="fc" id="L217">                            result = this.mQClientFactory.getMQAdminImpl().maxOffset(mq);</span>
+<span class="nc" id="L218">                        } catch (MQClientException e) {</span>
+<span class="nc" id="L219">                            log.warn(&quot;Compute consume offset from last offset exception, mq={}, exception={}&quot;, mq, e);</span>
+<span class="nc" id="L220">                            throw e;</span>
+<span class="fc" id="L221">                        }</span>
+                    } else {
+                        try {
+<span class="fc" id="L224">                            long timestamp = UtilAll.parseDate(this.defaultMQPushConsumerImpl.getDefaultMQPushConsumer().getConsumeTimestamp(),</span>
+<span class="fc" id="L225">                                UtilAll.YYYYMMDDHHMMSS).getTime();</span>
+<span class="fc" id="L226">                            result = this.mQClientFactory.getMQAdminImpl().searchOffset(mq, timestamp);</span>
+<span class="nc" id="L227">                        } catch (MQClientException e) {</span>
+<span class="nc" id="L228">                            log.warn(&quot;Compute consume offset from last offset exception, mq={}, exception={}&quot;, mq, e);</span>
+<span class="nc" id="L229">                            throw e;</span>
+<span class="fc" id="L230">                        }</span>
+                    }
+                } else {
+<span class="nc" id="L233">                    throw new MQClientException(ResponseCode.QUERY_NOT_FOUND, &quot;Failed to query offset from offset &quot; +</span>
+                            &quot;store&quot;);
+                }
+                break;
+            }
+
+            default:
+                break;
+        }
+
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (result &lt; 0) {</span>
+<span class="nc" id="L244">            throw new MQClientException(ResponseCode.SYSTEM_ERROR, &quot;Found unexpected result &quot; + result);</span>
+        }
+
+<span class="fc" id="L247">        return result;</span>
+    }
+
+    @Override
+    public int getConsumeInitMode() {
+<span class="nc" id="L252">        final ConsumeFromWhere consumeFromWhere = this.defaultMQPushConsumerImpl.getDefaultMQPushConsumer().getConsumeFromWhere();</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (ConsumeFromWhere.CONSUME_FROM_FIRST_OFFSET == consumeFromWhere) {</span>
+<span class="nc" id="L254">            return ConsumeInitMode.MIN;</span>
+        } else {
+<span class="nc" id="L256">            return ConsumeInitMode.MAX;</span>
+        }
+    }
+
+    @Override
+    public void dispatchPullRequest(final List&lt;PullRequest&gt; pullRequestList, final long delay) {
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        for (PullRequest pullRequest : pullRequestList) {</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">            if (delay &lt;= 0) {</span>
+<span class="nc" id="L264">                this.defaultMQPushConsumerImpl.executePullRequestImmediately(pullRequest);</span>
+            } else {
+<span class="nc" id="L266">                this.defaultMQPushConsumerImpl.executePullRequestLater(pullRequest, delay);</span>
+            }
+<span class="nc" id="L268">        }</span>
+<span class="fc" id="L269">    }</span>
+
+    @Override
+    public void dispatchPopPullRequest(final List&lt;PopRequest&gt; pullRequestList, final long delay) {
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        for (PopRequest pullRequest : pullRequestList) {</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">            if (delay &lt;= 0) {</span>
+<span class="nc" id="L275">                this.defaultMQPushConsumerImpl.executePopPullRequestImmediately(pullRequest);</span>
+            } else {
+<span class="nc" id="L277">                this.defaultMQPushConsumerImpl.executePopPullRequestLater(pullRequest, delay);</span>
+            }
+<span class="nc" id="L279">        }</span>
+<span class="nc" id="L280">    }</span>
+
+    @Override
+    public ProcessQueue createProcessQueue() {
+<span class="fc" id="L284">        return new ProcessQueue();</span>
+    }
+
+    @Override public ProcessQueue createProcessQueue(String topicName) {
+<span class="fc" id="L288">        return createProcessQueue();</span>
+    }
+
+    @Override
+    public PopProcessQueue createPopProcessQueue() {
+<span class="nc" id="L293">        return new PopProcessQueue();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

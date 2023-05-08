@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StatisticsManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.statistics</a> &gt; <span class="el_source">StatisticsManager.java</span></div><h1>StatisticsManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.statistics;
+
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.rocketmq.common.utils.ThreadUtils;
+
+public class StatisticsManager {
+
+    /**
+     * Set of Statistics Kind Metadata
+     */
+    private Map&lt;String, StatisticsKindMeta&gt; kindMetaMap;
+
+    /**
+     * item names to calculate statistics brief
+     */
+    private Pair&lt;String, long[][]&gt;[] briefMetas;
+
+    /**
+     * Statistics
+     */
+<span class="nc" id="L44">    private final ConcurrentHashMap&lt;String, ConcurrentHashMap&lt;String, StatisticsItem&gt;&gt; statsTable</span>
+        = new ConcurrentHashMap&lt;String, ConcurrentHashMap&lt;String, StatisticsItem&gt;&gt;();
+
+    private static final int MAX_IDLE_TIME = 10 * 60 * 1000;
+<span class="nc" id="L48">    private final ScheduledExecutorService executor = ThreadUtils.newSingleThreadScheduledExecutor(</span>
+        &quot;StatisticsManagerCleaner&quot;, true);
+
+    private StatisticsItemStateGetter statisticsItemStateGetter;
+
+<span class="nc" id="L53">    public StatisticsManager() {</span>
+<span class="nc" id="L54">        kindMetaMap = new HashMap&lt;String, StatisticsKindMeta&gt;();</span>
+<span class="nc" id="L55">        start();</span>
+<span class="nc" id="L56">    }</span>
+
+<span class="nc" id="L58">    public StatisticsManager(Map&lt;String, StatisticsKindMeta&gt; kindMeta) {</span>
+<span class="nc" id="L59">        this.kindMetaMap = kindMeta;</span>
+<span class="nc" id="L60">        start();</span>
+<span class="nc" id="L61">    }</span>
+
+    public void addStatisticsKindMeta(StatisticsKindMeta kindMeta) {
+<span class="nc" id="L64">        kindMetaMap.put(kindMeta.getName(), kindMeta);</span>
+<span class="nc" id="L65">        statsTable.putIfAbsent(kindMeta.getName(), new ConcurrentHashMap&lt;String, StatisticsItem&gt;(16));</span>
+<span class="nc" id="L66">    }</span>
+
+    public void setBriefMeta(Pair&lt;String, long[][]&gt;[] briefMetas) {
+<span class="nc" id="L69">        this.briefMetas = briefMetas;</span>
+<span class="nc" id="L70">    }</span>
+
+    private void start() {
+<span class="nc" id="L73">        int maxIdleTime = MAX_IDLE_TIME;</span>
+<span class="nc" id="L74">        executor.scheduleAtFixedRate(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L77">                Iterator&lt;Map.Entry&lt;String, ConcurrentHashMap&lt;String, StatisticsItem&gt;&gt;&gt; iter</span>
+<span class="nc" id="L78">                    = statsTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                while (iter.hasNext()) {</span>
+<span class="nc" id="L80">                    Map.Entry&lt;String, ConcurrentHashMap&lt;String, StatisticsItem&gt;&gt; entry = iter.next();</span>
+<span class="nc" id="L81">                    String kind = entry.getKey();</span>
+<span class="nc" id="L82">                    ConcurrentHashMap&lt;String, StatisticsItem&gt; itemMap = entry.getValue();</span>
+
+<span class="nc bnc" id="L84" title="All 4 branches missed.">                    if (itemMap == null || itemMap.isEmpty()) {</span>
+<span class="nc" id="L85">                        continue;</span>
+                    }
+
+<span class="nc" id="L88">                    HashMap&lt;String, StatisticsItem&gt; tmpItemMap = new HashMap&lt;String, StatisticsItem&gt;(itemMap);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                    for (StatisticsItem item : tmpItemMap.values()) {</span>
+                        // remove when expired
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                        if (System.currentTimeMillis() - item.getLastTimeStamp().get() &gt; MAX_IDLE_TIME</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">                            &amp;&amp; (statisticsItemStateGetter == null || !statisticsItemStateGetter.online(item))) {</span>
+<span class="nc" id="L93">                            remove(item);</span>
+                        }
+<span class="nc" id="L95">                    }</span>
+<span class="nc" id="L96">                }</span>
+<span class="nc" id="L97">            }</span>
+        }, maxIdleTime, maxIdleTime / 3, TimeUnit.MILLISECONDS);
+<span class="nc" id="L99">    }</span>
+
+    /**
+     * Increment a StatisticsItem
+     *
+     * @param kind
+     * @param key
+     * @param itemAccumulates
+     */
+    public boolean inc(String kind, String key, long... itemAccumulates) {
+<span class="nc" id="L109">        ConcurrentHashMap&lt;String, StatisticsItem&gt; itemMap = statsTable.get(kind);</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (itemMap != null) {</span>
+<span class="nc" id="L111">            StatisticsItem item = itemMap.get(key);</span>
+
+            // if not exist, create and schedule
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            if (item == null) {</span>
+<span class="nc" id="L115">                item = new StatisticsItem(kind, key, kindMetaMap.get(kind).getItemNames());</span>
+<span class="nc" id="L116">                item.setInterceptor(new StatisticsBriefInterceptor(item, briefMetas));</span>
+<span class="nc" id="L117">                StatisticsItem oldItem = itemMap.putIfAbsent(key, item);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                if (oldItem != null) {</span>
+<span class="nc" id="L119">                    item = oldItem;</span>
+                } else {
+<span class="nc" id="L121">                    scheduleStatisticsItem(item);</span>
+                }
+            }
+
+            // do increment
+<span class="nc" id="L126">            item.incItems(itemAccumulates);</span>
+
+<span class="nc" id="L128">            return true;</span>
+        }
+
+<span class="nc" id="L131">        return false;</span>
+    }
+
+    private void scheduleStatisticsItem(StatisticsItem item) {
+<span class="nc" id="L135">        kindMetaMap.get(item.getStatKind()).getScheduledPrinter().schedule(item);</span>
+<span class="nc" id="L136">    }</span>
+
+    public void remove(StatisticsItem item) {
+<span class="nc" id="L139">        ConcurrentHashMap&lt;String, StatisticsItem&gt; itemMap = statsTable.get(item.getStatKind());</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (itemMap != null) {</span>
+<span class="nc" id="L141">            itemMap.remove(item.getStatObject(), item);</span>
+        }
+
+<span class="nc" id="L144">        StatisticsKindMeta kindMeta = kindMetaMap.get(item.getStatKind());</span>
+<span class="nc bnc" id="L145" title="All 4 branches missed.">        if (kindMeta != null &amp;&amp; kindMeta.getScheduledPrinter() != null) {</span>
+<span class="nc" id="L146">            kindMeta.getScheduledPrinter().remove(item);</span>
+        }
+<span class="nc" id="L148">    }</span>
+
+    public StatisticsItemStateGetter getStatisticsItemStateGetter() {
+<span class="nc" id="L151">        return statisticsItemStateGetter;</span>
+    }
+
+    public void setStatisticsItemStateGetter(StatisticsItemStateGetter statisticsItemStateGetter) {
+<span class="nc" id="L155">        this.statisticsItemStateGetter = statisticsItemStateGetter;</span>
+<span class="nc" id="L156">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

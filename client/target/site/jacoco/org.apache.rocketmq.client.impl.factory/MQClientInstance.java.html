@@ -1,0 +1,1328 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MQClientInstance.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.impl.factory</a> &gt; <span class="el_source">MQClientInstance.java</span></div><h1>MQClientInstance.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.impl.factory;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.rocketmq.client.ClientConfig;
+import org.apache.rocketmq.client.admin.MQAdminExtInner;
+import org.apache.rocketmq.client.exception.MQBrokerException;
+import org.apache.rocketmq.client.exception.MQClientException;
+import org.apache.rocketmq.client.impl.ClientRemotingProcessor;
+import org.apache.rocketmq.client.impl.FindBrokerResult;
+import org.apache.rocketmq.client.impl.MQAdminImpl;
+import org.apache.rocketmq.client.impl.MQClientAPIImpl;
+import org.apache.rocketmq.client.impl.MQClientManager;
+import org.apache.rocketmq.client.impl.consumer.DefaultMQPullConsumerImpl;
+import org.apache.rocketmq.client.impl.consumer.DefaultMQPushConsumerImpl;
+import org.apache.rocketmq.client.impl.consumer.MQConsumerInner;
+import org.apache.rocketmq.client.impl.consumer.ProcessQueue;
+import org.apache.rocketmq.client.impl.consumer.PullMessageService;
+import org.apache.rocketmq.client.impl.consumer.RebalanceService;
+import org.apache.rocketmq.client.impl.producer.DefaultMQProducerImpl;
+import org.apache.rocketmq.client.impl.producer.MQProducerInner;
+import org.apache.rocketmq.client.impl.producer.TopicPublishInfo;
+import org.apache.rocketmq.client.log.ClientLogger;
+import org.apache.rocketmq.client.producer.DefaultMQProducer;
+import org.apache.rocketmq.client.stat.ConsumerStatsManager;
+import org.apache.rocketmq.common.MQVersion;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.ServiceState;
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.constant.PermName;
+import org.apache.rocketmq.common.filter.ExpressionType;
+import org.apache.rocketmq.common.protocol.NamespaceUtil;
+import org.apache.rocketmq.common.topic.TopicValidator;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.common.message.MessageExt;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.message.MessageQueueAssignment;
+import org.apache.rocketmq.common.protocol.body.ConsumeMessageDirectlyResult;
+import org.apache.rocketmq.common.protocol.body.ConsumerRunningInfo;
+import org.apache.rocketmq.common.protocol.heartbeat.ConsumeType;
+import org.apache.rocketmq.common.protocol.heartbeat.ConsumerData;
+import org.apache.rocketmq.common.protocol.heartbeat.HeartbeatData;
+import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
+import org.apache.rocketmq.common.protocol.heartbeat.ProducerData;
+import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
+import org.apache.rocketmq.common.protocol.route.BrokerData;
+import org.apache.rocketmq.common.protocol.route.QueueData;
+import org.apache.rocketmq.common.protocol.route.TopicRouteData;
+import org.apache.rocketmq.remoting.RPCHook;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
+import org.apache.rocketmq.remoting.exception.RemotingException;
+import org.apache.rocketmq.remoting.netty.NettyClientConfig;
+import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+
+import java.io.UnsupportedEncodingException;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+import static org.apache.rocketmq.common.rpc.ClientMetadata.topicRouteData2EndpointsForStaticTopic;
+
+public class MQClientInstance {
+    private final static long LOCK_TIMEOUT_MILLIS = 3000;
+<span class="fc" id="L95">    private final static InternalLogger log = ClientLogger.getLog();</span>
+    private final ClientConfig clientConfig;
+    private final int instanceIndex;
+    private final String clientId;
+<span class="fc" id="L99">    private final long bootTimestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L100">    private final ConcurrentMap&lt;String/* group */, MQProducerInner&gt; producerTable = new ConcurrentHashMap&lt;String, MQProducerInner&gt;();</span>
+<span class="fc" id="L101">    private final ConcurrentMap&lt;String/* group */, MQConsumerInner&gt; consumerTable = new ConcurrentHashMap&lt;String, MQConsumerInner&gt;();</span>
+<span class="fc" id="L102">    private final ConcurrentMap&lt;String/* group */, MQAdminExtInner&gt; adminExtTable = new ConcurrentHashMap&lt;String, MQAdminExtInner&gt;();</span>
+    private final NettyClientConfig nettyClientConfig;
+    private final MQClientAPIImpl mQClientAPIImpl;
+    private final MQAdminImpl mQAdminImpl;
+<span class="fc" id="L106">    private final ConcurrentMap&lt;String/* Topic */, TopicRouteData&gt; topicRouteTable = new ConcurrentHashMap&lt;String, TopicRouteData&gt;();</span>
+<span class="fc" id="L107">    private final ConcurrentMap&lt;String/* Topic */, ConcurrentMap&lt;MessageQueue, String/*brokerName*/&gt;&gt; topicEndPointsTable = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L108">    private final Lock lockNamesrv = new ReentrantLock();</span>
+<span class="fc" id="L109">    private final Lock lockHeartbeat = new ReentrantLock();</span>
+<span class="fc" id="L110">    private final ConcurrentMap&lt;String/* Broker Name */, HashMap&lt;Long/* brokerId */, String/* address */&gt;&gt; brokerAddrTable =</span>
+        new ConcurrentHashMap&lt;String, HashMap&lt;Long, String&gt;&gt;();
+<span class="fc" id="L112">    private final ConcurrentMap&lt;String/* Broker Name */, HashMap&lt;String/* address */, Integer&gt;&gt; brokerVersionTable =</span>
+        new ConcurrentHashMap&lt;String, HashMap&lt;String, Integer&gt;&gt;();
+<span class="fc" id="L114">    private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {</span>
+        @Override
+        public Thread newThread(Runnable r) {
+<span class="fc" id="L117">            return new Thread(r, &quot;MQClientFactoryScheduledThread&quot;);</span>
+        }
+    });
+    private final ClientRemotingProcessor clientRemotingProcessor;
+    private final PullMessageService pullMessageService;
+    private final RebalanceService rebalanceService;
+    private final DefaultMQProducer defaultMQProducer;
+    private final ConsumerStatsManager consumerStatsManager;
+<span class="fc" id="L125">    private final AtomicLong sendHeartbeatTimesTotal = new AtomicLong(0);</span>
+<span class="fc" id="L126">    private ServiceState serviceState = ServiceState.CREATE_JUST;</span>
+<span class="fc" id="L127">    private Random random = new Random();</span>
+
+    public MQClientInstance(ClientConfig clientConfig, int instanceIndex, String clientId) {
+<span class="nc" id="L130">        this(clientConfig, instanceIndex, clientId, null);</span>
+<span class="nc" id="L131">    }</span>
+
+<span class="fc" id="L133">    public MQClientInstance(ClientConfig clientConfig, int instanceIndex, String clientId, RPCHook rpcHook) {</span>
+<span class="fc" id="L134">        this.clientConfig = clientConfig;</span>
+<span class="fc" id="L135">        this.instanceIndex = instanceIndex;</span>
+<span class="fc" id="L136">        this.nettyClientConfig = new NettyClientConfig();</span>
+<span class="fc" id="L137">        this.nettyClientConfig.setClientCallbackExecutorThreads(clientConfig.getClientCallbackExecutorThreads());</span>
+<span class="fc" id="L138">        this.nettyClientConfig.setUseTLS(clientConfig.isUseTLS());</span>
+<span class="fc" id="L139">        this.clientRemotingProcessor = new ClientRemotingProcessor(this);</span>
+<span class="fc" id="L140">        this.mQClientAPIImpl = new MQClientAPIImpl(this.nettyClientConfig, this.clientRemotingProcessor, rpcHook, clientConfig);</span>
+
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (this.clientConfig.getNamesrvAddr() != null) {</span>
+<span class="fc" id="L143">            this.mQClientAPIImpl.updateNameServerAddressList(this.clientConfig.getNamesrvAddr());</span>
+<span class="fc" id="L144">            log.info(&quot;user specified name server address: {}&quot;, this.clientConfig.getNamesrvAddr());</span>
+        }
+
+<span class="fc" id="L147">        this.clientId = clientId;</span>
+
+<span class="fc" id="L149">        this.mQAdminImpl = new MQAdminImpl(this);</span>
+
+<span class="fc" id="L151">        this.pullMessageService = new PullMessageService(this);</span>
+
+<span class="fc" id="L153">        this.rebalanceService = new RebalanceService(this);</span>
+
+<span class="fc" id="L155">        this.defaultMQProducer = new DefaultMQProducer(MixAll.CLIENT_INNER_PRODUCER_GROUP);</span>
+<span class="fc" id="L156">        this.defaultMQProducer.resetClientConfig(clientConfig);</span>
+
+<span class="fc" id="L158">        this.consumerStatsManager = new ConsumerStatsManager(this.scheduledExecutorService);</span>
+
+<span class="fc" id="L160">        log.info(&quot;Created a new client Instance, InstanceIndex:{}, ClientID:{}, ClientConfig:{}, ClientVersion:{}, SerializerType:{}&quot;,</span>
+<span class="fc" id="L161">            this.instanceIndex,</span>
+            this.clientId,
+            this.clientConfig,
+<span class="fc" id="L164">            MQVersion.getVersionDesc(MQVersion.CURRENT_VERSION), RemotingCommand.getSerializeTypeConfigInThisServer());</span>
+<span class="fc" id="L165">    }</span>
+
+    public static TopicPublishInfo topicRouteData2TopicPublishInfo(final String topic, final TopicRouteData route) {
+<span class="fc" id="L168">        TopicPublishInfo info = new TopicPublishInfo();</span>
+        // TO DO should check the usage of raw route, it is better to remove such field
+<span class="fc" id="L170">        info.setTopicRouteData(route);</span>
+<span class="pc bpc" id="L171" title="3 of 4 branches missed.">        if (route.getOrderTopicConf() != null &amp;&amp; route.getOrderTopicConf().length() &gt; 0) {</span>
+<span class="nc" id="L172">            String[] brokers = route.getOrderTopicConf().split(&quot;;&quot;);</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            for (String broker : brokers) {</span>
+<span class="nc" id="L174">                String[] item = broker.split(&quot;:&quot;);</span>
+<span class="nc" id="L175">                int nums = Integer.parseInt(item[1]);</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">                for (int i = 0; i &lt; nums; i++) {</span>
+<span class="nc" id="L177">                    MessageQueue mq = new MessageQueue(topic, item[0], i);</span>
+<span class="nc" id="L178">                    info.getMessageQueueList().add(mq);</span>
+                }
+            }
+
+<span class="nc" id="L182">            info.setOrderTopic(true);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        } else if (route.getOrderTopicConf() == null</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                &amp;&amp; route.getTopicQueueMappingByBroker() != null</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                &amp;&amp; !route.getTopicQueueMappingByBroker().isEmpty()) {</span>
+<span class="nc" id="L186">            info.setOrderTopic(false);</span>
+<span class="nc" id="L187">            ConcurrentMap&lt;MessageQueue, String&gt; mqEndPoints = topicRouteData2EndpointsForStaticTopic(topic, route);</span>
+<span class="nc" id="L188">            info.getMessageQueueList().addAll(mqEndPoints.keySet());</span>
+<span class="nc" id="L189">            Collections.sort(info.getMessageQueueList(), new Comparator&lt;MessageQueue&gt;() {</span>
+                @Override public int compare(MessageQueue o1, MessageQueue o2) {
+<span class="nc" id="L191">                    return MixAll.compareInteger(o1.getQueueId(), o2.getQueueId());</span>
+                }
+            });
+<span class="nc" id="L194">        } else {</span>
+<span class="fc" id="L195">            List&lt;QueueData&gt; qds = route.getQueueDatas();</span>
+<span class="fc" id="L196">            Collections.sort(qds);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            for (QueueData qd : qds) {</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                if (PermName.isWriteable(qd.getPerm())) {</span>
+<span class="fc" id="L199">                    BrokerData brokerData = null;</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">                    for (BrokerData bd : route.getBrokerDatas()) {</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                        if (bd.getBrokerName().equals(qd.getBrokerName())) {</span>
+<span class="fc" id="L202">                            brokerData = bd;</span>
+<span class="fc" id="L203">                            break;</span>
+                        }
+<span class="nc" id="L205">                    }</span>
+
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                    if (null == brokerData) {</span>
+<span class="nc" id="L208">                        continue;</span>
+                    }
+
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                    if (!brokerData.getBrokerAddrs().containsKey(MixAll.MASTER_ID)) {</span>
+<span class="nc" id="L212">                        continue;</span>
+                    }
+
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                    for (int i = 0; i &lt; qd.getWriteQueueNums(); i++) {</span>
+<span class="fc" id="L216">                        MessageQueue mq = new MessageQueue(topic, qd.getBrokerName(), i);</span>
+<span class="fc" id="L217">                        info.getMessageQueueList().add(mq);</span>
+                    }
+                }
+<span class="fc" id="L220">            }</span>
+
+<span class="fc" id="L222">            info.setOrderTopic(false);</span>
+        }
+
+<span class="fc" id="L225">        return info;</span>
+    }
+
+    public static Set&lt;MessageQueue&gt; topicRouteData2TopicSubscribeInfo(final String topic, final TopicRouteData route) {
+<span class="fc" id="L229">        Set&lt;MessageQueue&gt; mqList = new HashSet&lt;MessageQueue&gt;();</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        if (route.getTopicQueueMappingByBroker() != null</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">                &amp;&amp; !route.getTopicQueueMappingByBroker().isEmpty()) {</span>
+<span class="nc" id="L232">            ConcurrentMap&lt;MessageQueue, String&gt; mqEndPoints = topicRouteData2EndpointsForStaticTopic(topic, route);</span>
+<span class="nc" id="L233">            return mqEndPoints.keySet();</span>
+        }
+<span class="fc" id="L235">        List&lt;QueueData&gt; qds = route.getQueueDatas();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (QueueData qd : qds) {</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            if (PermName.isReadable(qd.getPerm())) {</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">                for (int i = 0; i &lt; qd.getReadQueueNums(); i++) {</span>
+<span class="fc" id="L239">                    MessageQueue mq = new MessageQueue(topic, qd.getBrokerName(), i);</span>
+<span class="fc" id="L240">                    mqList.add(mq);</span>
+                }
+            }
+<span class="fc" id="L243">        }</span>
+
+<span class="fc" id="L245">        return mqList;</span>
+    }
+
+    public void start() throws MQClientException {
+
+<span class="fc" id="L250">        synchronized (this) {</span>
+<span class="pc bpc" id="L251" title="1 of 3 branches missed.">            switch (this.serviceState) {</span>
+                case CREATE_JUST:
+<span class="fc" id="L253">                    this.serviceState = ServiceState.START_FAILED;</span>
+                    // If not specified,looking address from name server
+<span class="fc bfc" id="L255" title="All 2 branches covered.">                    if (null == this.clientConfig.getNamesrvAddr()) {</span>
+<span class="fc" id="L256">                        this.mQClientAPIImpl.fetchNameServerAddr();</span>
+                    }
+                    // Start request-response channel
+<span class="fc" id="L259">                    this.mQClientAPIImpl.start();</span>
+                    // Start various schedule tasks
+<span class="fc" id="L261">                    this.startScheduledTask();</span>
+                    // Start pull service
+<span class="fc" id="L263">                    this.pullMessageService.start();</span>
+                    // Start rebalance service
+<span class="fc" id="L265">                    this.rebalanceService.start();</span>
+                    // Start push service
+<span class="fc" id="L267">                    this.defaultMQProducer.getDefaultMQProducerImpl().start(false);</span>
+<span class="fc" id="L268">                    log.info(&quot;the client factory [{}] start OK&quot;, this.clientId);</span>
+<span class="fc" id="L269">                    this.serviceState = ServiceState.RUNNING;</span>
+<span class="fc" id="L270">                    break;</span>
+                case START_FAILED:
+<span class="nc" id="L272">                    throw new MQClientException(&quot;The Factory object[&quot; + this.getClientId() + &quot;] has been created before, and failed.&quot;, null);</span>
+                default:
+                    break;
+            }
+<span class="fc" id="L276">        }</span>
+<span class="fc" id="L277">    }</span>
+
+    private void startScheduledTask() {
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        if (null == this.clientConfig.getNamesrvAddr()) {</span>
+<span class="fc" id="L281">            this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {</span>
+
+                @Override
+                public void run() {
+                    try {
+<span class="fc" id="L286">                        MQClientInstance.this.mQClientAPIImpl.fetchNameServerAddr();</span>
+<span class="nc" id="L287">                    } catch (Exception e) {</span>
+<span class="nc" id="L288">                        log.error(&quot;ScheduledTask fetchNameServerAddr exception&quot;, e);</span>
+<span class="fc" id="L289">                    }</span>
+<span class="fc" id="L290">                }</span>
+            }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
+        }
+
+<span class="fc" id="L294">        this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {</span>
+
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L299">                    MQClientInstance.this.updateTopicRouteInfoFromNameServer();</span>
+<span class="fc" id="L300">                } catch (Exception e) {</span>
+<span class="fc" id="L301">                    log.error(&quot;ScheduledTask updateTopicRouteInfoFromNameServer exception&quot;, e);</span>
+<span class="fc" id="L302">                }</span>
+<span class="fc" id="L303">            }</span>
+<span class="fc" id="L304">        }, 10, this.clientConfig.getPollNameServerInterval(), TimeUnit.MILLISECONDS);</span>
+
+<span class="fc" id="L306">        this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {</span>
+
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L311">                    MQClientInstance.this.cleanOfflineBroker();</span>
+<span class="fc" id="L312">                    MQClientInstance.this.sendHeartbeatToAllBrokerWithLock();</span>
+<span class="nc" id="L313">                } catch (Exception e) {</span>
+<span class="nc" id="L314">                    log.error(&quot;ScheduledTask sendHeartbeatToAllBroker exception&quot;, e);</span>
+<span class="fc" id="L315">                }</span>
+<span class="fc" id="L316">            }</span>
+<span class="fc" id="L317">        }, 1000, this.clientConfig.getHeartbeatBrokerInterval(), TimeUnit.MILLISECONDS);</span>
+
+<span class="fc" id="L319">        this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {</span>
+
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L324">                    MQClientInstance.this.persistAllConsumerOffset();</span>
+<span class="nc" id="L325">                } catch (Exception e) {</span>
+<span class="nc" id="L326">                    log.error(&quot;ScheduledTask persistAllConsumerOffset exception&quot;, e);</span>
+<span class="fc" id="L327">                }</span>
+<span class="fc" id="L328">            }</span>
+<span class="fc" id="L329">        }, 1000 * 10, this.clientConfig.getPersistConsumerOffsetInterval(), TimeUnit.MILLISECONDS);</span>
+
+<span class="fc" id="L331">        this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {</span>
+
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L336">                    MQClientInstance.this.adjustThreadPool();</span>
+<span class="nc" id="L337">                } catch (Exception e) {</span>
+<span class="nc" id="L338">                    log.error(&quot;ScheduledTask adjustThreadPool exception&quot;, e);</span>
+<span class="fc" id="L339">                }</span>
+<span class="fc" id="L340">            }</span>
+        }, 1, 1, TimeUnit.MINUTES);
+<span class="fc" id="L342">    }</span>
+
+    public String getClientId() {
+<span class="fc" id="L345">        return clientId;</span>
+    }
+
+    public void updateTopicRouteInfoFromNameServer() {
+<span class="fc" id="L349">        Set&lt;String&gt; topicList = new HashSet&lt;String&gt;();</span>
+
+        // Consumer
+        {
+<span class="fc" id="L353">            Iterator&lt;Entry&lt;String, MQConsumerInner&gt;&gt; it = this.consumerTable.entrySet().iterator();</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">            while (it.hasNext()) {</span>
+<span class="fc" id="L355">                Entry&lt;String, MQConsumerInner&gt; entry = it.next();</span>
+<span class="fc" id="L356">                MQConsumerInner impl = entry.getValue();</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">                if (impl != null) {</span>
+<span class="fc" id="L358">                    Set&lt;SubscriptionData&gt; subList = impl.subscriptions();</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">                    if (subList != null) {</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">                        for (SubscriptionData subData : subList) {</span>
+<span class="fc" id="L361">                            topicList.add(subData.getTopic());</span>
+<span class="fc" id="L362">                        }</span>
+                    }
+                }
+<span class="fc" id="L365">            }</span>
+        }
+
+        // Producer
+        {
+<span class="fc" id="L370">            Iterator&lt;Entry&lt;String, MQProducerInner&gt;&gt; it = this.producerTable.entrySet().iterator();</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">            while (it.hasNext()) {</span>
+<span class="fc" id="L372">                Entry&lt;String, MQProducerInner&gt; entry = it.next();</span>
+<span class="fc" id="L373">                MQProducerInner impl = entry.getValue();</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">                if (impl != null) {</span>
+<span class="fc" id="L375">                    Set&lt;String&gt; lst = impl.getPublishTopicList();</span>
+<span class="fc" id="L376">                    topicList.addAll(lst);</span>
+                }
+<span class="fc" id="L378">            }</span>
+        }
+
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        for (String topic : topicList) {</span>
+<span class="fc" id="L382">            this.updateTopicRouteInfoFromNameServer(topic);</span>
+<span class="fc" id="L383">        }</span>
+<span class="fc" id="L384">    }</span>
+
+    /**
+     * @param offsetTable
+     * @param namespace
+     * @return newOffsetTable
+     */
+    public Map&lt;MessageQueue, Long&gt; parseOffsetTableFromBroker(Map&lt;MessageQueue, Long&gt; offsetTable, String namespace) {
+<span class="nc" id="L392">        HashMap&lt;MessageQueue, Long&gt; newOffsetTable = new HashMap&lt;MessageQueue, Long&gt;(offsetTable.size(), 1);</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">        if (StringUtils.isNotEmpty(namespace)) {</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">            for (Entry&lt;MessageQueue, Long&gt; entry : offsetTable.entrySet()) {</span>
+<span class="nc" id="L395">                MessageQueue queue = entry.getKey();</span>
+<span class="nc" id="L396">                queue.setTopic(NamespaceUtil.withoutNamespace(queue.getTopic(), namespace));</span>
+<span class="nc" id="L397">                newOffsetTable.put(queue, entry.getValue());</span>
+<span class="nc" id="L398">            }</span>
+        } else {
+<span class="nc" id="L400">            newOffsetTable.putAll(offsetTable);</span>
+        }
+
+<span class="nc" id="L403">        return newOffsetTable;</span>
+    }
+
+    /**
+     * Remove offline broker
+     */
+    private void cleanOfflineBroker() {
+        try {
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">            if (this.lockNamesrv.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))</span>
+                try {
+<span class="fc" id="L413">                    ConcurrentHashMap&lt;String, HashMap&lt;Long, String&gt;&gt; updatedTable = new ConcurrentHashMap&lt;String, HashMap&lt;Long, String&gt;&gt;(this.brokerAddrTable.size(), 1);</span>
+
+<span class="fc" id="L415">                    Iterator&lt;Entry&lt;String, HashMap&lt;Long, String&gt;&gt;&gt; itBrokerTable = this.brokerAddrTable.entrySet().iterator();</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">                    while (itBrokerTable.hasNext()) {</span>
+<span class="nc" id="L417">                        Entry&lt;String, HashMap&lt;Long, String&gt;&gt; entry = itBrokerTable.next();</span>
+<span class="nc" id="L418">                        String brokerName = entry.getKey();</span>
+<span class="nc" id="L419">                        HashMap&lt;Long, String&gt; oneTable = entry.getValue();</span>
+
+<span class="nc" id="L421">                        HashMap&lt;Long, String&gt; cloneAddrTable = new HashMap&lt;Long, String&gt;(oneTable.size(), 1);</span>
+<span class="nc" id="L422">                        cloneAddrTable.putAll(oneTable);</span>
+
+<span class="nc" id="L424">                        Iterator&lt;Entry&lt;Long, String&gt;&gt; it = cloneAddrTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">                        while (it.hasNext()) {</span>
+<span class="nc" id="L426">                            Entry&lt;Long, String&gt; ee = it.next();</span>
+<span class="nc" id="L427">                            String addr = ee.getValue();</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">                            if (!this.isBrokerAddrExistInTopicRouteTable(addr)) {</span>
+<span class="nc" id="L429">                                it.remove();</span>
+<span class="nc" id="L430">                                log.info(&quot;the broker addr[{} {}] is offline, remove it&quot;, brokerName, addr);</span>
+                            }
+<span class="nc" id="L432">                        }</span>
+
+<span class="nc bnc" id="L434" title="All 2 branches missed.">                        if (cloneAddrTable.isEmpty()) {</span>
+<span class="nc" id="L435">                            itBrokerTable.remove();</span>
+<span class="nc" id="L436">                            log.info(&quot;the broker[{}] name's host is offline, remove it&quot;, brokerName);</span>
+                        } else {
+<span class="nc" id="L438">                            updatedTable.put(brokerName, cloneAddrTable);</span>
+                        }
+<span class="nc" id="L440">                    }</span>
+
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">                    if (!updatedTable.isEmpty()) {</span>
+<span class="nc" id="L443">                        this.brokerAddrTable.putAll(updatedTable);</span>
+                    }
+                } finally {
+<span class="fc" id="L446">                    this.lockNamesrv.unlock();</span>
+                }
+<span class="nc" id="L448">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L449">            log.warn(&quot;cleanOfflineBroker Exception&quot;, e);</span>
+<span class="fc" id="L450">        }</span>
+<span class="fc" id="L451">    }</span>
+
+    public void checkClientInBroker() throws MQClientException {
+<span class="fc" id="L454">        Iterator&lt;Entry&lt;String, MQConsumerInner&gt;&gt; it = this.consumerTable.entrySet().iterator();</span>
+
+<span class="fc bfc" id="L456" title="All 2 branches covered.">        while (it.hasNext()) {</span>
+<span class="fc" id="L457">            Entry&lt;String, MQConsumerInner&gt; entry = it.next();</span>
+<span class="fc" id="L458">            Set&lt;SubscriptionData&gt; subscriptionInner = entry.getValue().subscriptions();</span>
+<span class="pc bpc" id="L459" title="1 of 4 branches missed.">            if (subscriptionInner == null || subscriptionInner.isEmpty()) {</span>
+<span class="fc" id="L460">                return;</span>
+            }
+
+<span class="fc bfc" id="L463" title="All 2 branches covered.">            for (SubscriptionData subscriptionData : subscriptionInner) {</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">                if (ExpressionType.isTagType(subscriptionData.getExpressionType())) {</span>
+<span class="fc" id="L465">                    continue;</span>
+                }
+                // may need to check one broker every cluster...
+                // assume that the configs of every broker in cluster are the the same.
+<span class="nc" id="L469">                String addr = findBrokerAddrByTopic(subscriptionData.getTopic());</span>
+
+<span class="nc bnc" id="L471" title="All 2 branches missed.">                if (addr != null) {</span>
+                    try {
+<span class="nc" id="L473">                        this.getMQClientAPIImpl().checkClientInBroker(</span>
+<span class="nc" id="L474">                            addr, entry.getKey(), this.clientId, subscriptionData, clientConfig.getMqClientApiTimeout()</span>
+                        );
+<span class="nc" id="L476">                    } catch (Exception e) {</span>
+<span class="nc bnc" id="L477" title="All 2 branches missed.">                        if (e instanceof MQClientException) {</span>
+<span class="nc" id="L478">                            throw (MQClientException) e;</span>
+                        } else {
+<span class="nc" id="L480">                            throw new MQClientException(&quot;Check client in broker error, maybe because you use &quot;</span>
+<span class="nc" id="L481">                                + subscriptionData.getExpressionType() + &quot; to filter message, but server has not been upgraded to support!&quot;</span>
+                                + &quot;This error would not affect the launch of consumer, but may has impact on message receiving if you &quot; +
+                                &quot;have use the new features which are not supported by server, please check the log!&quot;, e);
+                        }
+<span class="nc" id="L485">                    }</span>
+                }
+<span class="nc" id="L487">            }</span>
+<span class="fc" id="L488">        }</span>
+<span class="fc" id="L489">    }</span>
+
+    public void sendHeartbeatToAllBrokerWithLock() {
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">        if (this.lockHeartbeat.tryLock()) {</span>
+            try {
+<span class="fc" id="L494">                this.sendHeartbeatToAllBroker();</span>
+<span class="fc" id="L495">                this.uploadFilterClassSource();</span>
+<span class="nc" id="L496">            } catch (final Exception e) {</span>
+<span class="nc" id="L497">                log.error(&quot;sendHeartbeatToAllBroker exception&quot;, e);</span>
+            } finally {
+<span class="fc" id="L499">                this.lockHeartbeat.unlock();</span>
+<span class="fc" id="L500">            }</span>
+        } else {
+<span class="nc" id="L502">            log.warn(&quot;lock heartBeat, but failed. [{}]&quot;, this.clientId);</span>
+        }
+<span class="fc" id="L504">    }</span>
+
+    private void persistAllConsumerOffset() {
+<span class="fc" id="L507">        Iterator&lt;Entry&lt;String, MQConsumerInner&gt;&gt; it = this.consumerTable.entrySet().iterator();</span>
+<span class="fc bfc" id="L508" title="All 2 branches covered.">        while (it.hasNext()) {</span>
+<span class="fc" id="L509">            Entry&lt;String, MQConsumerInner&gt; entry = it.next();</span>
+<span class="fc" id="L510">            MQConsumerInner impl = entry.getValue();</span>
+<span class="fc" id="L511">            impl.persistConsumerOffset();</span>
+<span class="fc" id="L512">        }</span>
+<span class="fc" id="L513">    }</span>
+
+    public void adjustThreadPool() {
+<span class="fc" id="L516">        Iterator&lt;Entry&lt;String, MQConsumerInner&gt;&gt; it = this.consumerTable.entrySet().iterator();</span>
+<span class="fc bfc" id="L517" title="All 2 branches covered.">        while (it.hasNext()) {</span>
+<span class="fc" id="L518">            Entry&lt;String, MQConsumerInner&gt; entry = it.next();</span>
+<span class="fc" id="L519">            MQConsumerInner impl = entry.getValue();</span>
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">            if (impl != null) {</span>
+                try {
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">                    if (impl instanceof DefaultMQPushConsumerImpl) {</span>
+<span class="fc" id="L523">                        DefaultMQPushConsumerImpl dmq = (DefaultMQPushConsumerImpl) impl;</span>
+<span class="fc" id="L524">                        dmq.adjustThreadPool();</span>
+                    }
+<span class="nc" id="L526">                } catch (Exception e) {</span>
+<span class="fc" id="L527">                }</span>
+            }
+<span class="fc" id="L529">        }</span>
+<span class="fc" id="L530">    }</span>
+
+    public boolean updateTopicRouteInfoFromNameServer(final String topic) {
+<span class="fc" id="L533">        return updateTopicRouteInfoFromNameServer(topic, false, null);</span>
+    }
+
+    private boolean isBrokerAddrExistInTopicRouteTable(final String addr) {
+<span class="nc" id="L537">        Iterator&lt;Entry&lt;String, TopicRouteData&gt;&gt; it = this.topicRouteTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L538" title="All 2 branches missed.">        while (it.hasNext()) {</span>
+<span class="nc" id="L539">            Entry&lt;String, TopicRouteData&gt; entry = it.next();</span>
+<span class="nc" id="L540">            TopicRouteData topicRouteData = entry.getValue();</span>
+<span class="nc" id="L541">            List&lt;BrokerData&gt; bds = topicRouteData.getBrokerDatas();</span>
+<span class="nc bnc" id="L542" title="All 2 branches missed.">            for (BrokerData bd : bds) {</span>
+<span class="nc bnc" id="L543" title="All 2 branches missed.">                if (bd.getBrokerAddrs() != null) {</span>
+<span class="nc" id="L544">                    boolean exist = bd.getBrokerAddrs().containsValue(addr);</span>
+<span class="nc bnc" id="L545" title="All 2 branches missed.">                    if (exist)</span>
+<span class="nc" id="L546">                        return true;</span>
+                }
+<span class="nc" id="L548">            }</span>
+<span class="nc" id="L549">        }</span>
+
+<span class="nc" id="L551">        return false;</span>
+    }
+
+    private void sendHeartbeatToAllBroker() {
+<span class="fc" id="L555">        final HeartbeatData heartbeatData = this.prepareHeartbeatData();</span>
+<span class="fc" id="L556">        final boolean producerEmpty = heartbeatData.getProducerDataSet().isEmpty();</span>
+<span class="fc" id="L557">        final boolean consumerEmpty = heartbeatData.getConsumerDataSet().isEmpty();</span>
+<span class="pc bpc" id="L558" title="1 of 4 branches missed.">        if (producerEmpty &amp;&amp; consumerEmpty) {</span>
+<span class="fc" id="L559">            log.warn(&quot;sending heartbeat, but no consumer and no producer. [{}]&quot;, this.clientId);</span>
+<span class="fc" id="L560">            return;</span>
+        }
+
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">        if (!this.brokerAddrTable.isEmpty()) {</span>
+<span class="nc" id="L564">            long times = this.sendHeartbeatTimesTotal.getAndIncrement();</span>
+<span class="nc" id="L565">            Iterator&lt;Entry&lt;String, HashMap&lt;Long, String&gt;&gt;&gt; it = this.brokerAddrTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L566" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L567">                Entry&lt;String, HashMap&lt;Long, String&gt;&gt; entry = it.next();</span>
+<span class="nc" id="L568">                String brokerName = entry.getKey();</span>
+<span class="nc" id="L569">                HashMap&lt;Long, String&gt; oneTable = entry.getValue();</span>
+<span class="nc bnc" id="L570" title="All 2 branches missed.">                if (oneTable != null) {</span>
+<span class="nc bnc" id="L571" title="All 2 branches missed.">                    for (Map.Entry&lt;Long, String&gt; entry1 : oneTable.entrySet()) {</span>
+<span class="nc" id="L572">                        Long id = entry1.getKey();</span>
+<span class="nc" id="L573">                        String addr = entry1.getValue();</span>
+<span class="nc bnc" id="L574" title="All 2 branches missed.">                        if (addr != null) {</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">                            if (consumerEmpty) {</span>
+<span class="nc bnc" id="L576" title="All 2 branches missed.">                                if (id != MixAll.MASTER_ID)</span>
+<span class="nc" id="L577">                                    continue;</span>
+                            }
+
+                            try {
+<span class="nc" id="L581">                                int version = this.mQClientAPIImpl.sendHeartbeat(addr, heartbeatData, clientConfig.getMqClientApiTimeout());</span>
+<span class="nc bnc" id="L582" title="All 2 branches missed.">                                if (!this.brokerVersionTable.containsKey(brokerName)) {</span>
+<span class="nc" id="L583">                                    this.brokerVersionTable.put(brokerName, new HashMap&lt;String, Integer&gt;(4));</span>
+                                }
+<span class="nc" id="L585">                                this.brokerVersionTable.get(brokerName).put(addr, version);</span>
+<span class="nc bnc" id="L586" title="All 2 branches missed.">                                if (times % 20 == 0) {</span>
+<span class="nc" id="L587">                                    log.info(&quot;send heart beat to broker[{} {} {}] success&quot;, brokerName, id, addr);</span>
+<span class="nc" id="L588">                                    log.info(heartbeatData.toString());</span>
+                                }
+<span class="nc" id="L590">                            } catch (Exception e) {</span>
+<span class="nc bnc" id="L591" title="All 2 branches missed.">                                if (this.isBrokerInNameServer(addr)) {</span>
+<span class="nc" id="L592">                                    log.info(&quot;send heart beat to broker[{} {} {}] failed&quot;, brokerName, id, addr, e);</span>
+                                } else {
+<span class="nc" id="L594">                                    log.info(&quot;send heart beat to broker[{} {} {}] exception, because the broker not up, forget it&quot;, brokerName,</span>
+                                        id, addr, e);
+                                }
+<span class="nc" id="L597">                            }</span>
+                        }
+<span class="nc" id="L599">                    }</span>
+                }
+<span class="nc" id="L601">            }</span>
+        }
+<span class="fc" id="L603">    }</span>
+
+    private void uploadFilterClassSource() {
+<span class="fc" id="L606">        Iterator&lt;Entry&lt;String, MQConsumerInner&gt;&gt; it = this.consumerTable.entrySet().iterator();</span>
+<span class="fc bfc" id="L607" title="All 2 branches covered.">        while (it.hasNext()) {</span>
+<span class="fc" id="L608">            Entry&lt;String, MQConsumerInner&gt; next = it.next();</span>
+<span class="fc" id="L609">            MQConsumerInner consumer = next.getValue();</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">            if (ConsumeType.CONSUME_PASSIVELY == consumer.consumeType()) {</span>
+<span class="fc" id="L611">                Set&lt;SubscriptionData&gt; subscriptions = consumer.subscriptions();</span>
+<span class="fc bfc" id="L612" title="All 2 branches covered.">                for (SubscriptionData sub : subscriptions) {</span>
+<span class="pc bpc" id="L613" title="3 of 4 branches missed.">                    if (sub.isClassFilterMode() &amp;&amp; sub.getFilterClassSource() != null) {</span>
+<span class="nc" id="L614">                        final String consumerGroup = consumer.groupName();</span>
+<span class="nc" id="L615">                        final String className = sub.getSubString();</span>
+<span class="nc" id="L616">                        final String topic = sub.getTopic();</span>
+<span class="nc" id="L617">                        final String filterClassSource = sub.getFilterClassSource();</span>
+                        try {
+<span class="nc" id="L619">                            this.uploadFilterClassToAllFilterServer(consumerGroup, className, topic, filterClassSource);</span>
+<span class="nc" id="L620">                        } catch (Exception e) {</span>
+<span class="nc" id="L621">                            log.error(&quot;uploadFilterClassToAllFilterServer Exception&quot;, e);</span>
+<span class="nc" id="L622">                        }</span>
+                    }
+<span class="fc" id="L624">                }</span>
+            }
+<span class="fc" id="L626">        }</span>
+<span class="fc" id="L627">    }</span>
+
+    public boolean updateTopicRouteInfoFromNameServer(final String topic, boolean isDefault,
+        DefaultMQProducer defaultMQProducer) {
+        try {
+<span class="pc bpc" id="L632" title="1 of 2 branches missed.">            if (this.lockNamesrv.tryLock(LOCK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {</span>
+                try {
+                    TopicRouteData topicRouteData;
+<span class="pc bpc" id="L635" title="1 of 4 branches missed.">                    if (isDefault &amp;&amp; defaultMQProducer != null) {</span>
+<span class="fc" id="L636">                        topicRouteData = this.mQClientAPIImpl.getDefaultTopicRouteInfoFromNameServer(defaultMQProducer.getCreateTopicKey(),</span>
+<span class="fc" id="L637">                            clientConfig.getMqClientApiTimeout());</span>
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">                        if (topicRouteData != null) {</span>
+<span class="nc bnc" id="L639" title="All 2 branches missed.">                            for (QueueData data : topicRouteData.getQueueDatas()) {</span>
+<span class="nc" id="L640">                                int queueNums = Math.min(defaultMQProducer.getDefaultTopicQueueNums(), data.getReadQueueNums());</span>
+<span class="nc" id="L641">                                data.setReadQueueNums(queueNums);</span>
+<span class="nc" id="L642">                                data.setWriteQueueNums(queueNums);</span>
+<span class="nc" id="L643">                            }</span>
+                        }
+                    } else {
+<span class="fc" id="L646">                        topicRouteData = this.mQClientAPIImpl.getTopicRouteInfoFromNameServer(topic, clientConfig.getMqClientApiTimeout());</span>
+                    }
+<span class="fc bfc" id="L648" title="All 2 branches covered.">                    if (topicRouteData != null) {</span>
+<span class="fc" id="L649">                        TopicRouteData old = this.topicRouteTable.get(topic);</span>
+<span class="fc" id="L650">                        boolean changed = topicRouteDataIsChange(old, topicRouteData);</span>
+<span class="fc bfc" id="L651" title="All 2 branches covered.">                        if (!changed) {</span>
+<span class="fc" id="L652">                            changed = this.isNeedUpdateTopicRouteInfo(topic);</span>
+                        } else {
+<span class="fc" id="L654">                            log.info(&quot;the topic[{}] route info changed, old[{}] ,new[{}]&quot;, topic, old, topicRouteData);</span>
+                        }
+
+<span class="fc bfc" id="L657" title="All 2 branches covered.">                        if (changed) {</span>
+
+<span class="fc bfc" id="L659" title="All 2 branches covered.">                            for (BrokerData bd : topicRouteData.getBrokerDatas()) {</span>
+<span class="fc" id="L660">                                this.brokerAddrTable.put(bd.getBrokerName(), bd.getBrokerAddrs());</span>
+<span class="fc" id="L661">                            }</span>
+
+                            // Update endpoint map
+                            {
+<span class="fc" id="L665">                                ConcurrentMap&lt;MessageQueue, String&gt; mqEndPoints = topicRouteData2EndpointsForStaticTopic(topic, topicRouteData);</span>
+<span class="pc bpc" id="L666" title="2 of 4 branches missed.">                                if (mqEndPoints != null &amp;&amp; !mqEndPoints.isEmpty()) {</span>
+<span class="nc" id="L667">                                    topicEndPointsTable.put(topic, mqEndPoints);</span>
+                                }
+                            }
+
+                            // Update Pub info
+                            {
+<span class="fc" id="L673">                                TopicPublishInfo publishInfo = topicRouteData2TopicPublishInfo(topic, topicRouteData);</span>
+<span class="fc" id="L674">                                publishInfo.setHaveTopicRouterInfo(true);</span>
+<span class="fc" id="L675">                                Iterator&lt;Entry&lt;String, MQProducerInner&gt;&gt; it = this.producerTable.entrySet().iterator();</span>
+<span class="fc bfc" id="L676" title="All 2 branches covered.">                                while (it.hasNext()) {</span>
+<span class="fc" id="L677">                                    Entry&lt;String, MQProducerInner&gt; entry = it.next();</span>
+<span class="fc" id="L678">                                    MQProducerInner impl = entry.getValue();</span>
+<span class="pc bpc" id="L679" title="1 of 2 branches missed.">                                    if (impl != null) {</span>
+<span class="fc" id="L680">                                        impl.updateTopicPublishInfo(topic, publishInfo);</span>
+                                    }
+<span class="fc" id="L682">                                }</span>
+                            }
+
+                            // Update sub info
+<span class="fc bfc" id="L686" title="All 2 branches covered.">                            if (!consumerTable.isEmpty()) {</span>
+<span class="fc" id="L687">                                Set&lt;MessageQueue&gt; subscribeInfo = topicRouteData2TopicSubscribeInfo(topic, topicRouteData);</span>
+<span class="fc" id="L688">                                Iterator&lt;Entry&lt;String, MQConsumerInner&gt;&gt; it = this.consumerTable.entrySet().iterator();</span>
+<span class="fc bfc" id="L689" title="All 2 branches covered.">                                while (it.hasNext()) {</span>
+<span class="fc" id="L690">                                    Entry&lt;String, MQConsumerInner&gt; entry = it.next();</span>
+<span class="fc" id="L691">                                    MQConsumerInner impl = entry.getValue();</span>
+<span class="pc bpc" id="L692" title="1 of 2 branches missed.">                                    if (impl != null) {</span>
+<span class="fc" id="L693">                                        impl.updateTopicSubscribeInfo(topic, subscribeInfo);</span>
+                                    }
+<span class="fc" id="L695">                                }</span>
+                            }
+<span class="fc" id="L697">                            TopicRouteData cloneTopicRouteData = new TopicRouteData(topicRouteData);</span>
+<span class="fc" id="L698">                            log.info(&quot;topicRouteTable.put. Topic = {}, TopicRouteData[{}]&quot;, topic, cloneTopicRouteData);</span>
+<span class="fc" id="L699">                            this.topicRouteTable.put(topic, cloneTopicRouteData);</span>
+<span class="fc" id="L700">                            return true;</span>
+                        }
+<span class="fc" id="L702">                    } else {</span>
+<span class="fc" id="L703">                        log.warn(&quot;updateTopicRouteInfoFromNameServer, getTopicRouteInfoFromNameServer return null, Topic: {}. [{}]&quot;, topic, this.clientId);</span>
+                    }
+<span class="nc" id="L705">                } catch (MQClientException e) {</span>
+<span class="nc bnc" id="L706" title="All 4 branches missed.">                    if (!topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX) &amp;&amp; !topic.equals(TopicValidator.AUTO_CREATE_TOPIC_KEY_TOPIC)) {</span>
+<span class="nc" id="L707">                        log.warn(&quot;updateTopicRouteInfoFromNameServer Exception&quot;, e);</span>
+                    }
+<span class="fc" id="L709">                } catch (RemotingException e) {</span>
+<span class="fc" id="L710">                    log.error(&quot;updateTopicRouteInfoFromNameServer Exception&quot;, e);</span>
+<span class="fc" id="L711">                    throw new IllegalStateException(e);</span>
+                } finally {
+<span class="fc" id="L713">                    this.lockNamesrv.unlock();</span>
+<span class="fc" id="L714">                }</span>
+            } else {
+<span class="nc" id="L716">                log.warn(&quot;updateTopicRouteInfoFromNameServer tryLock timeout {}ms. [{}]&quot;, LOCK_TIMEOUT_MILLIS, this.clientId);</span>
+            }
+<span class="nc" id="L718">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L719">            log.warn(&quot;updateTopicRouteInfoFromNameServer Exception&quot;, e);</span>
+<span class="fc" id="L720">        }</span>
+
+<span class="fc" id="L722">        return false;</span>
+    }
+
+    private HeartbeatData prepareHeartbeatData() {
+<span class="fc" id="L726">        HeartbeatData heartbeatData = new HeartbeatData();</span>
+
+        // clientID
+<span class="fc" id="L729">        heartbeatData.setClientID(this.clientId);</span>
+
+        // Consumer
+<span class="fc bfc" id="L732" title="All 2 branches covered.">        for (Map.Entry&lt;String, MQConsumerInner&gt; entry : this.consumerTable.entrySet()) {</span>
+<span class="fc" id="L733">            MQConsumerInner impl = entry.getValue();</span>
+<span class="pc bpc" id="L734" title="1 of 2 branches missed.">            if (impl != null) {</span>
+<span class="fc" id="L735">                ConsumerData consumerData = new ConsumerData();</span>
+<span class="fc" id="L736">                consumerData.setGroupName(impl.groupName());</span>
+<span class="fc" id="L737">                consumerData.setConsumeType(impl.consumeType());</span>
+<span class="fc" id="L738">                consumerData.setMessageModel(impl.messageModel());</span>
+<span class="fc" id="L739">                consumerData.setConsumeFromWhere(impl.consumeFromWhere());</span>
+<span class="fc" id="L740">                consumerData.getSubscriptionDataSet().addAll(impl.subscriptions());</span>
+<span class="fc" id="L741">                consumerData.setUnitMode(impl.isUnitMode());</span>
+
+<span class="fc" id="L743">                heartbeatData.getConsumerDataSet().add(consumerData);</span>
+            }
+<span class="fc" id="L745">        }</span>
+
+        // Producer
+<span class="fc bfc" id="L748" title="All 2 branches covered.">        for (Map.Entry&lt;String/* group */, MQProducerInner&gt; entry : this.producerTable.entrySet()) {</span>
+<span class="fc" id="L749">            MQProducerInner impl = entry.getValue();</span>
+<span class="pc bpc" id="L750" title="1 of 2 branches missed.">            if (impl != null) {</span>
+<span class="fc" id="L751">                ProducerData producerData = new ProducerData();</span>
+<span class="fc" id="L752">                producerData.setGroupName(entry.getKey());</span>
+
+<span class="fc" id="L754">                heartbeatData.getProducerDataSet().add(producerData);</span>
+            }
+<span class="fc" id="L756">        }</span>
+
+<span class="fc" id="L758">        return heartbeatData;</span>
+    }
+
+    private boolean isBrokerInNameServer(final String brokerAddr) {
+<span class="nc" id="L762">        Iterator&lt;Entry&lt;String, TopicRouteData&gt;&gt; it = this.topicRouteTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L763" title="All 2 branches missed.">        while (it.hasNext()) {</span>
+<span class="nc" id="L764">            Entry&lt;String, TopicRouteData&gt; itNext = it.next();</span>
+<span class="nc" id="L765">            List&lt;BrokerData&gt; brokerDatas = itNext.getValue().getBrokerDatas();</span>
+<span class="nc bnc" id="L766" title="All 2 branches missed.">            for (BrokerData bd : brokerDatas) {</span>
+<span class="nc" id="L767">                boolean contain = bd.getBrokerAddrs().containsValue(brokerAddr);</span>
+<span class="nc bnc" id="L768" title="All 2 branches missed.">                if (contain)</span>
+<span class="nc" id="L769">                    return true;</span>
+<span class="nc" id="L770">            }</span>
+<span class="nc" id="L771">        }</span>
+
+<span class="nc" id="L773">        return false;</span>
+    }
+
+    /**
+     * This method will be removed in the version 5.0.0,because filterServer was removed,and method
+     * &lt;code&gt;subscribe(final String topic, final MessageSelector messageSelector)&lt;/code&gt; is recommended.
+     */
+    @Deprecated
+    private void uploadFilterClassToAllFilterServer(final String consumerGroup, final String fullClassName,
+        final String topic,
+        final String filterClassSource) throws UnsupportedEncodingException {
+<span class="nc" id="L784">        byte[] classBody = null;</span>
+<span class="nc" id="L785">        int classCRC = 0;</span>
+        try {
+<span class="nc" id="L787">            classBody = filterClassSource.getBytes(MixAll.DEFAULT_CHARSET);</span>
+<span class="nc" id="L788">            classCRC = UtilAll.crc32(classBody);</span>
+<span class="nc" id="L789">        } catch (Exception e1) {</span>
+<span class="nc" id="L790">            log.warn(&quot;uploadFilterClassToAllFilterServer Exception, ClassName: {} {}&quot;,</span>
+                fullClassName,
+<span class="nc" id="L792">                RemotingHelper.exceptionSimpleDesc(e1));</span>
+<span class="nc" id="L793">        }</span>
+
+<span class="nc" id="L795">        TopicRouteData topicRouteData = this.topicRouteTable.get(topic);</span>
+<span class="nc bnc" id="L796" title="All 2 branches missed.">        if (topicRouteData != null</span>
+<span class="nc bnc" id="L797" title="All 4 branches missed.">            &amp;&amp; topicRouteData.getFilterServerTable() != null &amp;&amp; !topicRouteData.getFilterServerTable().isEmpty()) {</span>
+<span class="nc" id="L798">            Iterator&lt;Entry&lt;String, List&lt;String&gt;&gt;&gt; it = topicRouteData.getFilterServerTable().entrySet().iterator();</span>
+<span class="nc bnc" id="L799" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L800">                Entry&lt;String, List&lt;String&gt;&gt; next = it.next();</span>
+<span class="nc" id="L801">                List&lt;String&gt; value = next.getValue();</span>
+<span class="nc bnc" id="L802" title="All 2 branches missed.">                for (final String fsAddr : value) {</span>
+                    try {
+<span class="nc" id="L804">                        this.mQClientAPIImpl.registerMessageFilterClass(fsAddr, consumerGroup, topic, fullClassName, classCRC, classBody,</span>
+                            5000);
+
+<span class="nc" id="L807">                        log.info(&quot;register message class filter to {} OK, ConsumerGroup: {} Topic: {} ClassName: {}&quot;, fsAddr, consumerGroup,</span>
+                            topic, fullClassName);
+
+<span class="nc" id="L810">                    } catch (Exception e) {</span>
+<span class="nc" id="L811">                        log.error(&quot;uploadFilterClassToAllFilterServer Exception&quot;, e);</span>
+<span class="nc" id="L812">                    }</span>
+<span class="nc" id="L813">                }</span>
+<span class="nc" id="L814">            }</span>
+<span class="nc" id="L815">        } else {</span>
+<span class="nc" id="L816">            log.warn(&quot;register message class filter failed, because no filter server, ConsumerGroup: {} Topic: {} ClassName: {}&quot;,</span>
+                consumerGroup, topic, fullClassName);
+        }
+<span class="nc" id="L819">    }</span>
+
+    private boolean topicRouteDataIsChange(TopicRouteData olddata, TopicRouteData nowdata) {
+<span class="pc bpc" id="L822" title="1 of 4 branches missed.">        if (olddata == null || nowdata == null)</span>
+<span class="fc" id="L823">            return true;</span>
+<span class="fc" id="L824">        TopicRouteData old = new TopicRouteData(olddata);</span>
+<span class="fc" id="L825">        TopicRouteData now = new TopicRouteData(nowdata);</span>
+<span class="fc" id="L826">        Collections.sort(old.getQueueDatas());</span>
+<span class="fc" id="L827">        Collections.sort(old.getBrokerDatas());</span>
+<span class="fc" id="L828">        Collections.sort(now.getQueueDatas());</span>
+<span class="fc" id="L829">        Collections.sort(now.getBrokerDatas());</span>
+<span class="pc bpc" id="L830" title="1 of 2 branches missed.">        return !old.equals(now);</span>
+
+    }
+
+    private boolean isNeedUpdateTopicRouteInfo(final String topic) {
+<span class="fc" id="L835">        boolean result = false;</span>
+        {
+<span class="fc" id="L837">            Iterator&lt;Entry&lt;String, MQProducerInner&gt;&gt; it = this.producerTable.entrySet().iterator();</span>
+<span class="fc bfc" id="L838" title="All 4 branches covered.">            while (it.hasNext() &amp;&amp; !result) {</span>
+<span class="fc" id="L839">                Entry&lt;String, MQProducerInner&gt; entry = it.next();</span>
+<span class="fc" id="L840">                MQProducerInner impl = entry.getValue();</span>
+<span class="pc bpc" id="L841" title="1 of 2 branches missed.">                if (impl != null) {</span>
+<span class="fc" id="L842">                    result = impl.isPublishTopicNeedUpdate(topic);</span>
+                }
+<span class="fc" id="L844">            }</span>
+        }
+
+<span class="fc bfc" id="L847" title="All 2 branches covered.">        if (result) {</span>
+<span class="fc" id="L848">            return true;</span>
+        }
+
+        {
+<span class="fc" id="L852">            Iterator&lt;Entry&lt;String, MQConsumerInner&gt;&gt; it = this.consumerTable.entrySet().iterator();</span>
+<span class="pc bpc" id="L853" title="1 of 4 branches missed.">            while (it.hasNext() &amp;&amp; !result) {</span>
+<span class="fc" id="L854">                Entry&lt;String, MQConsumerInner&gt; entry = it.next();</span>
+<span class="fc" id="L855">                MQConsumerInner impl = entry.getValue();</span>
+<span class="pc bpc" id="L856" title="1 of 2 branches missed.">                if (impl != null) {</span>
+<span class="fc" id="L857">                    result = impl.isSubscribeTopicNeedUpdate(topic);</span>
+                }
+<span class="fc" id="L859">            }</span>
+        }
+
+<span class="fc" id="L862">        return result;</span>
+    }
+
+    public void shutdown() {
+        // Consumer
+<span class="fc bfc" id="L867" title="All 2 branches covered.">        if (!this.consumerTable.isEmpty())</span>
+<span class="fc" id="L868">            return;</span>
+
+        // AdminExt
+<span class="pc bpc" id="L871" title="1 of 2 branches missed.">        if (!this.adminExtTable.isEmpty())</span>
+<span class="nc" id="L872">            return;</span>
+
+        // Producer
+<span class="fc bfc" id="L875" title="All 2 branches covered.">        if (this.producerTable.size() &gt; 1)</span>
+<span class="fc" id="L876">            return;</span>
+
+<span class="fc" id="L878">        synchronized (this) {</span>
+<span class="pc bpc" id="L879" title="2 of 4 branches missed.">            switch (this.serviceState) {</span>
+                case CREATE_JUST:
+<span class="fc" id="L881">                    break;</span>
+                case RUNNING:
+<span class="fc" id="L883">                    this.defaultMQProducer.getDefaultMQProducerImpl().shutdown(false);</span>
+
+<span class="fc" id="L885">                    this.serviceState = ServiceState.SHUTDOWN_ALREADY;</span>
+<span class="fc" id="L886">                    this.pullMessageService.shutdown(true);</span>
+<span class="fc" id="L887">                    this.scheduledExecutorService.shutdown();</span>
+<span class="fc" id="L888">                    this.mQClientAPIImpl.shutdown();</span>
+<span class="fc" id="L889">                    this.rebalanceService.shutdown();</span>
+
+<span class="fc" id="L891">                    MQClientManager.getInstance().removeClientFactory(this.clientId);</span>
+<span class="fc" id="L892">                    log.info(&quot;the client factory [{}] shutdown OK&quot;, this.clientId);</span>
+<span class="fc" id="L893">                    break;</span>
+                case SHUTDOWN_ALREADY:
+<span class="nc" id="L895">                    break;</span>
+                default:
+                    break;
+            }
+<span class="fc" id="L899">        }</span>
+<span class="fc" id="L900">    }</span>
+
+    public synchronized boolean registerConsumer(final String group, final MQConsumerInner consumer) {
+<span class="pc bpc" id="L903" title="2 of 4 branches missed.">        if (null == group || null == consumer) {</span>
+<span class="nc" id="L904">            return false;</span>
+        }
+
+<span class="fc" id="L907">        MQConsumerInner prev = this.consumerTable.putIfAbsent(group, consumer);</span>
+<span class="fc bfc" id="L908" title="All 2 branches covered.">        if (prev != null) {</span>
+<span class="fc" id="L909">            log.warn(&quot;the consumer group[&quot; + group + &quot;] exist already.&quot;);</span>
+<span class="fc" id="L910">            return false;</span>
+        }
+
+<span class="fc" id="L913">        return true;</span>
+    }
+
+    public synchronized void unregisterConsumer(final String group) {
+<span class="fc" id="L917">        this.consumerTable.remove(group);</span>
+<span class="fc" id="L918">        this.unregisterClient(null, group);</span>
+<span class="fc" id="L919">    }</span>
+
+    private void unregisterClient(final String producerGroup, final String consumerGroup) {
+<span class="fc" id="L922">        Iterator&lt;Entry&lt;String, HashMap&lt;Long, String&gt;&gt;&gt; it = this.brokerAddrTable.entrySet().iterator();</span>
+<span class="fc bfc" id="L923" title="All 2 branches covered.">        while (it.hasNext()) {</span>
+<span class="fc" id="L924">            Entry&lt;String, HashMap&lt;Long, String&gt;&gt; entry = it.next();</span>
+<span class="fc" id="L925">            String brokerName = entry.getKey();</span>
+<span class="fc" id="L926">            HashMap&lt;Long, String&gt; oneTable = entry.getValue();</span>
+
+<span class="pc bpc" id="L928" title="1 of 2 branches missed.">            if (oneTable != null) {</span>
+<span class="fc bfc" id="L929" title="All 2 branches covered.">                for (Map.Entry&lt;Long, String&gt; entry1 : oneTable.entrySet()) {</span>
+<span class="fc" id="L930">                    String addr = entry1.getValue();</span>
+<span class="pc bpc" id="L931" title="1 of 2 branches missed.">                    if (addr != null) {</span>
+                        try {
+<span class="fc" id="L933">                            this.mQClientAPIImpl.unregisterClient(addr, this.clientId, producerGroup, consumerGroup, clientConfig.getMqClientApiTimeout());</span>
+<span class="fc" id="L934">                            log.info(&quot;unregister client[Producer: {} Consumer: {}] from broker[{} {} {}] success&quot;, producerGroup, consumerGroup, brokerName, entry1.getKey(), addr);</span>
+<span class="nc" id="L935">                        } catch (RemotingException e) {</span>
+<span class="nc" id="L936">                            log.warn(&quot;unregister client RemotingException from broker: {}, {}&quot;, addr, e.getMessage());</span>
+<span class="nc" id="L937">                        } catch (InterruptedException e) {</span>
+<span class="nc" id="L938">                            log.warn(&quot;unregister client InterruptedException from broker: {}, {}&quot;, addr, e.getMessage());</span>
+<span class="nc" id="L939">                        } catch (MQBrokerException e) {</span>
+<span class="nc" id="L940">                            log.warn(&quot;unregister client MQBrokerException from broker: {}, {}&quot;, addr, e.getMessage());</span>
+<span class="pc" id="L941">                        }</span>
+                    }
+<span class="fc" id="L943">                }</span>
+            }
+<span class="fc" id="L945">        }</span>
+<span class="fc" id="L946">    }</span>
+
+    public synchronized boolean registerProducer(final String group, final DefaultMQProducerImpl producer) {
+<span class="pc bpc" id="L949" title="2 of 4 branches missed.">        if (null == group || null == producer) {</span>
+<span class="nc" id="L950">            return false;</span>
+        }
+
+<span class="fc" id="L953">        MQProducerInner prev = this.producerTable.putIfAbsent(group, producer);</span>
+<span class="fc bfc" id="L954" title="All 2 branches covered.">        if (prev != null) {</span>
+<span class="fc" id="L955">            log.warn(&quot;the producer group[{}] exist already.&quot;, group);</span>
+<span class="fc" id="L956">            return false;</span>
+        }
+
+<span class="fc" id="L959">        return true;</span>
+    }
+
+    public synchronized void unregisterProducer(final String group) {
+<span class="fc" id="L963">        this.producerTable.remove(group);</span>
+<span class="fc" id="L964">        this.unregisterClient(group, null);</span>
+<span class="fc" id="L965">    }</span>
+
+    public boolean registerAdminExt(final String group, final MQAdminExtInner admin) {
+<span class="pc bpc" id="L968" title="2 of 4 branches missed.">        if (null == group || null == admin) {</span>
+<span class="nc" id="L969">            return false;</span>
+        }
+
+<span class="fc" id="L972">        MQAdminExtInner prev = this.adminExtTable.putIfAbsent(group, admin);</span>
+<span class="fc bfc" id="L973" title="All 2 branches covered.">        if (prev != null) {</span>
+<span class="fc" id="L974">            log.warn(&quot;the admin group[{}] exist already.&quot;, group);</span>
+<span class="fc" id="L975">            return false;</span>
+        }
+
+<span class="fc" id="L978">        return true;</span>
+    }
+
+    public void unregisterAdminExt(final String group) {
+<span class="fc" id="L982">        this.adminExtTable.remove(group);</span>
+<span class="fc" id="L983">    }</span>
+
+    public void rebalanceLater(long delayMillis) {
+<span class="nc bnc" id="L986" title="All 2 branches missed.">        if (delayMillis &lt;= 0) {</span>
+<span class="nc" id="L987">            this.rebalanceService.wakeup();</span>
+        } else {
+<span class="nc" id="L989">            this.scheduledExecutorService.schedule(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L992">                    MQClientInstance.this.rebalanceService.wakeup();</span>
+<span class="nc" id="L993">                }</span>
+            }, delayMillis, TimeUnit.MILLISECONDS);
+        }
+<span class="nc" id="L996">    }</span>
+
+    public void rebalanceImmediately() {
+<span class="fc" id="L999">        this.rebalanceService.wakeup();</span>
+<span class="fc" id="L1000">    }</span>
+
+    public void doRebalance() {
+<span class="fc bfc" id="L1003" title="All 2 branches covered.">        for (Map.Entry&lt;String, MQConsumerInner&gt; entry : this.consumerTable.entrySet()) {</span>
+<span class="fc" id="L1004">            MQConsumerInner impl = entry.getValue();</span>
+<span class="pc bpc" id="L1005" title="1 of 2 branches missed.">            if (impl != null) {</span>
+                try {
+<span class="fc" id="L1007">                    impl.doRebalance();</span>
+<span class="nc" id="L1008">                } catch (Throwable e) {</span>
+<span class="nc" id="L1009">                    log.error(&quot;doRebalance exception&quot;, e);</span>
+<span class="fc" id="L1010">                }</span>
+            }
+<span class="fc" id="L1012">        }</span>
+<span class="fc" id="L1013">    }</span>
+
+    public MQProducerInner selectProducer(final String group) {
+<span class="nc" id="L1016">        return this.producerTable.get(group);</span>
+    }
+
+    public MQConsumerInner selectConsumer(final String group) {
+<span class="fc" id="L1020">        return this.consumerTable.get(group);</span>
+    }
+
+    public String getBrokerNameFromMessageQueue(final MessageQueue mq) {
+<span class="pc bpc" id="L1024" title="1 of 2 branches missed.">        if (topicEndPointsTable != null</span>
+<span class="pc bpc" id="L1025" title="1 of 2 branches missed.">            &amp;&amp; topicEndPointsTable.get(mq.getTopic()) != null</span>
+<span class="nc bnc" id="L1026" title="All 2 branches missed.">            &amp;&amp; !topicEndPointsTable.get(mq.getTopic()).isEmpty()) {</span>
+<span class="nc" id="L1027">            return topicEndPointsTable.get(mq.getTopic()).get(mq);</span>
+        }
+<span class="fc" id="L1029">        return mq.getBrokerName();</span>
+    }
+
+    public FindBrokerResult findBrokerAddressInAdmin(final String brokerName) {
+<span class="nc bnc" id="L1033" title="All 2 branches missed.">        if (brokerName == null) {</span>
+<span class="nc" id="L1034">            return null;</span>
+        }
+<span class="nc" id="L1036">        String brokerAddr = null;</span>
+<span class="nc" id="L1037">        boolean slave = false;</span>
+<span class="nc" id="L1038">        boolean found = false;</span>
+
+<span class="nc" id="L1040">        HashMap&lt;Long/* brokerId */, String/* address */&gt; map = this.brokerAddrTable.get(brokerName);</span>
+<span class="nc bnc" id="L1041" title="All 4 branches missed.">        if (map != null &amp;&amp; !map.isEmpty()) {</span>
+<span class="nc bnc" id="L1042" title="All 2 branches missed.">            for (Map.Entry&lt;Long, String&gt; entry : map.entrySet()) {</span>
+<span class="nc" id="L1043">                Long id = entry.getKey();</span>
+<span class="nc" id="L1044">                brokerAddr = entry.getValue();</span>
+<span class="nc bnc" id="L1045" title="All 2 branches missed.">                if (brokerAddr != null) {</span>
+<span class="nc" id="L1046">                    found = true;</span>
+<span class="nc bnc" id="L1047" title="All 2 branches missed.">                    if (MixAll.MASTER_ID == id) {</span>
+<span class="nc" id="L1048">                        slave = false;</span>
+                    } else {
+<span class="nc" id="L1050">                        slave = true;</span>
+                    }
+<span class="nc" id="L1052">                    break;</span>
+
+                }
+<span class="nc" id="L1055">            } // end of for</span>
+        }
+
+<span class="nc bnc" id="L1058" title="All 2 branches missed.">        if (found) {</span>
+<span class="nc" id="L1059">            return new FindBrokerResult(brokerAddr, slave, findBrokerVersion(brokerName, brokerAddr));</span>
+        }
+
+<span class="nc" id="L1062">        return null;</span>
+    }
+
+    public String findBrokerAddressInPublish(final String brokerName) {
+<span class="pc bpc" id="L1066" title="1 of 2 branches missed.">        if (brokerName == null) {</span>
+<span class="nc" id="L1067">            return null;</span>
+        }
+<span class="fc" id="L1069">        HashMap&lt;Long/* brokerId */, String/* address */&gt; map = this.brokerAddrTable.get(brokerName);</span>
+<span class="pc bpc" id="L1070" title="1 of 4 branches missed.">        if (map != null &amp;&amp; !map.isEmpty()) {</span>
+<span class="fc" id="L1071">            return map.get(MixAll.MASTER_ID);</span>
+        }
+
+<span class="fc" id="L1074">        return null;</span>
+    }
+
+    public FindBrokerResult findBrokerAddressInSubscribe(
+        final String brokerName,
+        final long brokerId,
+        final boolean onlyThisBroker
+    ) {
+<span class="pc bpc" id="L1082" title="1 of 2 branches missed.">        if (brokerName == null) {</span>
+<span class="nc" id="L1083">            return null;</span>
+        }
+<span class="fc" id="L1085">        String brokerAddr = null;</span>
+<span class="fc" id="L1086">        boolean slave = false;</span>
+<span class="fc" id="L1087">        boolean found = false;</span>
+
+<span class="fc" id="L1089">        HashMap&lt;Long/* brokerId */, String/* address */&gt; map = this.brokerAddrTable.get(brokerName);</span>
+<span class="pc bpc" id="L1090" title="1 of 4 branches missed.">        if (map != null &amp;&amp; !map.isEmpty()) {</span>
+<span class="fc" id="L1091">            brokerAddr = map.get(brokerId);</span>
+<span class="pc bpc" id="L1092" title="1 of 2 branches missed.">            slave = brokerId != MixAll.MASTER_ID;</span>
+<span class="fc bfc" id="L1093" title="All 2 branches covered.">            found = brokerAddr != null;</span>
+
+<span class="pc bpc" id="L1095" title="1 of 4 branches missed.">            if (!found &amp;&amp; slave) {</span>
+<span class="fc" id="L1096">                brokerAddr = map.get(brokerId + 1);</span>
+<span class="pc bpc" id="L1097" title="1 of 2 branches missed.">                found = brokerAddr != null;</span>
+            }
+
+<span class="pc bpc" id="L1100" title="3 of 4 branches missed.">            if (!found &amp;&amp; !onlyThisBroker) {</span>
+<span class="nc" id="L1101">                Entry&lt;Long, String&gt; entry = map.entrySet().iterator().next();</span>
+<span class="nc" id="L1102">                brokerAddr = entry.getValue();</span>
+<span class="nc bnc" id="L1103" title="All 2 branches missed.">                slave = entry.getKey() != MixAll.MASTER_ID;</span>
+<span class="nc" id="L1104">                found = true;</span>
+            }
+        }
+
+<span class="fc bfc" id="L1108" title="All 2 branches covered.">        if (found) {</span>
+<span class="fc" id="L1109">            return new FindBrokerResult(brokerAddr, slave, findBrokerVersion(brokerName, brokerAddr));</span>
+        }
+
+<span class="fc" id="L1112">        return null;</span>
+    }
+
+    private int findBrokerVersion(String brokerName, String brokerAddr) {
+<span class="pc bpc" id="L1116" title="1 of 2 branches missed.">        if (this.brokerVersionTable.containsKey(brokerName)) {</span>
+<span class="nc bnc" id="L1117" title="All 2 branches missed.">            if (this.brokerVersionTable.get(brokerName).containsKey(brokerAddr)) {</span>
+<span class="nc" id="L1118">                return this.brokerVersionTable.get(brokerName).get(brokerAddr);</span>
+            }
+        }
+        //To do need to fresh the version
+<span class="fc" id="L1122">        return 0;</span>
+    }
+
+    public List&lt;String&gt; findConsumerIdList(final String topic, final String group) {
+<span class="fc" id="L1126">        String brokerAddr = this.findBrokerAddrByTopic(topic);</span>
+<span class="pc bpc" id="L1127" title="1 of 2 branches missed.">        if (null == brokerAddr) {</span>
+<span class="fc" id="L1128">            this.updateTopicRouteInfoFromNameServer(topic);</span>
+<span class="fc" id="L1129">            brokerAddr = this.findBrokerAddrByTopic(topic);</span>
+        }
+
+<span class="pc bpc" id="L1132" title="1 of 2 branches missed.">        if (null != brokerAddr) {</span>
+            try {
+<span class="nc" id="L1134">                return this.mQClientAPIImpl.getConsumerIdListByGroup(brokerAddr, group, clientConfig.getMqClientApiTimeout());</span>
+<span class="nc" id="L1135">            } catch (Exception e) {</span>
+<span class="nc" id="L1136">                log.warn(&quot;getConsumerIdListByGroup exception, &quot; + brokerAddr + &quot; &quot; + group, e);</span>
+            }
+        }
+
+<span class="fc" id="L1140">        return null;</span>
+    }
+
+    public Set&lt;MessageQueueAssignment&gt; queryAssignment(final String topic, final String consumerGroup,
+        final String strategyName, final MessageModel messageModel, int timeout)
+        throws RemotingException, InterruptedException, MQBrokerException {
+<span class="nc" id="L1146">        String brokerAddr = this.findBrokerAddrByTopic(topic);</span>
+<span class="nc bnc" id="L1147" title="All 2 branches missed.">        if (null == brokerAddr) {</span>
+<span class="nc" id="L1148">            this.updateTopicRouteInfoFromNameServer(topic);</span>
+<span class="nc" id="L1149">            brokerAddr = this.findBrokerAddrByTopic(topic);</span>
+        }
+
+<span class="nc bnc" id="L1152" title="All 2 branches missed.">        if (null != brokerAddr) {</span>
+<span class="nc" id="L1153">            return this.mQClientAPIImpl.queryAssignment(brokerAddr, topic, consumerGroup, clientId, strategyName,</span>
+                messageModel, timeout);
+        }
+
+<span class="nc" id="L1157">        return null;</span>
+    }
+
+    public String findBrokerAddrByTopic(final String topic) {
+<span class="fc" id="L1161">        TopicRouteData topicRouteData = this.topicRouteTable.get(topic);</span>
+<span class="pc bpc" id="L1162" title="1 of 2 branches missed.">        if (topicRouteData != null) {</span>
+<span class="nc" id="L1163">            List&lt;BrokerData&gt; brokers = topicRouteData.getBrokerDatas();</span>
+<span class="nc bnc" id="L1164" title="All 2 branches missed.">            if (!brokers.isEmpty()) {</span>
+<span class="nc" id="L1165">                int index = random.nextInt(brokers.size());</span>
+<span class="nc" id="L1166">                BrokerData bd = brokers.get(index % brokers.size());</span>
+<span class="nc" id="L1167">                return bd.selectBrokerAddr();</span>
+            }
+        }
+
+<span class="fc" id="L1171">        return null;</span>
+    }
+
+    public synchronized void resetOffset(String topic, String group, Map&lt;MessageQueue, Long&gt; offsetTable) {
+<span class="nc" id="L1175">        DefaultMQPushConsumerImpl consumer = null;</span>
+        try {
+<span class="nc" id="L1177">            MQConsumerInner impl = this.consumerTable.get(group);</span>
+<span class="nc bnc" id="L1178" title="All 4 branches missed.">            if (impl != null &amp;&amp; impl instanceof DefaultMQPushConsumerImpl) {</span>
+<span class="nc" id="L1179">                consumer = (DefaultMQPushConsumerImpl) impl;</span>
+            } else {
+<span class="nc" id="L1181">                log.info(&quot;[reset-offset] consumer dose not exist. group={}&quot;, group);</span>
+<span class="nc" id="L1182">                return;</span>
+            }
+<span class="nc" id="L1184">            consumer.suspend();</span>
+
+<span class="nc" id="L1186">            ConcurrentMap&lt;MessageQueue, ProcessQueue&gt; processQueueTable = consumer.getRebalanceImpl().getProcessQueueTable();</span>
+<span class="nc bnc" id="L1187" title="All 2 branches missed.">            for (Map.Entry&lt;MessageQueue, ProcessQueue&gt; entry : processQueueTable.entrySet()) {</span>
+<span class="nc" id="L1188">                MessageQueue mq = entry.getKey();</span>
+<span class="nc bnc" id="L1189" title="All 4 branches missed.">                if (topic.equals(mq.getTopic()) &amp;&amp; offsetTable.containsKey(mq)) {</span>
+<span class="nc" id="L1190">                    ProcessQueue pq = entry.getValue();</span>
+<span class="nc" id="L1191">                    pq.setDropped(true);</span>
+<span class="nc" id="L1192">                    pq.clear();</span>
+                }
+<span class="nc" id="L1194">            }</span>
+
+            try {
+<span class="nc" id="L1197">                TimeUnit.SECONDS.sleep(10);</span>
+<span class="nc" id="L1198">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L1199">            }</span>
+
+<span class="nc" id="L1201">            Iterator&lt;MessageQueue&gt; iterator = processQueueTable.keySet().iterator();</span>
+<span class="nc bnc" id="L1202" title="All 2 branches missed.">            while (iterator.hasNext()) {</span>
+<span class="nc" id="L1203">                MessageQueue mq = iterator.next();</span>
+<span class="nc" id="L1204">                Long offset = offsetTable.get(mq);</span>
+<span class="nc bnc" id="L1205" title="All 4 branches missed.">                if (topic.equals(mq.getTopic()) &amp;&amp; offset != null) {</span>
+                    try {
+<span class="nc" id="L1207">                        consumer.updateConsumeOffset(mq, offset);</span>
+<span class="nc" id="L1208">                        consumer.getRebalanceImpl().removeUnnecessaryMessageQueue(mq, processQueueTable.get(mq));</span>
+<span class="nc" id="L1209">                        iterator.remove();</span>
+<span class="nc" id="L1210">                    } catch (Exception e) {</span>
+<span class="nc" id="L1211">                        log.warn(&quot;reset offset failed. group={}, {}&quot;, group, mq, e);</span>
+<span class="nc" id="L1212">                    }</span>
+                }
+<span class="nc" id="L1214">            }</span>
+        } finally {
+<span class="nc bnc" id="L1216" title="All 2 branches missed.">            if (consumer != null) {</span>
+<span class="nc" id="L1217">                consumer.resume();</span>
+            }
+        }
+<span class="nc" id="L1220">    }</span>
+
+    public Map&lt;MessageQueue, Long&gt; getConsumerStatus(String topic, String group) {
+<span class="nc" id="L1223">        MQConsumerInner impl = this.consumerTable.get(group);</span>
+<span class="nc bnc" id="L1224" title="All 4 branches missed.">        if (impl != null &amp;&amp; impl instanceof DefaultMQPushConsumerImpl) {</span>
+<span class="nc" id="L1225">            DefaultMQPushConsumerImpl consumer = (DefaultMQPushConsumerImpl) impl;</span>
+<span class="nc" id="L1226">            return consumer.getOffsetStore().cloneOffsetTable(topic);</span>
+<span class="nc bnc" id="L1227" title="All 4 branches missed.">        } else if (impl != null &amp;&amp; impl instanceof DefaultMQPullConsumerImpl) {</span>
+<span class="nc" id="L1228">            DefaultMQPullConsumerImpl consumer = (DefaultMQPullConsumerImpl) impl;</span>
+<span class="nc" id="L1229">            return consumer.getOffsetStore().cloneOffsetTable(topic);</span>
+        } else {
+<span class="nc" id="L1231">            return Collections.EMPTY_MAP;</span>
+        }
+    }
+
+    public TopicRouteData getAnExistTopicRouteData(final String topic) {
+<span class="nc" id="L1236">        return this.topicRouteTable.get(topic);</span>
+    }
+
+    public MQClientAPIImpl getMQClientAPIImpl() {
+<span class="fc" id="L1240">        return mQClientAPIImpl;</span>
+    }
+
+    public MQAdminImpl getMQAdminImpl() {
+<span class="fc" id="L1244">        return mQAdminImpl;</span>
+    }
+
+    public long getBootTimestamp() {
+<span class="nc" id="L1248">        return bootTimestamp;</span>
+    }
+
+    public ScheduledExecutorService getScheduledExecutorService() {
+<span class="nc" id="L1252">        return scheduledExecutorService;</span>
+    }
+
+    public PullMessageService getPullMessageService() {
+<span class="fc" id="L1256">        return pullMessageService;</span>
+    }
+
+    public DefaultMQProducer getDefaultMQProducer() {
+<span class="nc" id="L1260">        return defaultMQProducer;</span>
+    }
+
+    public ConcurrentMap&lt;String, TopicRouteData&gt; getTopicRouteTable() {
+<span class="fc" id="L1264">        return topicRouteTable;</span>
+    }
+
+    public ConsumeMessageDirectlyResult consumeMessageDirectly(final MessageExt msg,
+        final String consumerGroup,
+        final String brokerName) {
+<span class="nc" id="L1270">        MQConsumerInner mqConsumerInner = this.consumerTable.get(consumerGroup);</span>
+<span class="nc bnc" id="L1271" title="All 2 branches missed.">        if (null != mqConsumerInner) {</span>
+<span class="nc" id="L1272">            DefaultMQPushConsumerImpl consumer = (DefaultMQPushConsumerImpl) mqConsumerInner;</span>
+
+<span class="nc" id="L1274">            ConsumeMessageDirectlyResult result = consumer.getConsumeMessageService().consumeMessageDirectly(msg, brokerName);</span>
+<span class="nc" id="L1275">            return result;</span>
+        }
+
+<span class="nc" id="L1278">        return null;</span>
+    }
+
+    public ConsumerRunningInfo consumerRunningInfo(final String consumerGroup) {
+<span class="fc" id="L1282">        MQConsumerInner mqConsumerInner = this.consumerTable.get(consumerGroup);</span>
+<span class="fc bfc" id="L1283" title="All 2 branches covered.">        if (mqConsumerInner == null) {</span>
+<span class="fc" id="L1284">            return null;</span>
+        }
+
+<span class="fc" id="L1287">        ConsumerRunningInfo consumerRunningInfo = mqConsumerInner.consumerRunningInfo();</span>
+
+<span class="fc" id="L1289">        List&lt;String&gt; nsList = this.mQClientAPIImpl.getRemotingClient().getNameServerAddressList();</span>
+
+<span class="fc" id="L1291">        StringBuilder strBuilder = new StringBuilder();</span>
+<span class="pc bpc" id="L1292" title="1 of 2 branches missed.">        if (nsList != null) {</span>
+<span class="nc bnc" id="L1293" title="All 2 branches missed.">            for (String addr : nsList) {</span>
+<span class="nc" id="L1294">                strBuilder.append(addr).append(&quot;;&quot;);</span>
+<span class="nc" id="L1295">            }</span>
+        }
+
+<span class="fc" id="L1298">        String nsAddr = strBuilder.toString();</span>
+<span class="fc" id="L1299">        consumerRunningInfo.getProperties().put(ConsumerRunningInfo.PROP_NAMESERVER_ADDR, nsAddr);</span>
+<span class="fc" id="L1300">        consumerRunningInfo.getProperties().put(ConsumerRunningInfo.PROP_CONSUME_TYPE, mqConsumerInner.consumeType().name());</span>
+<span class="fc" id="L1301">        consumerRunningInfo.getProperties().put(ConsumerRunningInfo.PROP_CLIENT_VERSION,</span>
+<span class="fc" id="L1302">            MQVersion.getVersionDesc(MQVersion.CURRENT_VERSION));</span>
+
+<span class="fc" id="L1304">        return consumerRunningInfo;</span>
+    }
+
+    public ConsumerStatsManager getConsumerStatsManager() {
+<span class="fc" id="L1308">        return consumerStatsManager;</span>
+    }
+
+    public NettyClientConfig getNettyClientConfig() {
+<span class="nc" id="L1312">        return nettyClientConfig;</span>
+    }
+
+    public ClientConfig getClientConfig() {
+<span class="fc" id="L1316">        return clientConfig;</span>
+    }
+
+    public TopicRouteData queryTopicRouteData(String topic) {
+<span class="nc" id="L1320">        TopicRouteData data = this.getAnExistTopicRouteData(topic);</span>
+<span class="nc bnc" id="L1321" title="All 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L1322">            this.updateTopicRouteInfoFromNameServer(topic);</span>
+<span class="nc" id="L1323">            data = this.getAnExistTopicRouteData(topic);</span>
+        }
+<span class="nc" id="L1325">        return data;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

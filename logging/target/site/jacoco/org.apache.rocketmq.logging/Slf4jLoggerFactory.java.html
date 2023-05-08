@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Slf4jLoggerFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-logging 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.logging</a> &gt; <span class="el_source">Slf4jLoggerFactory.java</span></div><h1>Slf4jLoggerFactory.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.logging;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class Slf4jLoggerFactory extends InternalLoggerFactory {
+
+<span class="fc" id="L29">    public Slf4jLoggerFactory() {</span>
+<span class="fc" id="L30">        LoggerFactory.getILoggerFactory();</span>
+<span class="fc" id="L31">        doRegister();</span>
+<span class="fc" id="L32">    }</span>
+
+    @Override
+    protected String getLoggerType() {
+<span class="fc" id="L36">        return InternalLoggerFactory.LOGGER_SLF4J;</span>
+    }
+
+    @Override
+    protected InternalLogger getLoggerInstance(String name) {
+<span class="fc" id="L41">        return new Slf4jLogger(name);</span>
+    }
+
+    @Override
+    protected void shutdown() {
+
+<span class="nc" id="L47">    }</span>
+
+    public static class Slf4jLogger implements InternalLogger {
+<span class="fc" id="L50">        private static final Pattern PATTERN = Pattern.compile(&quot;#.*#&quot;);</span>
+
+        private final String loggerSuffix;
+        private final Logger defaultLogger;
+
+<span class="fc" id="L55">        private final Map&lt;String, Logger&gt; loggerMap = new HashMap&lt;String, Logger&gt;();</span>
+
+<span class="fc" id="L57">        public Slf4jLogger(String loggerSuffix) {</span>
+<span class="fc" id="L58">            this.loggerSuffix = loggerSuffix;</span>
+<span class="fc" id="L59">            this.defaultLogger = LoggerFactory.getLogger(loggerSuffix);</span>
+<span class="fc" id="L60">        }</span>
+
+        private Logger getLogger() {
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            if (loggerSuffix.equals(ACCOUNT_LOGGER_NAME)</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                || loggerSuffix.equals(CONSUMER_STATS_LOGGER_NAME)</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                || loggerSuffix.equals(COMMERCIAL_LOGGER_NAME)) {</span>
+<span class="nc" id="L66">                return defaultLogger;</span>
+            }
+<span class="fc" id="L68">            String brokerIdentity = InnerLoggerFactory.brokerIdentity.get();</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (brokerIdentity == null) {</span>
+<span class="fc" id="L70">                Matcher m = PATTERN.matcher(Thread.currentThread().getName());</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                if (m.find()) {</span>
+<span class="nc" id="L72">                    String match = m.group();</span>
+<span class="nc" id="L73">                    brokerIdentity = match.substring(1, match.length() - 1);</span>
+                }
+            }
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (InnerLoggerFactory.BROKER_CONTAINER_NAME.equals(brokerIdentity)) {</span>
+<span class="nc" id="L77">                return defaultLogger;</span>
+            }
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (brokerIdentity != null) {</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                if (!loggerMap.containsKey(brokerIdentity)) {</span>
+<span class="nc" id="L81">                    loggerMap.put(brokerIdentity, LoggerFactory.getLogger(&quot;#&quot; + brokerIdentity + &quot;#&quot; + loggerSuffix));</span>
+                }
+<span class="nc" id="L83">                return loggerMap.get(brokerIdentity);</span>
+            }
+<span class="fc" id="L85">            return defaultLogger;</span>
+        }
+
+        @Override
+        public String getName() {
+<span class="fc" id="L90">            return getLogger().getName();</span>
+        }
+
+        @Override
+        public void debug(String s) {
+<span class="fc" id="L95">            getLogger().debug(s);</span>
+<span class="fc" id="L96">        }</span>
+
+        @Override
+        public void debug(String s, Object o) {
+<span class="fc" id="L100">            getLogger().debug(s, o);</span>
+<span class="fc" id="L101">        }</span>
+
+        @Override
+        public void debug(String s, Object o, Object o1) {
+<span class="nc" id="L105">            getLogger().debug(s, o, o1);</span>
+<span class="nc" id="L106">        }</span>
+
+        @Override
+        public void debug(String s, Object... objects) {
+<span class="nc" id="L110">            getLogger().debug(s, objects);</span>
+<span class="nc" id="L111">        }</span>
+
+        @Override
+        public void debug(String s, Throwable throwable) {
+<span class="nc" id="L115">            getLogger().debug(s, throwable);</span>
+<span class="nc" id="L116">        }</span>
+
+        @Override
+        public void info(String s) {
+<span class="fc" id="L120">            getLogger().info(s);</span>
+<span class="fc" id="L121">        }</span>
+
+        @Override
+        public void info(String s, Object o) {
+<span class="fc" id="L125">            getLogger().info(s, o);</span>
+<span class="fc" id="L126">        }</span>
+
+        @Override
+        public void info(String s, Object o, Object o1) {
+<span class="nc" id="L130">            getLogger().info(s, o, o1);</span>
+<span class="nc" id="L131">        }</span>
+
+        @Override
+        public void info(String s, Object... objects) {
+<span class="nc" id="L135">            getLogger().info(s, objects);</span>
+<span class="nc" id="L136">        }</span>
+
+        @Override
+        public void info(String s, Throwable throwable) {
+<span class="nc" id="L140">            getLogger().info(s, throwable);</span>
+<span class="nc" id="L141">        }</span>
+
+        @Override
+        public void warn(String s) {
+<span class="fc" id="L145">            getLogger().warn(s);</span>
+<span class="fc" id="L146">        }</span>
+
+        @Override
+        public void warn(String s, Object o) {
+<span class="fc" id="L150">            getLogger().warn(s, o);</span>
+<span class="fc" id="L151">        }</span>
+
+        @Override
+        public void warn(String s, Object... objects) {
+<span class="nc" id="L155">            getLogger().warn(s, objects);</span>
+<span class="nc" id="L156">        }</span>
+
+        @Override
+        public void warn(String s, Object o, Object o1) {
+<span class="nc" id="L160">            getLogger().warn(s, o, o1);</span>
+<span class="nc" id="L161">        }</span>
+
+        @Override
+        public void warn(String s, Throwable throwable) {
+<span class="nc" id="L165">            getLogger().warn(s, throwable);</span>
+<span class="nc" id="L166">        }</span>
+
+        @Override
+        public void error(String s) {
+<span class="fc" id="L170">            getLogger().error(s);</span>
+<span class="fc" id="L171">        }</span>
+
+        @Override
+        public void error(String s, Object o) {
+<span class="fc" id="L175">            getLogger().error(s, o);</span>
+<span class="fc" id="L176">        }</span>
+
+        @Override
+        public void error(String s, Object o, Object o1) {
+<span class="nc" id="L180">            getLogger().error(s, o, o1);</span>
+<span class="nc" id="L181">        }</span>
+
+        @Override
+        public void error(String s, Object... objects) {
+<span class="nc" id="L185">            getLogger().error(s, objects);</span>
+<span class="nc" id="L186">        }</span>
+
+        @Override
+        public void error(String s, Throwable throwable) {
+<span class="fc" id="L190">            getLogger().error(s, throwable);</span>
+<span class="fc" id="L191">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IOTinyUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.utils</a> &gt; <span class="el_source">IOTinyUtils.java</span></div><h1>IOTinyUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.utils;
+
+import java.io.BufferedReader;
+import java.io.CharArrayWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
+
+<span class="nc" id="L36">public class IOTinyUtils {</span>
+
+    static public String toString(InputStream input, String encoding) throws IOException {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        return (null == encoding) ? toString(new InputStreamReader(input, RemotingHelper.DEFAULT_CHARSET)) : toString(new InputStreamReader(</span>
+            input, encoding));
+    }
+
+    static public String toString(Reader reader) throws IOException {
+<span class="fc" id="L44">        CharArrayWriter sw = new CharArrayWriter();</span>
+<span class="fc" id="L45">        copy(reader, sw);</span>
+<span class="fc" id="L46">        return sw.toString();</span>
+    }
+
+    static public long copy(Reader input, Writer output) throws IOException {
+<span class="fc" id="L50">        char[] buffer = new char[1 &lt;&lt; 12];</span>
+<span class="fc" id="L51">        long count = 0;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (int n = 0; (n = input.read(buffer)) &gt;= 0; ) {</span>
+<span class="fc" id="L53">            output.write(buffer, 0, n);</span>
+<span class="fc" id="L54">            count += n;</span>
+        }
+<span class="fc" id="L56">        return count;</span>
+    }
+
+    static public List&lt;String&gt; readLines(Reader input) throws IOException {
+<span class="fc" id="L60">        BufferedReader reader = toBufferedReader(input);</span>
+<span class="fc" id="L61">        List&lt;String&gt; list = new ArrayList&lt;String&gt;();</span>
+        String line;
+        for (; ; ) {
+<span class="fc" id="L64">            line = reader.readLine();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            if (null != line) {</span>
+<span class="fc" id="L66">                list.add(line);</span>
+            } else {
+                break;
+            }
+        }
+<span class="fc" id="L71">        return list;</span>
+    }
+
+    static private BufferedReader toBufferedReader(Reader reader) {
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        return reader instanceof BufferedReader ? (BufferedReader) reader : new BufferedReader(reader);</span>
+    }
+
+    static public void copyFile(String source, String target) throws IOException {
+<span class="fc" id="L79">        File sf = new File(source);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (!sf.exists()) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(&quot;source file does not exist.&quot;);</span>
+        }
+<span class="fc" id="L83">        File tf = new File(target);</span>
+<span class="fc" id="L84">        tf.getParentFile().mkdirs();</span>
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">        if (!tf.exists() &amp;&amp; !tf.createNewFile()) {</span>
+<span class="nc" id="L86">            throw new RuntimeException(&quot;failed to create target file.&quot;);</span>
+        }
+
+<span class="fc" id="L89">        FileChannel sc = null;</span>
+<span class="fc" id="L90">        FileChannel tc = null;</span>
+        try {
+<span class="fc" id="L92">            tc = new FileOutputStream(tf).getChannel();</span>
+<span class="fc" id="L93">            sc = new FileInputStream(sf).getChannel();</span>
+<span class="fc" id="L94">            sc.transferTo(0, sc.size(), tc);</span>
+        } finally {
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (null != sc) {</span>
+<span class="fc" id="L97">                sc.close();</span>
+            }
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if (null != tc) {</span>
+<span class="fc" id="L100">                tc.close();</span>
+            }
+        }
+<span class="fc" id="L103">    }</span>
+
+    public static void delete(File fileOrDir) throws IOException {
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (fileOrDir == null) {</span>
+<span class="nc" id="L107">            return;</span>
+        }
+
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (fileOrDir.isDirectory()) {</span>
+<span class="fc" id="L111">            cleanDirectory(fileOrDir);</span>
+        }
+
+<span class="fc" id="L114">        fileOrDir.delete();</span>
+<span class="fc" id="L115">    }</span>
+
+    public static void cleanDirectory(File directory) throws IOException {
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (!directory.exists()) {</span>
+<span class="nc" id="L119">            String message = directory + &quot; does not exist&quot;;</span>
+<span class="nc" id="L120">            throw new IllegalArgumentException(message);</span>
+        }
+
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (!directory.isDirectory()) {</span>
+<span class="nc" id="L124">            String message = directory + &quot; is not a directory&quot;;</span>
+<span class="nc" id="L125">            throw new IllegalArgumentException(message);</span>
+        }
+
+<span class="fc" id="L128">        File[] files = directory.listFiles();</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (files == null) { // null if security restricted</span>
+<span class="nc" id="L130">            throw new IOException(&quot;Failed to list contents of &quot; + directory);</span>
+        }
+
+<span class="fc" id="L133">        IOException exception = null;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (File file : files) {</span>
+            try {
+<span class="fc" id="L136">                delete(file);</span>
+<span class="nc" id="L137">            } catch (IOException ioe) {</span>
+<span class="nc" id="L138">                exception = ioe;</span>
+<span class="fc" id="L139">            }</span>
+        }
+
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (null != exception) {</span>
+<span class="nc" id="L143">            throw exception;</span>
+        }
+<span class="fc" id="L145">    }</span>
+
+    public static void writeStringToFile(File file, String data, String encoding) throws IOException {
+<span class="fc" id="L148">        OutputStream os = null;</span>
+        try {
+<span class="fc" id="L150">            os = new FileOutputStream(file);</span>
+<span class="fc" id="L151">            os.write(data.getBytes(encoding));</span>
+        } finally {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (null != os) {</span>
+<span class="fc" id="L154">                os.close();</span>
+            }
+        }
+<span class="fc" id="L157">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

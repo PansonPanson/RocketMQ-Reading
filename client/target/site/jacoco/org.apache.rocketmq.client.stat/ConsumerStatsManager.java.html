@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumerStatsManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.stat</a> &gt; <span class="el_source">ConsumerStatsManager.java</span></div><h1>ConsumerStatsManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.client.stat;
+
+import java.util.concurrent.ScheduledExecutorService;
+
+import org.apache.rocketmq.client.log.ClientLogger;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.common.protocol.body.ConsumeStatus;
+import org.apache.rocketmq.common.stats.StatsItemSet;
+import org.apache.rocketmq.common.stats.StatsSnapshot;
+
+public class ConsumerStatsManager {
+<span class="fc" id="L29">    private static final InternalLogger log = ClientLogger.getLog();</span>
+
+    private static final String TOPIC_AND_GROUP_CONSUME_OK_TPS = &quot;CONSUME_OK_TPS&quot;;
+    private static final String TOPIC_AND_GROUP_CONSUME_FAILED_TPS = &quot;CONSUME_FAILED_TPS&quot;;
+    private static final String TOPIC_AND_GROUP_CONSUME_RT = &quot;CONSUME_RT&quot;;
+    private static final String TOPIC_AND_GROUP_PULL_TPS = &quot;PULL_TPS&quot;;
+    private static final String TOPIC_AND_GROUP_PULL_RT = &quot;PULL_RT&quot;;
+
+    private final StatsItemSet topicAndGroupConsumeOKTPS;
+    private final StatsItemSet topicAndGroupConsumeRT;
+    private final StatsItemSet topicAndGroupConsumeFailedTPS;
+    private final StatsItemSet topicAndGroupPullTPS;
+    private final StatsItemSet topicAndGroupPullRT;
+
+<span class="fc" id="L43">    public ConsumerStatsManager(final ScheduledExecutorService scheduledExecutorService) {</span>
+<span class="fc" id="L44">        this.topicAndGroupConsumeOKTPS =</span>
+            new StatsItemSet(TOPIC_AND_GROUP_CONSUME_OK_TPS, scheduledExecutorService, log);
+
+<span class="fc" id="L47">        this.topicAndGroupConsumeRT =</span>
+            new StatsItemSet(TOPIC_AND_GROUP_CONSUME_RT, scheduledExecutorService, log);
+
+<span class="fc" id="L50">        this.topicAndGroupConsumeFailedTPS =</span>
+            new StatsItemSet(TOPIC_AND_GROUP_CONSUME_FAILED_TPS, scheduledExecutorService, log);
+
+<span class="fc" id="L53">        this.topicAndGroupPullTPS = new StatsItemSet(TOPIC_AND_GROUP_PULL_TPS, scheduledExecutorService, log);</span>
+
+<span class="fc" id="L55">        this.topicAndGroupPullRT = new StatsItemSet(TOPIC_AND_GROUP_PULL_RT, scheduledExecutorService, log);</span>
+<span class="fc" id="L56">    }</span>
+
+    public void start() {
+<span class="nc" id="L59">    }</span>
+
+    public void shutdown() {
+<span class="nc" id="L62">    }</span>
+
+    public void incPullRT(final String group, final String topic, final long rt) {
+<span class="fc" id="L65">        this.topicAndGroupPullRT.addRTValue(topic + &quot;@&quot; + group, (int) rt, 1);</span>
+<span class="fc" id="L66">    }</span>
+
+    public void incPullTPS(final String group, final String topic, final long msgs) {
+<span class="fc" id="L69">        this.topicAndGroupPullTPS.addValue(topic + &quot;@&quot; + group, (int) msgs, 1);</span>
+<span class="fc" id="L70">    }</span>
+
+    public void incConsumeRT(final String group, final String topic, final long rt) {
+<span class="fc" id="L73">        this.topicAndGroupConsumeRT.addRTValue(topic + &quot;@&quot; + group, (int) rt, 1);</span>
+<span class="fc" id="L74">    }</span>
+
+    public void incConsumeOKTPS(final String group, final String topic, final long msgs) {
+<span class="fc" id="L77">        this.topicAndGroupConsumeOKTPS.addValue(topic + &quot;@&quot; + group, (int) msgs, 1);</span>
+<span class="fc" id="L78">    }</span>
+
+    public void incConsumeFailedTPS(final String group, final String topic, final long msgs) {
+<span class="fc" id="L81">        this.topicAndGroupConsumeFailedTPS.addValue(topic + &quot;@&quot; + group, (int) msgs, 1);</span>
+<span class="fc" id="L82">    }</span>
+
+    public ConsumeStatus consumeStatus(final String group, final String topic) {
+<span class="fc" id="L85">        ConsumeStatus cs = new ConsumeStatus();</span>
+        {
+<span class="fc" id="L87">            StatsSnapshot ss = this.getPullRT(group, topic);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            if (ss != null) {</span>
+<span class="fc" id="L89">                cs.setPullRT(ss.getAvgpt());</span>
+            }
+        }
+
+        {
+<span class="fc" id="L94">            StatsSnapshot ss = this.getPullTPS(group, topic);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (ss != null) {</span>
+<span class="fc" id="L96">                cs.setPullTPS(ss.getTps());</span>
+            }
+        }
+
+        {
+<span class="fc" id="L101">            StatsSnapshot ss = this.getConsumeRT(group, topic);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (ss != null) {</span>
+<span class="fc" id="L103">                cs.setConsumeRT(ss.getAvgpt());</span>
+            }
+        }
+
+        {
+<span class="fc" id="L108">            StatsSnapshot ss = this.getConsumeOKTPS(group, topic);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (ss != null) {</span>
+<span class="fc" id="L110">                cs.setConsumeOKTPS(ss.getTps());</span>
+            }
+        }
+
+        {
+<span class="fc" id="L115">            StatsSnapshot ss = this.getConsumeFailedTPS(group, topic);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (ss != null) {</span>
+<span class="fc" id="L117">                cs.setConsumeFailedTPS(ss.getTps());</span>
+            }
+        }
+
+        {
+<span class="fc" id="L122">            StatsSnapshot ss = this.topicAndGroupConsumeFailedTPS.getStatsDataInHour(topic + &quot;@&quot; + group);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            if (ss != null) {</span>
+<span class="fc" id="L124">                cs.setConsumeFailedMsgs(ss.getSum());</span>
+            }
+        }
+
+<span class="fc" id="L128">        return cs;</span>
+    }
+
+    private StatsSnapshot getPullRT(final String group, final String topic) {
+<span class="fc" id="L132">        return this.topicAndGroupPullRT.getStatsDataInMinute(topic + &quot;@&quot; + group);</span>
+    }
+
+    private StatsSnapshot getPullTPS(final String group, final String topic) {
+<span class="fc" id="L136">        return this.topicAndGroupPullTPS.getStatsDataInMinute(topic + &quot;@&quot; + group);</span>
+    }
+
+    private StatsSnapshot getConsumeRT(final String group, final String topic) {
+<span class="fc" id="L140">        StatsSnapshot statsData = this.topicAndGroupConsumeRT.getStatsDataInMinute(topic + &quot;@&quot; + group);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (0 == statsData.getSum()) {</span>
+<span class="fc" id="L142">            statsData = this.topicAndGroupConsumeRT.getStatsDataInHour(topic + &quot;@&quot; + group);</span>
+        }
+
+<span class="fc" id="L145">        return statsData;</span>
+    }
+
+    private StatsSnapshot getConsumeOKTPS(final String group, final String topic) {
+<span class="fc" id="L149">        return this.topicAndGroupConsumeOKTPS.getStatsDataInMinute(topic + &quot;@&quot; + group);</span>
+    }
+
+    private StatsSnapshot getConsumeFailedTPS(final String group, final String topic) {
+<span class="fc" id="L153">        return this.topicAndGroupConsumeFailedTPS.getStatsDataInMinute(topic + &quot;@&quot; + group);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

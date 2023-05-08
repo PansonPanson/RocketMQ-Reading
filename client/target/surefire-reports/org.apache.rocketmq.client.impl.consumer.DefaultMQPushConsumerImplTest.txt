@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: org.apache.rocketmq.client.impl.consumer.DefaultMQPushConsumerImplTest
+-------------------------------------------------------------------------------
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.298 sec - in org.apache.rocketmq.client.impl.consumer.DefaultMQPushConsumerImplTest

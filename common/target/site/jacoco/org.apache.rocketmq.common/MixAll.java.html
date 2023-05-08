@@ -1,0 +1,480 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MixAll.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common</a> &gt; <span class="el_source">MixAll.java</span></div><h1>MixAll.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common;
+
+import org.apache.rocketmq.common.annotation.ImportantField;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.common.help.FAQUrl;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
+
+<span class="nc" id="L51">public class MixAll {</span>
+    public static final String ROCKETMQ_HOME_ENV = &quot;ROCKETMQ_HOME&quot;;
+    public static final String ROCKETMQ_HOME_PROPERTY = &quot;rocketmq.home.dir&quot;;
+    public static final String NAMESRV_ADDR_ENV = &quot;NAMESRV_ADDR&quot;;
+    public static final String NAMESRV_ADDR_PROPERTY = &quot;rocketmq.namesrv.addr&quot;;
+    public static final String MESSAGE_COMPRESS_TYPE = &quot;rocketmq.message.compressType&quot;;
+    public static final String MESSAGE_COMPRESS_LEVEL = &quot;rocketmq.message.compressLevel&quot;;
+    public static final String DEFAULT_NAMESRV_ADDR_LOOKUP = &quot;jmenv.tbsite.net&quot;;
+<span class="fc" id="L59">    public static final String WS_DOMAIN_NAME = System.getProperty(&quot;rocketmq.namesrv.domain&quot;, DEFAULT_NAMESRV_ADDR_LOOKUP);</span>
+<span class="fc" id="L60">    public static final String WS_DOMAIN_SUBGROUP = System.getProperty(&quot;rocketmq.namesrv.domain.subgroup&quot;, &quot;nsaddr&quot;);</span>
+    //http://jmenv.tbsite.net:8080/rocketmq/nsaddr
+    //public static final String WS_ADDR = &quot;http://&quot; + WS_DOMAIN_NAME + &quot;:8080/rocketmq/&quot; + WS_DOMAIN_SUBGROUP;
+    public static final String DEFAULT_PRODUCER_GROUP = &quot;DEFAULT_PRODUCER&quot;;
+    public static final String DEFAULT_CONSUMER_GROUP = &quot;DEFAULT_CONSUMER&quot;;
+    public static final String TOOLS_CONSUMER_GROUP = &quot;TOOLS_CONSUMER&quot;;
+    public static final String SCHEDULE_CONSUMER_GROUP = &quot;SCHEDULE_CONSUMER&quot;;
+    public static final String FILTERSRV_CONSUMER_GROUP = &quot;FILTERSRV_CONSUMER&quot;;
+    public static final String MONITOR_CONSUMER_GROUP = &quot;__MONITOR_CONSUMER&quot;;
+    public static final String CLIENT_INNER_PRODUCER_GROUP = &quot;CLIENT_INNER_PRODUCER&quot;;
+    public static final String SELF_TEST_PRODUCER_GROUP = &quot;SELF_TEST_P_GROUP&quot;;
+    public static final String SELF_TEST_CONSUMER_GROUP = &quot;SELF_TEST_C_GROUP&quot;;
+    public static final String ONS_HTTP_PROXY_GROUP = &quot;CID_ONS-HTTP-PROXY&quot;;
+    public static final String CID_ONSAPI_PERMISSION_GROUP = &quot;CID_ONSAPI_PERMISSION&quot;;
+    public static final String CID_ONSAPI_OWNER_GROUP = &quot;CID_ONSAPI_OWNER&quot;;
+    public static final String CID_ONSAPI_PULL_GROUP = &quot;CID_ONSAPI_PULL&quot;;
+    public static final String CID_RMQ_SYS_PREFIX = &quot;CID_RMQ_SYS_&quot;;
+<span class="fc" id="L77">    public static final List&lt;String&gt; LOCAL_INET_ADDRESS = getLocalInetAddress();</span>
+<span class="fc" id="L78">    public static final String LOCALHOST = localhost();</span>
+    public static final String DEFAULT_CHARSET = &quot;UTF-8&quot;;
+    public static final long MASTER_ID = 0L;
+    public static final long FIRST_SLAVE_ID = 1L;
+<span class="fc" id="L82">    public static final long CURRENT_JVM_PID = getPID();</span>
+    public final static int UNIT_PRE_SIZE_FOR_MSG = 28;
+    public final static int ALL_ACK_IN_SYNC_STATE_SET = -1;
+
+    public static final String RETRY_GROUP_TOPIC_PREFIX = &quot;%RETRY%&quot;;
+    public static final String DLQ_GROUP_TOPIC_PREFIX = &quot;%DLQ%&quot;;
+    public static final String REPLY_TOPIC_POSTFIX = &quot;REPLY_TOPIC&quot;;
+    public static final String UNIQUE_MSG_QUERY_FLAG = &quot;_UNIQUE_KEY_QUERY&quot;;
+    public static final String DEFAULT_TRACE_REGION_ID = &quot;DefaultRegion&quot;;
+    public static final String CONSUME_CONTEXT_TYPE = &quot;ConsumeContextType&quot;;
+    public static final String CID_SYS_RMQ_TRANS = &quot;CID_RMQ_SYS_TRANS&quot;;
+    public static final String ACL_CONF_TOOLS_FILE = &quot;/conf/tools.yml&quot;;
+    public static final String REPLY_MESSAGE_FLAG = &quot;reply&quot;;
+    public static final String LMQ_PREFIX = &quot;%LMQ%&quot;;
+    public static final String MULTI_DISPATCH_QUEUE_SPLITTER = &quot;,&quot;;
+    public static final String REQ_T = &quot;ReqT&quot;;
+<span class="fc" id="L98">    private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);</span>
+    public static final String LOGICAL_QUEUE_MOCK_BROKER_PREFIX = &quot;__syslo__&quot;;
+    public static final String METADATA_SCOPE_GLOBAL = &quot;__global__&quot;;
+    public static final String LOGICAL_QUEUE_MOCK_BROKER_NAME_NOT_EXIST = &quot;__syslo__none__&quot;;
+<span class="fc" id="L102">    public static final String MULTI_PATH_SPLITTER = System.getProperty(&quot;rocketmq.broker.multiPathSplitter&quot;, &quot;,&quot;);</span>
+
+    public static String getWSAddr() {
+<span class="nc" id="L105">        String wsDomainName = System.getProperty(&quot;rocketmq.namesrv.domain&quot;, DEFAULT_NAMESRV_ADDR_LOOKUP);</span>
+<span class="nc" id="L106">        String wsDomainSubgroup = System.getProperty(&quot;rocketmq.namesrv.domain.subgroup&quot;, &quot;nsaddr&quot;);</span>
+<span class="nc" id="L107">        String wsAddr = &quot;http://&quot; + wsDomainName + &quot;:8080/rocketmq/&quot; + wsDomainSubgroup;</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (wsDomainName.indexOf(&quot;:&quot;) &gt; 0) {</span>
+<span class="nc" id="L109">            wsAddr = &quot;http://&quot; + wsDomainName + &quot;/rocketmq/&quot; + wsDomainSubgroup;</span>
+        }
+<span class="nc" id="L111">        return wsAddr;</span>
+    }
+
+    public static String getRetryTopic(final String consumerGroup) {
+<span class="nc" id="L115">        return RETRY_GROUP_TOPIC_PREFIX + consumerGroup;</span>
+    }
+
+    public static String getReplyTopic(final String clusterName) {
+<span class="nc" id="L119">        return clusterName + &quot;_&quot; + REPLY_TOPIC_POSTFIX;</span>
+    }
+
+    public static boolean isSysConsumerGroup(final String consumerGroup) {
+<span class="fc" id="L123">        return consumerGroup.startsWith(CID_RMQ_SYS_PREFIX);</span>
+    }
+
+    public static String getDLQTopic(final String consumerGroup) {
+<span class="nc" id="L127">        return DLQ_GROUP_TOPIC_PREFIX + consumerGroup;</span>
+    }
+
+    public static String brokerVIPChannel(final boolean isChange, final String brokerAddr) {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (isChange) {</span>
+<span class="fc" id="L132">            int split = brokerAddr.lastIndexOf(&quot;:&quot;);</span>
+<span class="fc" id="L133">            String ip = brokerAddr.substring(0, split);</span>
+<span class="fc" id="L134">            String port = brokerAddr.substring(split + 1);</span>
+<span class="fc" id="L135">            String brokerAddrNew = ip + &quot;:&quot; + (Integer.parseInt(port) - 2);</span>
+<span class="fc" id="L136">            return brokerAddrNew;</span>
+        } else {
+<span class="nc" id="L138">            return brokerAddr;</span>
+        }
+    }
+
+    public static long getPID() {
+<span class="fc" id="L143">        String processName = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();</span>
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">        if (processName != null &amp;&amp; processName.length() &gt; 0) {</span>
+            try {
+<span class="fc" id="L146">                return Long.parseLong(processName.split(&quot;@&quot;)[0]);</span>
+<span class="nc" id="L147">            } catch (Exception e) {</span>
+<span class="nc" id="L148">                return 0;</span>
+            }
+        }
+
+<span class="nc" id="L152">        return 0;</span>
+    }
+
+    public static void string2File(final String str, final String fileName) throws IOException {
+
+<span class="fc" id="L157">        String tmpFile = fileName + &quot;.tmp&quot;;</span>
+<span class="fc" id="L158">        string2FileNotSafe(str, tmpFile);</span>
+
+<span class="fc" id="L160">        String bakFile = fileName + &quot;.bak&quot;;</span>
+<span class="fc" id="L161">        String prevContent = file2String(fileName);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (prevContent != null) {</span>
+<span class="fc" id="L163">            string2FileNotSafe(prevContent, bakFile);</span>
+        }
+
+<span class="fc" id="L166">        File file = new File(fileName);</span>
+<span class="fc" id="L167">        file.delete();</span>
+
+<span class="fc" id="L169">        file = new File(tmpFile);</span>
+<span class="fc" id="L170">        file.renameTo(new File(fileName));</span>
+<span class="fc" id="L171">    }</span>
+
+    public static void string2FileNotSafe(final String str, final String fileName) throws IOException {
+<span class="fc" id="L174">        File file = new File(fileName);</span>
+<span class="fc" id="L175">        File fileParent = file.getParentFile();</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (fileParent != null) {</span>
+<span class="fc" id="L177">            fileParent.mkdirs();</span>
+        }
+<span class="fc" id="L179">        FileWriter fileWriter = null;</span>
+
+        try {
+<span class="fc" id="L182">            fileWriter = new FileWriter(file);</span>
+<span class="fc" id="L183">            fileWriter.write(str);</span>
+<span class="nc" id="L184">        } catch (IOException e) {</span>
+<span class="nc" id="L185">            throw e;</span>
+        } finally {
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (fileWriter != null) {</span>
+<span class="fc" id="L188">                fileWriter.close();</span>
+            }
+        }
+<span class="fc" id="L191">    }</span>
+
+    public static String file2String(final String fileName) throws IOException {
+<span class="fc" id="L194">        File file = new File(fileName);</span>
+<span class="fc" id="L195">        return file2String(file);</span>
+    }
+
+    public static String file2String(final File file) throws IOException {
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (file.exists()) {</span>
+<span class="fc" id="L200">            byte[] data = new byte[(int) file.length()];</span>
+            boolean result;
+
+<span class="fc" id="L203">            FileInputStream inputStream = null;</span>
+            try {
+<span class="fc" id="L205">                inputStream = new FileInputStream(file);</span>
+<span class="fc" id="L206">                int len = inputStream.read(data);</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                result = len == data.length;</span>
+            } finally {
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                if (inputStream != null) {</span>
+<span class="fc" id="L210">                    inputStream.close();</span>
+                }
+            }
+
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            if (result) {</span>
+<span class="fc" id="L215">                return new String(data);</span>
+            }
+        }
+<span class="fc" id="L218">        return null;</span>
+    }
+
+    public static String file2String(final URL url) {
+<span class="nc" id="L222">        InputStream in = null;</span>
+        try {
+<span class="nc" id="L224">            URLConnection urlConnection = url.openConnection();</span>
+<span class="nc" id="L225">            urlConnection.setUseCaches(false);</span>
+<span class="nc" id="L226">            in = urlConnection.getInputStream();</span>
+<span class="nc" id="L227">            int len = in.available();</span>
+<span class="nc" id="L228">            byte[] data = new byte[len];</span>
+<span class="nc" id="L229">            in.read(data, 0, len);</span>
+<span class="nc" id="L230">            return new String(data, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L231">        } catch (Exception ignored) {</span>
+        } finally {
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            if (null != in) {</span>
+                try {
+<span class="nc" id="L235">                    in.close();</span>
+<span class="nc" id="L236">                } catch (IOException ignored) {</span>
+<span class="nc" id="L237">                }</span>
+            }
+        }
+
+<span class="nc" id="L241">        return null;</span>
+    }
+
+    public static void printObjectProperties(final InternalLogger logger, final Object object) {
+<span class="nc" id="L245">        printObjectProperties(logger, object, false);</span>
+<span class="nc" id="L246">    }</span>
+
+    public static void printObjectProperties(final InternalLogger logger, final Object object,
+        final boolean onlyImportantField) {
+<span class="nc" id="L250">        Field[] fields = object.getClass().getDeclaredFields();</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        for (Field field : fields) {</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            if (!Modifier.isStatic(field.getModifiers())) {</span>
+<span class="nc" id="L253">                String name = field.getName();</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">                if (!name.startsWith(&quot;this&quot;)) {</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">                    if (onlyImportantField) {</span>
+<span class="nc" id="L256">                        Annotation annotation = field.getAnnotation(ImportantField.class);</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">                        if (null == annotation) {</span>
+<span class="nc" id="L258">                            continue;</span>
+                        }
+                    }
+
+<span class="nc" id="L262">                    Object value = null;</span>
+                    try {
+<span class="nc" id="L264">                        field.setAccessible(true);</span>
+<span class="nc" id="L265">                        value = field.get(object);</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                        if (null == value) {</span>
+<span class="nc" id="L267">                            value = &quot;&quot;;</span>
+                        }
+<span class="nc" id="L269">                    } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L270">                        log.error(&quot;Failed to obtain object properties&quot;, e);</span>
+<span class="nc" id="L271">                    }</span>
+
+<span class="nc bnc" id="L273" title="All 2 branches missed.">                    if (logger != null) {</span>
+<span class="nc" id="L274">                        logger.info(name + &quot;=&quot; + value);</span>
+                    } else {
+                    }
+                }
+            }
+        }
+<span class="nc" id="L280">    }</span>
+
+    public static String properties2String(final Properties properties) {
+<span class="nc" id="L283">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        for (Map.Entry&lt;Object, Object&gt; entry : properties.entrySet()) {</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">            if (entry.getValue() != null) {</span>
+<span class="nc" id="L286">                sb.append(entry.getKey().toString() + &quot;=&quot; + entry.getValue().toString() + &quot;\n&quot;);</span>
+            }
+<span class="nc" id="L288">        }</span>
+<span class="nc" id="L289">        return sb.toString();</span>
+    }
+
+    public static Properties string2Properties(final String str) {
+<span class="nc" id="L293">        Properties properties = new Properties();</span>
+        try {
+<span class="nc" id="L295">            InputStream in = new ByteArrayInputStream(str.getBytes(DEFAULT_CHARSET));</span>
+<span class="nc" id="L296">            properties.load(in);</span>
+<span class="nc" id="L297">        } catch (Exception e) {</span>
+<span class="nc" id="L298">            log.error(&quot;Failed to handle properties&quot;, e);</span>
+<span class="nc" id="L299">            return null;</span>
+<span class="nc" id="L300">        }</span>
+
+<span class="nc" id="L302">        return properties;</span>
+    }
+
+    public static Properties object2Properties(final Object object) {
+<span class="fc" id="L306">        Properties properties = new Properties();</span>
+
+<span class="fc" id="L308">        Field[] fields = object.getClass().getDeclaredFields();</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        for (Field field : fields) {</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            if (!Modifier.isStatic(field.getModifiers())) {</span>
+<span class="fc" id="L311">                String name = field.getName();</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">                if (!name.startsWith(&quot;this&quot;)) {</span>
+<span class="fc" id="L313">                    Object value = null;</span>
+                    try {
+<span class="fc" id="L315">                        field.setAccessible(true);</span>
+<span class="fc" id="L316">                        value = field.get(object);</span>
+<span class="nc" id="L317">                    } catch (IllegalAccessException e) {</span>
+<span class="nc" id="L318">                        log.error(&quot;Failed to handle properties&quot;, e);</span>
+<span class="fc" id="L319">                    }</span>
+
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">                    if (value != null) {</span>
+<span class="fc" id="L322">                        properties.setProperty(name, value.toString());</span>
+                    }
+                }
+            }
+        }
+
+<span class="fc" id="L328">        return properties;</span>
+    }
+
+    public static void properties2Object(final Properties p, final Object object) {
+<span class="fc" id="L332">        Method[] methods = object.getClass().getMethods();</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        for (Method method : methods) {</span>
+<span class="fc" id="L334">            String mn = method.getName();</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">            if (mn.startsWith(&quot;set&quot;)) {</span>
+                try {
+<span class="fc" id="L337">                    String tmp = mn.substring(4);</span>
+<span class="fc" id="L338">                    String first = mn.substring(3, 4);</span>
+
+<span class="fc" id="L340">                    String key = first.toLowerCase() + tmp;</span>
+<span class="fc" id="L341">                    String property = p.getProperty(key);</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">                    if (property != null) {</span>
+<span class="fc" id="L343">                        Class&lt;?&gt;[] pt = method.getParameterTypes();</span>
+<span class="pc bpc" id="L344" title="2 of 4 branches missed.">                        if (pt != null &amp;&amp; pt.length &gt; 0) {</span>
+<span class="fc" id="L345">                            String cn = pt[0].getSimpleName();</span>
+<span class="fc" id="L346">                            Object arg = null;</span>
+<span class="pc bpc" id="L347" title="1 of 4 branches missed.">                            if (cn.equals(&quot;int&quot;) || cn.equals(&quot;Integer&quot;)) {</span>
+<span class="fc" id="L348">                                arg = Integer.parseInt(property);</span>
+<span class="pc bpc" id="L349" title="2 of 4 branches missed.">                            } else if (cn.equals(&quot;long&quot;) || cn.equals(&quot;Long&quot;)) {</span>
+<span class="nc" id="L350">                                arg = Long.parseLong(property);</span>
+<span class="pc bpc" id="L351" title="2 of 4 branches missed.">                            } else if (cn.equals(&quot;double&quot;) || cn.equals(&quot;Double&quot;)) {</span>
+<span class="nc" id="L352">                                arg = Double.parseDouble(property);</span>
+<span class="pc bpc" id="L353" title="1 of 4 branches missed.">                            } else if (cn.equals(&quot;boolean&quot;) || cn.equals(&quot;Boolean&quot;)) {</span>
+<span class="fc" id="L354">                                arg = Boolean.parseBoolean(property);</span>
+<span class="pc bpc" id="L355" title="2 of 4 branches missed.">                            } else if (cn.equals(&quot;float&quot;) || cn.equals(&quot;Float&quot;)) {</span>
+<span class="nc" id="L356">                                arg = Float.parseFloat(property);</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">                            } else if (cn.equals(&quot;String&quot;)) {</span>
+<span class="fc" id="L358">                                arg = property;</span>
+                            } else {
+<span class="nc" id="L360">                                continue;</span>
+                            }
+<span class="fc" id="L362">                            method.invoke(object, arg);</span>
+                        }
+                    }
+<span class="nc" id="L365">                } catch (Throwable ignored) {</span>
+<span class="fc" id="L366">                }</span>
+            }
+        }
+<span class="fc" id="L369">    }</span>
+
+    public static boolean isPropertiesEqual(final Properties p1, final Properties p2) {
+<span class="fc" id="L372">        return p1.equals(p2);</span>
+    }
+
+    public static List&lt;String&gt; getLocalInetAddress() {
+<span class="fc" id="L376">        List&lt;String&gt; inetAddressList = new ArrayList&lt;String&gt;();</span>
+        try {
+<span class="fc" id="L378">            Enumeration&lt;NetworkInterface&gt; enumeration = NetworkInterface.getNetworkInterfaces();</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">            while (enumeration.hasMoreElements()) {</span>
+<span class="fc" id="L380">                NetworkInterface networkInterface = enumeration.nextElement();</span>
+<span class="fc" id="L381">                Enumeration&lt;InetAddress&gt; addrs = networkInterface.getInetAddresses();</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">                while (addrs.hasMoreElements()) {</span>
+<span class="fc" id="L383">                    inetAddressList.add(addrs.nextElement().getHostAddress());</span>
+                }
+<span class="fc" id="L385">            }</span>
+<span class="nc" id="L386">        } catch (SocketException e) {</span>
+<span class="nc" id="L387">            throw new RuntimeException(&quot;get local inet address fail&quot;, e);</span>
+<span class="fc" id="L388">        }</span>
+
+<span class="fc" id="L390">        return inetAddressList;</span>
+    }
+
+    private static String localhost() {
+        try {
+<span class="fc" id="L395">            return InetAddress.getLocalHost().getHostAddress();</span>
+<span class="nc" id="L396">        } catch (Throwable e) {</span>
+            try {
+<span class="nc" id="L398">                String candidatesHost = getLocalhostByNetworkInterface();</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">                if (candidatesHost != null)</span>
+<span class="nc" id="L400">                    return candidatesHost;</span>
+
+<span class="nc" id="L402">            } catch (Exception ignored) {</span>
+<span class="nc" id="L403">            }</span>
+
+<span class="nc" id="L405">            throw new RuntimeException(&quot;InetAddress java.net.InetAddress.getLocalHost() throws UnknownHostException&quot; + FAQUrl.suggestTodo(FAQUrl.UNKNOWN_HOST_EXCEPTION), e);</span>
+        }
+    }
+
+    //Reverse logic comparing to RemotingUtil method, consider refactor in RocketMQ 5.0
+    public static String getLocalhostByNetworkInterface() throws SocketException {
+<span class="fc" id="L411">        List&lt;String&gt; candidatesHost = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L412">        Enumeration&lt;NetworkInterface&gt; enumeration = NetworkInterface.getNetworkInterfaces();</span>
+
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">        while (enumeration.hasMoreElements()) {</span>
+<span class="fc" id="L415">            NetworkInterface networkInterface = enumeration.nextElement();</span>
+            // Workaround for docker0 bridge
+<span class="pc bpc" id="L417" title="2 of 4 branches missed.">            if (&quot;docker0&quot;.equals(networkInterface.getName()) || !networkInterface.isUp()) {</span>
+<span class="nc" id="L418">                continue;</span>
+            }
+<span class="fc" id="L420">            Enumeration&lt;InetAddress&gt; addrs = networkInterface.getInetAddresses();</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">            while (addrs.hasMoreElements()) {</span>
+<span class="fc" id="L422">                InetAddress address = addrs.nextElement();</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">                if (address.isLoopbackAddress()) {</span>
+<span class="nc" id="L424">                    continue;</span>
+                }
+                //ip4 higher priority
+<span class="fc bfc" id="L427" title="All 2 branches covered.">                if (address instanceof Inet6Address) {</span>
+<span class="fc" id="L428">                    candidatesHost.add(address.getHostAddress());</span>
+<span class="fc" id="L429">                    continue;</span>
+                }
+<span class="fc" id="L431">                return address.getHostAddress();</span>
+            }
+<span class="fc" id="L433">        }</span>
+
+<span class="nc bnc" id="L435" title="All 2 branches missed.">        if (!candidatesHost.isEmpty()) {</span>
+<span class="nc" id="L436">            return candidatesHost.get(0);</span>
+        }
+<span class="nc" id="L438">        return null;</span>
+    }
+
+    public static boolean compareAndIncreaseOnly(final AtomicLong target, final long value) {
+<span class="fc" id="L442">        long prev = target.get();</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">        while (value &gt; prev) {</span>
+<span class="fc" id="L444">            boolean updated = target.compareAndSet(prev, value);</span>
+<span class="pc bpc" id="L445" title="1 of 2 branches missed.">            if (updated)</span>
+<span class="fc" id="L446">                return true;</span>
+
+<span class="nc" id="L448">            prev = target.get();</span>
+<span class="nc" id="L449">        }</span>
+
+<span class="fc" id="L451">        return false;</span>
+    }
+
+    public static String humanReadableByteCount(long bytes, boolean si) {
+<span class="nc bnc" id="L455" title="All 2 branches missed.">        int unit = si ? 1000 : 1024;</span>
+<span class="nc bnc" id="L456" title="All 2 branches missed.">        if (bytes &lt; unit)</span>
+<span class="nc" id="L457">            return bytes + &quot; B&quot;;</span>
+<span class="nc" id="L458">        int exp = (int) (Math.log(bytes) / Math.log(unit));</span>
+<span class="nc bnc" id="L459" title="All 4 branches missed.">        String pre = (si ? &quot;kMGTPE&quot; : &quot;KMGTPE&quot;).charAt(exp - 1) + (si ? &quot;&quot; : &quot;i&quot;);</span>
+<span class="nc" id="L460">        return String.format(&quot;%.1f %sB&quot;, bytes / Math.pow(unit, exp), pre);</span>
+    }
+
+    public static int compareInteger(int x, int y) {
+<span class="nc bnc" id="L464" title="All 4 branches missed.">        return (x &lt; y) ? -1 : ((x == y) ? 0 : 1);</span>
+    }
+
+    public static int compareLong(long x, long y) {
+<span class="nc bnc" id="L468" title="All 4 branches missed.">        return (x &lt; y) ? -1 : ((x == y) ? 0 : 1);</span>
+    }
+    public static boolean isLmq(String lmqMetaData) {
+<span class="fc bfc" id="L471" title="All 4 branches covered.">        return lmqMetaData != null &amp;&amp; lmqMetaData.startsWith(LMQ_PREFIX);</span>
+    }
+
+    public static String dealFilePath(String aclFilePath) {
+<span class="nc" id="L475">        Path path = Paths.get(aclFilePath);</span>
+<span class="nc" id="L476">        return path.normalize().toString();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

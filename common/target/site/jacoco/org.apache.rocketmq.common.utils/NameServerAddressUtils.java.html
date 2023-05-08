@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NameServerAddressUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.utils</a> &gt; <span class="el_source">NameServerAddressUtils.java</span></div><h1>NameServerAddressUtils.java</h1><pre class="source lang-java linenums">/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file
+ * to You under the Apache License, Version 2.0 (the &quot;License&quot;); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
+package org.apache.rocketmq.common.utils;
+
+import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.rocketmq.common.MixAll;
+
+<span class="nc" id="L19">public class NameServerAddressUtils {</span>
+    public static final String INSTANCE_PREFIX = &quot;MQ_INST_&quot;;
+    public static final String INSTANCE_REGEX = INSTANCE_PREFIX + &quot;\\w+_\\w+&quot;;
+    public static final String ENDPOINT_PREFIX = &quot;(\\w+://|)&quot;;
+<span class="fc" id="L23">    public static final Pattern NAMESRV_ENDPOINT_PATTERN = Pattern.compile(&quot;^http://.*&quot;);</span>
+<span class="fc" id="L24">    public static final Pattern INST_ENDPOINT_PATTERN = Pattern.compile(&quot;^&quot; + ENDPOINT_PREFIX + INSTANCE_REGEX + &quot;\\..*&quot;);</span>
+
+    public static String getNameServerAddresses() {
+<span class="nc" id="L27">        return System.getProperty(MixAll.NAMESRV_ADDR_PROPERTY, System.getenv(MixAll.NAMESRV_ADDR_ENV));</span>
+    }
+
+    public static boolean validateInstanceEndpoint(String endpoint) {
+<span class="fc" id="L31">        return INST_ENDPOINT_PATTERN.matcher(endpoint).matches();</span>
+    }
+
+    public static String parseInstanceIdFromEndpoint(String endpoint) {
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (StringUtils.isEmpty(endpoint)) {</span>
+<span class="nc" id="L36">            return null;</span>
+        }
+<span class="fc" id="L38">        return endpoint.substring(endpoint.lastIndexOf(&quot;/&quot;) + 1, endpoint.indexOf('.'));</span>
+    }
+
+    public static String getNameSrvAddrFromNamesrvEndpoint(String nameSrvEndpoint) {
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (StringUtils.isEmpty(nameSrvEndpoint)) {</span>
+<span class="nc" id="L43">            return null;</span>
+        }
+<span class="fc" id="L45">        return nameSrvEndpoint.substring(nameSrvEndpoint.lastIndexOf('/') + 1);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

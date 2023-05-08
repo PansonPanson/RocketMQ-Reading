@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NamesrvController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-namesrv 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.namesrv</a> &gt; <span class="el_source">NamesrvController.java</span></div><h1>NamesrvController.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.namesrv;
+
+import java.util.Arrays;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RunnableFuture;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
+import org.apache.rocketmq.common.Configuration;
+import org.apache.rocketmq.common.ThreadFactoryImpl;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.common.future.FutureTaskExt;
+import org.apache.rocketmq.common.protocol.RequestCode;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+import org.apache.rocketmq.common.namesrv.NamesrvConfig;
+import org.apache.rocketmq.namesrv.kvconfig.KVConfigManager;
+import org.apache.rocketmq.namesrv.processor.ClientRequestProcessor;
+import org.apache.rocketmq.namesrv.processor.ClusterTestRequestProcessor;
+import org.apache.rocketmq.namesrv.processor.DefaultRequestProcessor;
+import org.apache.rocketmq.namesrv.routeinfo.BrokerHousekeepingService;
+import org.apache.rocketmq.namesrv.routeinfo.RouteInfoManager;
+import org.apache.rocketmq.remoting.RemotingClient;
+import org.apache.rocketmq.remoting.RemotingServer;
+import org.apache.rocketmq.remoting.common.RemotingUtil;
+import org.apache.rocketmq.remoting.common.TlsMode;
+import org.apache.rocketmq.remoting.netty.NettyClientConfig;
+import org.apache.rocketmq.remoting.netty.NettyRemotingClient;
+import org.apache.rocketmq.remoting.netty.NettyRemotingServer;
+import org.apache.rocketmq.remoting.netty.NettyServerConfig;
+import org.apache.rocketmq.remoting.netty.RequestTask;
+import org.apache.rocketmq.remoting.netty.TlsSystemConfig;
+import org.apache.rocketmq.srvutil.FileWatchService;
+
+public class NamesrvController {
+<span class="fc" id="L56">    private static final InternalLogger LOGGER = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);</span>
+<span class="fc" id="L57">    private static final InternalLogger WATER_MARK_LOG = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_WATER_MARK_LOGGER_NAME);</span>
+
+    private final NamesrvConfig namesrvConfig;
+
+    private final NettyServerConfig nettyServerConfig;
+    private final NettyClientConfig nettyClientConfig;
+
+<span class="fc" id="L64">    private final ScheduledExecutorService scheduledExecutorService = new ScheduledThreadPoolExecutor(1,</span>
+        new BasicThreadFactory.Builder()
+<span class="fc" id="L66">            .namingPattern(&quot;NSScheduledThread&quot;)</span>
+<span class="fc" id="L67">            .daemon(true)</span>
+<span class="fc" id="L68">            .build());</span>
+<span class="fc" id="L69">    private final ScheduledExecutorService scanExecutorService = new ScheduledThreadPoolExecutor(1,</span>
+        new BasicThreadFactory.Builder()
+<span class="fc" id="L71">            .namingPattern(&quot;NSScanScheduledThread&quot;)</span>
+<span class="fc" id="L72">            .daemon(true)</span>
+<span class="fc" id="L73">            .build());</span>
+    private final KVConfigManager kvConfigManager;
+    private final RouteInfoManager routeInfoManager;
+
+    private RemotingClient remotingClient;
+    private RemotingServer remotingServer;
+
+    private BrokerHousekeepingService brokerHousekeepingService;
+
+    private ExecutorService defaultExecutor;
+    private ExecutorService clientRequestExecutor;
+
+    private BlockingQueue&lt;Runnable&gt; defaultThreadPoolQueue;
+    private BlockingQueue&lt;Runnable&gt; clientRequestThreadPoolQueue;
+
+    private Configuration configuration;
+    private FileWatchService fileWatchService;
+
+    public NamesrvController(NamesrvConfig namesrvConfig, NettyServerConfig nettyServerConfig) {
+<span class="fc" id="L92">        this(namesrvConfig, nettyServerConfig, new NettyClientConfig());</span>
+<span class="fc" id="L93">    }</span>
+
+<span class="fc" id="L95">    public NamesrvController(NamesrvConfig namesrvConfig, NettyServerConfig nettyServerConfig, NettyClientConfig nettyClientConfig) {</span>
+<span class="fc" id="L96">        this.namesrvConfig = namesrvConfig;</span>
+<span class="fc" id="L97">        this.nettyServerConfig = nettyServerConfig;</span>
+<span class="fc" id="L98">        this.nettyClientConfig = nettyClientConfig;</span>
+<span class="fc" id="L99">        this.kvConfigManager = new KVConfigManager(this);</span>
+<span class="fc" id="L100">        this.brokerHousekeepingService = new BrokerHousekeepingService(this);</span>
+<span class="fc" id="L101">        this.routeInfoManager = new RouteInfoManager(namesrvConfig, this);</span>
+<span class="fc" id="L102">        this.configuration = new Configuration(</span>
+            LOGGER,
+            this.namesrvConfig, this.nettyServerConfig
+        );
+<span class="fc" id="L106">        this.configuration.setStorePathFromConfig(this.namesrvConfig, &quot;configStorePath&quot;);</span>
+<span class="fc" id="L107">    }</span>
+
+    public boolean initialize() {
+
+<span class="fc" id="L111">        this.kvConfigManager.load();</span>
+
+<span class="fc" id="L113">        this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.brokerHousekeepingService);</span>
+
+<span class="fc" id="L115">        this.defaultThreadPoolQueue = new LinkedBlockingQueue&lt;&gt;(this.namesrvConfig.getDefaultThreadPoolQueueCapacity());</span>
+<span class="fc" id="L116">        this.defaultExecutor = new ThreadPoolExecutor(</span>
+<span class="fc" id="L117">            this.namesrvConfig.getDefaultThreadPoolNums(),</span>
+<span class="fc" id="L118">            this.namesrvConfig.getDefaultThreadPoolNums(),</span>
+            1000 * 60,
+            TimeUnit.MILLISECONDS,
+            this.defaultThreadPoolQueue,
+<span class="fc" id="L122">            new ThreadFactoryImpl(&quot;RemotingExecutorThread_&quot;)) {</span>
+            @Override
+            protected &lt;T&gt; RunnableFuture&lt;T&gt; newTaskFor(final Runnable runnable, final T value) {
+<span class="nc" id="L125">                return new FutureTaskExt&lt;T&gt;(runnable, value);</span>
+            }
+        };
+
+<span class="fc" id="L129">        this.clientRequestThreadPoolQueue = new LinkedBlockingQueue&lt;&gt;(this.namesrvConfig.getClientRequestThreadPoolQueueCapacity());</span>
+<span class="fc" id="L130">        this.clientRequestExecutor = new ThreadPoolExecutor(</span>
+<span class="fc" id="L131">            this.namesrvConfig.getClientRequestThreadPoolNums(),</span>
+<span class="fc" id="L132">            this.namesrvConfig.getClientRequestThreadPoolNums(),</span>
+            1000 * 60,
+            TimeUnit.MILLISECONDS,
+            this.clientRequestThreadPoolQueue,
+<span class="fc" id="L136">            new ThreadFactoryImpl(&quot;ClientRequestExecutorThread_&quot;)) {</span>
+            @Override
+            protected &lt;T&gt; RunnableFuture&lt;T&gt; newTaskFor(final Runnable runnable, final T value) {
+<span class="nc" id="L139">                return new FutureTaskExt&lt;T&gt;(runnable, value);</span>
+            }
+        };
+<span class="fc" id="L142">        this.remotingClient = new NettyRemotingClient(this.nettyClientConfig);</span>
+<span class="fc" id="L143">        this.remotingClient.updateNameServerAddressList(Arrays.asList(RemotingUtil.getLocalAddress() + &quot;:&quot; + this.nettyServerConfig.getListenPort()));</span>
+
+<span class="fc" id="L145">        this.registerProcessor();</span>
+
+<span class="fc" id="L147">        this.scanExecutorService.scheduleAtFixedRate(NamesrvController.this.routeInfoManager::scanNotActiveBroker,</span>
+<span class="fc" id="L148">            5, this.namesrvConfig.getScanNotActiveBrokerInterval(), TimeUnit.MILLISECONDS);</span>
+
+<span class="fc" id="L150">        this.scheduledExecutorService.scheduleAtFixedRate(NamesrvController.this.kvConfigManager::printAllPeriodically,</span>
+            1, 10, TimeUnit.MINUTES);
+
+<span class="fc" id="L153">        this.scheduledExecutorService.scheduleAtFixedRate(() -&gt; {</span>
+            try {
+<span class="nc" id="L155">                NamesrvController.this.printWaterMark();</span>
+<span class="nc" id="L156">            } catch (Throwable e) {</span>
+<span class="nc" id="L157">                LOGGER.error(&quot;printWaterMark error.&quot;, e);</span>
+<span class="nc" id="L158">            }</span>
+<span class="nc" id="L159">        }, 10, 1, TimeUnit.SECONDS);</span>
+
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (TlsSystemConfig.tlsMode != TlsMode.DISABLED) {</span>
+            // Register a listener to reload SslContext
+            try {
+<span class="fc" id="L164">                fileWatchService = new FileWatchService(</span>
+                    new String[] {
+                        TlsSystemConfig.tlsServerCertPath,
+                        TlsSystemConfig.tlsServerKeyPath,
+                        TlsSystemConfig.tlsServerTrustCertPath
+                    },
+<span class="fc" id="L170">                    new FileWatchService.Listener() {</span>
+<span class="fc" id="L171">                        boolean certChanged, keyChanged = false;</span>
+
+                        @Override
+                        public void onChanged(String path) {
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                            if (path.equals(TlsSystemConfig.tlsServerTrustCertPath)) {</span>
+<span class="nc" id="L176">                                LOGGER.info(&quot;The trust certificate changed, reload the ssl context&quot;);</span>
+<span class="nc" id="L177">                                reloadServerSslContext();</span>
+                            }
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                            if (path.equals(TlsSystemConfig.tlsServerCertPath)) {</span>
+<span class="nc" id="L180">                                certChanged = true;</span>
+                            }
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                            if (path.equals(TlsSystemConfig.tlsServerKeyPath)) {</span>
+<span class="nc" id="L183">                                keyChanged = true;</span>
+                            }
+<span class="nc bnc" id="L185" title="All 4 branches missed.">                            if (certChanged &amp;&amp; keyChanged) {</span>
+<span class="nc" id="L186">                                LOGGER.info(&quot;The certificate and private key changed, reload the ssl context&quot;);</span>
+<span class="nc" id="L187">                                certChanged = keyChanged = false;</span>
+<span class="nc" id="L188">                                reloadServerSslContext();</span>
+                            }
+<span class="nc" id="L190">                        }</span>
+
+                        private void reloadServerSslContext() {
+<span class="nc" id="L193">                            ((NettyRemotingServer) remotingServer).loadSslContext();</span>
+<span class="nc" id="L194">                        }</span>
+                    });
+<span class="nc" id="L196">            } catch (Exception e) {</span>
+<span class="nc" id="L197">                LOGGER.warn(&quot;FileWatchService created error, can't load the certificate dynamically&quot;);</span>
+<span class="fc" id="L198">            }</span>
+        }
+
+<span class="fc" id="L201">        return true;</span>
+    }
+
+    private void printWaterMark() {
+<span class="nc" id="L205">        WATER_MARK_LOG.info(&quot;[WATERMARK] ClientQueueSize:{} ClientQueueSlowTime:{} &quot; +</span>
+                &quot;DefaultQueueSize:{} DefaultQueueSlowTime:{}&quot;,
+<span class="nc" id="L207">            this.clientRequestThreadPoolQueue.size(), headSlowTimeMills(this.clientRequestThreadPoolQueue),</span>
+<span class="nc" id="L208">            this.defaultThreadPoolQueue.size(), headSlowTimeMills(this.defaultThreadPoolQueue));</span>
+<span class="nc" id="L209">    }</span>
+
+    private long headSlowTimeMills(BlockingQueue&lt;Runnable&gt; q) {
+<span class="nc" id="L212">        long slowTimeMills = 0;</span>
+<span class="nc" id="L213">        final Runnable firstRunnable = q.peek();</span>
+
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (firstRunnable instanceof FutureTaskExt) {</span>
+<span class="nc" id="L216">            final Runnable inner = ((FutureTaskExt) firstRunnable).getRunnable();</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">            if (inner instanceof RequestTask) {</span>
+<span class="nc" id="L218">                slowTimeMills = System.currentTimeMillis() - ((RequestTask) inner).getCreateTimestamp();</span>
+            }
+        }
+
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (slowTimeMills &lt; 0) {</span>
+<span class="nc" id="L223">            slowTimeMills = 0;</span>
+        }
+
+<span class="nc" id="L226">        return slowTimeMills;</span>
+    }
+
+    private void registerProcessor() {
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        if (namesrvConfig.isClusterTest()) {</span>
+
+<span class="nc" id="L232">            this.remotingServer.registerDefaultProcessor(new ClusterTestRequestProcessor(this, namesrvConfig.getProductEnvName()),</span>
+                this.defaultExecutor);
+        } else {
+            // Support get route info only temporarily
+<span class="fc" id="L236">            ClientRequestProcessor clientRequestProcessor = new ClientRequestProcessor(this);</span>
+<span class="fc" id="L237">            this.remotingServer.registerProcessor(RequestCode.GET_ROUTEINFO_BY_TOPIC, clientRequestProcessor, this.clientRequestExecutor);</span>
+
+<span class="fc" id="L239">            this.remotingServer.registerDefaultProcessor(new DefaultRequestProcessor(this), this.defaultExecutor);</span>
+        }
+<span class="fc" id="L241">    }</span>
+
+    public void start() throws Exception {
+<span class="fc" id="L244">        this.remotingServer.start();</span>
+<span class="fc" id="L245">        this.remotingClient.start();</span>
+
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (this.fileWatchService != null) {</span>
+<span class="fc" id="L248">            this.fileWatchService.start();</span>
+        }
+
+<span class="fc" id="L251">        this.routeInfoManager.start();</span>
+<span class="fc" id="L252">    }</span>
+
+    public void shutdown() {
+<span class="fc" id="L255">        this.remotingClient.shutdown();</span>
+<span class="fc" id="L256">        this.remotingServer.shutdown();</span>
+<span class="fc" id="L257">        this.defaultExecutor.shutdown();</span>
+<span class="fc" id="L258">        this.clientRequestExecutor.shutdown();</span>
+<span class="fc" id="L259">        this.scheduledExecutorService.shutdown();</span>
+<span class="fc" id="L260">        this.scanExecutorService.shutdown();</span>
+<span class="fc" id="L261">        this.routeInfoManager.shutdown();</span>
+
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (this.fileWatchService != null) {</span>
+<span class="fc" id="L264">            this.fileWatchService.shutdown();</span>
+        }
+<span class="fc" id="L266">    }</span>
+
+    public NamesrvConfig getNamesrvConfig() {
+<span class="fc" id="L269">        return namesrvConfig;</span>
+    }
+
+    public NettyServerConfig getNettyServerConfig() {
+<span class="fc" id="L273">        return nettyServerConfig;</span>
+    }
+
+    public KVConfigManager getKvConfigManager() {
+<span class="fc" id="L277">        return kvConfigManager;</span>
+    }
+
+    public RouteInfoManager getRouteInfoManager() {
+<span class="fc" id="L281">        return routeInfoManager;</span>
+    }
+
+    public RemotingServer getRemotingServer() {
+<span class="fc" id="L285">        return remotingServer;</span>
+    }
+
+    public RemotingClient getRemotingClient() {
+<span class="nc" id="L289">        return remotingClient;</span>
+    }
+
+    public void setRemotingServer(RemotingServer remotingServer) {
+<span class="fc" id="L293">        this.remotingServer = remotingServer;</span>
+<span class="fc" id="L294">    }</span>
+
+    public Configuration getConfiguration() {
+<span class="fc" id="L297">        return configuration;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

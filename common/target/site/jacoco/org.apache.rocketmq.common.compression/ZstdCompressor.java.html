@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZstdCompressor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.compression</a> &gt; <span class="el_source">ZstdCompressor.java</span></div><h1>ZstdCompressor.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.compression;
+
+import com.github.luben.zstd.ZstdInputStream;
+import com.github.luben.zstd.ZstdOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+
+<span class="fc" id="L29">public class ZstdCompressor implements Compressor {</span>
+<span class="fc" id="L30">    private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);</span>
+
+    @Override
+    public byte[] compress(byte[] src, int level) throws IOException {
+<span class="fc" id="L34">        byte[] result = src;</span>
+<span class="fc" id="L35">        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(src.length);</span>
+<span class="fc" id="L36">        ZstdOutputStream outputStream = new ZstdOutputStream(byteArrayOutputStream, level);</span>
+        try {
+<span class="fc" id="L38">            outputStream.write(src);</span>
+<span class="fc" id="L39">            outputStream.flush();</span>
+<span class="fc" id="L40">            outputStream.close();</span>
+<span class="fc" id="L41">            result = byteArrayOutputStream.toByteArray();</span>
+<span class="nc" id="L42">        } catch (IOException e) {</span>
+<span class="nc" id="L43">            log.error(&quot;Failed to compress data by zstd&quot;, e);</span>
+<span class="nc" id="L44">            throw e;</span>
+        } finally {
+            try {
+<span class="fc" id="L47">                byteArrayOutputStream.close();</span>
+<span class="nc" id="L48">            } catch (IOException ignored) {</span>
+<span class="fc" id="L49">            }</span>
+        }
+<span class="fc" id="L51">        return result;</span>
+    }
+
+    @Override
+    public byte[] decompress(byte[] src) throws IOException {
+<span class="fc" id="L56">        byte[] result = src;</span>
+<span class="fc" id="L57">        byte[] uncompressData = new byte[src.length];</span>
+<span class="fc" id="L58">        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(src);</span>
+<span class="fc" id="L59">        ZstdInputStream zstdInputStream = new ZstdInputStream(byteArrayInputStream);</span>
+<span class="fc" id="L60">        ByteArrayOutputStream resultOutputStream = new ByteArrayOutputStream(src.length);</span>
+
+        try {
+            while (true) {
+<span class="fc" id="L64">                int len = zstdInputStream.read(uncompressData, 0, uncompressData.length);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                if (len &lt;= 0) {</span>
+<span class="fc" id="L66">                    break;</span>
+                }
+<span class="fc" id="L68">                resultOutputStream.write(uncompressData, 0, len);</span>
+<span class="fc" id="L69">            }</span>
+<span class="fc" id="L70">            resultOutputStream.flush();</span>
+<span class="fc" id="L71">            resultOutputStream.close();</span>
+<span class="fc" id="L72">            result = resultOutputStream.toByteArray();</span>
+<span class="nc" id="L73">        } catch (IOException e) {</span>
+<span class="nc" id="L74">            throw e;</span>
+        } finally {
+            try {
+<span class="fc" id="L77">                zstdInputStream.close();</span>
+<span class="fc" id="L78">                byteArrayInputStream.close();</span>
+<span class="nc" id="L79">            } catch (IOException e) {</span>
+<span class="nc" id="L80">                log.warn(&quot;Failed to close the zstd compress stream&quot;, e);</span>
+<span class="fc" id="L81">            }</span>
+        }
+
+<span class="fc" id="L84">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

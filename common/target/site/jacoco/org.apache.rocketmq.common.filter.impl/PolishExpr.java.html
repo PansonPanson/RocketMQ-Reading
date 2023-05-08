@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolishExpr.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.filter.impl</a> &gt; <span class="el_source">PolishExpr.java</span></div><h1>PolishExpr.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.filter.impl;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Stack;
+
+import static org.apache.rocketmq.common.filter.impl.Operator.LEFTPARENTHESIS;
+import static org.apache.rocketmq.common.filter.impl.Operator.RIGHTPARENTHESIS;
+import static org.apache.rocketmq.common.filter.impl.Operator.createOperator;
+
+<span class="nc" id="L28">public class PolishExpr {</span>
+
+    public static List&lt;Op&gt; reversePolish(String expression) {
+<span class="nc" id="L31">        return reversePolish(participle(expression));</span>
+    }
+
+    /**
+     * Shunting-yard algorithm &lt;br/&gt;
+     * http://en.wikipedia.org/wiki/Shunting_yard_algorithm
+     *
+     * @return the compute result of Shunting-yard algorithm
+     */
+    public static List&lt;Op&gt; reversePolish(List&lt;Op&gt; tokens) {
+<span class="nc" id="L41">        List&lt;Op&gt; segments = new ArrayList&lt;Op&gt;();</span>
+<span class="nc" id="L42">        Stack&lt;Operator&gt; operatorStack = new Stack&lt;Operator&gt;();</span>
+
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        for (int i = 0; i &lt; tokens.size(); i++) {</span>
+<span class="nc" id="L45">            Op token = tokens.get(i);</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">            if (isOperand(token)) {</span>
+
+<span class="nc" id="L48">                segments.add(token);</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">            } else if (isLeftParenthesis(token)) {</span>
+
+<span class="nc" id="L51">                operatorStack.push((Operator) token);</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">            } else if (isRightParenthesis(token)) {</span>
+
+<span class="nc" id="L54">                Operator opNew = null;</span>
+<span class="nc bnc" id="L55" title="All 4 branches missed.">                while (!operatorStack.empty() &amp;&amp; LEFTPARENTHESIS != (opNew = operatorStack.pop())) {</span>
+<span class="nc" id="L56">                    segments.add(opNew);</span>
+                }
+<span class="nc bnc" id="L58" title="All 4 branches missed.">                if (null == opNew || LEFTPARENTHESIS != opNew)</span>
+<span class="nc" id="L59">                    throw new IllegalArgumentException(&quot;mismatched parentheses&quot;);</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            } else if (isOperator(token)) {</span>
+
+<span class="nc" id="L62">                Operator opNew = (Operator) token;</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">                if (!operatorStack.empty()) {</span>
+<span class="nc" id="L64">                    Operator opOld = operatorStack.peek();</span>
+<span class="nc bnc" id="L65" title="All 4 branches missed.">                    if (opOld.isCompareable() &amp;&amp; opNew.compare(opOld) != 1) {</span>
+<span class="nc" id="L66">                        segments.add(operatorStack.pop());</span>
+                    }
+                }
+<span class="nc" id="L69">                operatorStack.push(opNew);</span>
+<span class="nc" id="L70">            } else</span>
+<span class="nc" id="L71">                throw new IllegalArgumentException(&quot;illegal token &quot; + token);</span>
+        }
+
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        while (!operatorStack.empty()) {</span>
+<span class="nc" id="L75">            Operator operator = operatorStack.pop();</span>
+<span class="nc bnc" id="L76" title="All 4 branches missed.">            if (LEFTPARENTHESIS == operator || RIGHTPARENTHESIS == operator)</span>
+<span class="nc" id="L77">                throw new IllegalArgumentException(&quot;mismatched parentheses &quot; + operator);</span>
+<span class="nc" id="L78">            segments.add(operator);</span>
+<span class="nc" id="L79">        }</span>
+
+<span class="nc" id="L81">        return segments;</span>
+    }
+
+    /**
+     * @param expression
+     * @return
+     * @throws Exception
+     */
+    private static List&lt;Op&gt; participle(String expression) {
+<span class="nc" id="L90">        List&lt;Op&gt; segments = new ArrayList&lt;Op&gt;();</span>
+
+<span class="nc" id="L92">        int size = expression.length();</span>
+<span class="nc" id="L93">        int wordStartIndex = -1;</span>
+<span class="nc" id="L94">        int wordLen = 0;</span>
+<span class="nc" id="L95">        Type preType = Type.NULL;</span>
+
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="nc" id="L98">            int chValue = (int) expression.charAt(i);</span>
+
+<span class="nc bnc" id="L100" title="All 14 branches missed.">            if ((97 &lt;= chValue &amp;&amp; chValue &lt;= 122) || (65 &lt;= chValue &amp;&amp; chValue &lt;= 90)</span>
+                || (49 &lt;= chValue &amp;&amp; chValue &lt;= 57) || 95 == chValue) {
+
+<span class="nc bnc" id="L103" title="All 8 branches missed.">                if (Type.OPERATOR == preType || Type.SEPAERATOR == preType || Type.NULL == preType</span>
+                    || Type.PARENTHESIS == preType) {
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                    if (Type.OPERATOR == preType) {</span>
+<span class="nc" id="L106">                        segments.add(createOperator(expression.substring(wordStartIndex, wordStartIndex</span>
+                            + wordLen)));
+                    }
+<span class="nc" id="L109">                    wordStartIndex = i;</span>
+<span class="nc" id="L110">                    wordLen = 0;</span>
+                }
+<span class="nc" id="L112">                preType = Type.OPERAND;</span>
+<span class="nc" id="L113">                wordLen++;</span>
+<span class="nc bnc" id="L114" title="All 4 branches missed.">            } else if (40 == chValue || 41 == chValue) {</span>
+
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                if (Type.OPERATOR == preType) {</span>
+<span class="nc" id="L117">                    segments.add(createOperator(expression</span>
+<span class="nc" id="L118">                        .substring(wordStartIndex, wordStartIndex + wordLen)));</span>
+<span class="nc" id="L119">                    wordStartIndex = -1;</span>
+<span class="nc" id="L120">                    wordLen = 0;</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                } else if (Type.OPERAND == preType) {</span>
+<span class="nc" id="L122">                    segments.add(new Operand(expression.substring(wordStartIndex, wordStartIndex + wordLen)));</span>
+<span class="nc" id="L123">                    wordStartIndex = -1;</span>
+<span class="nc" id="L124">                    wordLen = 0;</span>
+                }
+
+<span class="nc" id="L127">                preType = Type.PARENTHESIS;</span>
+<span class="nc" id="L128">                segments.add(createOperator((char) chValue + &quot;&quot;));</span>
+<span class="nc bnc" id="L129" title="All 4 branches missed.">            } else if (38 == chValue || 124 == chValue) {</span>
+
+<span class="nc bnc" id="L131" title="All 6 branches missed.">                if (Type.OPERAND == preType || Type.SEPAERATOR == preType || Type.PARENTHESIS == preType) {</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                    if (Type.OPERAND == preType) {</span>
+<span class="nc" id="L133">                        segments.add(new Operand(expression.substring(wordStartIndex, wordStartIndex</span>
+                            + wordLen)));
+                    }
+<span class="nc" id="L136">                    wordStartIndex = i;</span>
+<span class="nc" id="L137">                    wordLen = 0;</span>
+                }
+<span class="nc" id="L139">                preType = Type.OPERATOR;</span>
+<span class="nc" id="L140">                wordLen++;</span>
+<span class="nc bnc" id="L141" title="All 4 branches missed.">            } else if (32 == chValue || 9 == chValue) {</span>
+
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                if (Type.OPERATOR == preType) {</span>
+<span class="nc" id="L144">                    segments.add(createOperator(expression</span>
+<span class="nc" id="L145">                        .substring(wordStartIndex, wordStartIndex + wordLen)));</span>
+<span class="nc" id="L146">                    wordStartIndex = -1;</span>
+<span class="nc" id="L147">                    wordLen = 0;</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                } else if (Type.OPERAND == preType) {</span>
+<span class="nc" id="L149">                    segments.add(new Operand(expression.substring(wordStartIndex, wordStartIndex + wordLen)));</span>
+<span class="nc" id="L150">                    wordStartIndex = -1;</span>
+<span class="nc" id="L151">                    wordLen = 0;</span>
+                }
+<span class="nc" id="L153">                preType = Type.SEPAERATOR;</span>
+            } else {
+
+<span class="nc" id="L156">                throw new IllegalArgumentException(&quot;illegal expression, at index &quot; + i + &quot; &quot; + (char) chValue);</span>
+            }
+
+        }
+
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (wordLen &gt; 0) {</span>
+<span class="nc" id="L162">            segments.add(new Operand(expression.substring(wordStartIndex, wordStartIndex + wordLen)));</span>
+        }
+<span class="nc" id="L164">        return segments;</span>
+    }
+
+    public static boolean isOperand(Op token) {
+<span class="nc" id="L168">        return token instanceof Operand;</span>
+    }
+
+    public static boolean isLeftParenthesis(Op token) {
+<span class="nc bnc" id="L172" title="All 4 branches missed.">        return token instanceof Operator &amp;&amp; LEFTPARENTHESIS == (Operator) token;</span>
+    }
+
+    public static boolean isRightParenthesis(Op token) {
+<span class="nc bnc" id="L176" title="All 4 branches missed.">        return token instanceof Operator &amp;&amp; RIGHTPARENTHESIS == (Operator) token;</span>
+    }
+
+    public static boolean isOperator(Op token) {
+<span class="nc" id="L180">        return token instanceof Operator;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

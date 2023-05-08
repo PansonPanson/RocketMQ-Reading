@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StatisticsItemScheduledPrinter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.statistics</a> &gt; <span class="el_source">StatisticsItemScheduledPrinter.java</span></div><h1>StatisticsItemScheduledPrinter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.statistics;
+
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
+public class StatisticsItemScheduledPrinter extends FutureHolder {
+    protected String name;
+
+    protected StatisticsItemPrinter printer;
+    protected ScheduledExecutorService executor;
+    protected long interval;
+    protected InitialDelay initialDelay;
+    protected Valve valve;
+
+    public StatisticsItemScheduledPrinter(String name, StatisticsItemPrinter printer,
+                                          ScheduledExecutorService executor, InitialDelay initialDelay,
+<span class="nc" id="L34">                                          long interval, Valve valve) {</span>
+<span class="nc" id="L35">        this.name = name;</span>
+<span class="nc" id="L36">        this.printer = printer;</span>
+<span class="nc" id="L37">        this.executor = executor;</span>
+<span class="nc" id="L38">        this.initialDelay = initialDelay;</span>
+<span class="nc" id="L39">        this.interval = interval;</span>
+<span class="nc" id="L40">        this.valve = valve;</span>
+<span class="nc" id="L41">    }</span>
+
+    /**
+     * schedule a StatisticsItem to print all the values periodically
+     */
+    public void schedule(final StatisticsItem statisticsItem) {
+<span class="nc" id="L47">        ScheduledFuture future = executor.scheduleAtFixedRate(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L50" title="All 2 branches missed.">                if (enabled()) {</span>
+<span class="nc" id="L51">                    printer.print(name, statisticsItem);</span>
+                }
+<span class="nc" id="L53">            }</span>
+<span class="nc" id="L54">        }, getInitialDelay(), interval, TimeUnit.MILLISECONDS);</span>
+
+<span class="nc" id="L56">        addFuture(statisticsItem, future);</span>
+<span class="nc" id="L57">    }</span>
+
+    public void remove(final StatisticsItem statisticsItem) {
+<span class="nc" id="L60">        removeAllFuture(statisticsItem);</span>
+<span class="nc" id="L61">    }</span>
+
+    public interface InitialDelay {
+        /**
+         * Get inital delay value
+         * @return
+         */
+        long get();
+    }
+
+    public interface Valve {
+        /**
+         * whether enabled
+         * @return
+         */
+        boolean enabled();
+
+        /**
+         * whether print zero lines
+         * @return
+         */
+        boolean printZeroLine();
+    }
+
+    protected long getInitialDelay() {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        return initialDelay != null ? initialDelay.get() : 0;</span>
+    }
+
+    protected boolean enabled() {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        return valve != null ? valve.enabled() : false;</span>
+    }
+
+    protected boolean printZeroLine() {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        return valve != null ? valve.printZeroLine() : false;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

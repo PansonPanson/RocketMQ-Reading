@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraceDataEncoder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.trace</a> &gt; <span class="el_source">TraceDataEncoder.java</span></div><h1>TraceDataEncoder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.trace;
+
+import org.apache.rocketmq.client.producer.LocalTransactionState;
+import org.apache.rocketmq.common.message.MessageConst;
+import org.apache.rocketmq.common.message.MessageType;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Encode/decode for Trace Data
+ */
+<span class="nc" id="L30">public class TraceDataEncoder {</span>
+
+    /**
+     * Resolving traceContext list From trace data String
+     *
+     * @param traceData
+     * @return
+     */
+    public static List&lt;TraceContext&gt; decoderFromTraceDataString(String traceData) {
+<span class="fc" id="L39">        List&lt;TraceContext&gt; resList = new ArrayList&lt;TraceContext&gt;();</span>
+<span class="pc bpc" id="L40" title="2 of 4 branches missed.">        if (traceData == null || traceData.length() &lt;= 0) {</span>
+<span class="nc" id="L41">            return resList;</span>
+        }
+<span class="fc" id="L43">        String[] contextList = traceData.split(String.valueOf(TraceConstants.FIELD_SPLITOR));</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (String context : contextList) {</span>
+<span class="fc" id="L45">            String[] line = context.split(String.valueOf(TraceConstants.CONTENT_SPLITOR));</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (line[0].equals(TraceType.Pub.name())) {</span>
+<span class="fc" id="L47">                TraceContext pubContext = new TraceContext();</span>
+<span class="fc" id="L48">                pubContext.setTraceType(TraceType.Pub);</span>
+<span class="fc" id="L49">                pubContext.setTimeStamp(Long.parseLong(line[1]));</span>
+<span class="fc" id="L50">                pubContext.setRegionId(line[2]);</span>
+<span class="fc" id="L51">                pubContext.setGroupName(line[3]);</span>
+<span class="fc" id="L52">                TraceBean bean = new TraceBean();</span>
+<span class="fc" id="L53">                bean.setTopic(line[4]);</span>
+<span class="fc" id="L54">                bean.setMsgId(line[5]);</span>
+<span class="fc" id="L55">                bean.setTags(line[6]);</span>
+<span class="fc" id="L56">                bean.setKeys(line[7]);</span>
+<span class="fc" id="L57">                bean.setStoreHost(line[8]);</span>
+<span class="fc" id="L58">                bean.setBodyLength(Integer.parseInt(line[9]));</span>
+<span class="fc" id="L59">                pubContext.setCostTime(Integer.parseInt(line[10]));</span>
+<span class="fc" id="L60">                bean.setMsgType(MessageType.values()[Integer.parseInt(line[11])]);</span>
+
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                if (line.length == 13) {</span>
+<span class="nc" id="L63">                    pubContext.setSuccess(Boolean.parseBoolean(line[12]));</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                } else if (line.length == 14) {</span>
+<span class="fc" id="L65">                    bean.setOffsetMsgId(line[12]);</span>
+<span class="fc" id="L66">                    pubContext.setSuccess(Boolean.parseBoolean(line[13]));</span>
+                }
+
+                // compatible with the old version
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                if (line.length &gt;= 15) {</span>
+<span class="nc" id="L71">                    bean.setOffsetMsgId(line[12]);</span>
+<span class="nc" id="L72">                    pubContext.setSuccess(Boolean.parseBoolean(line[13]));</span>
+<span class="nc" id="L73">                    bean.setClientHost(line[14]);</span>
+                }
+
+<span class="fc" id="L76">                pubContext.setTraceBeans(new ArrayList&lt;TraceBean&gt;(1));</span>
+<span class="fc" id="L77">                pubContext.getTraceBeans().add(bean);</span>
+<span class="fc" id="L78">                resList.add(pubContext);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            } else if (line[0].equals(TraceType.SubBefore.name())) {</span>
+<span class="nc" id="L80">                TraceContext subBeforeContext = new TraceContext();</span>
+<span class="nc" id="L81">                subBeforeContext.setTraceType(TraceType.SubBefore);</span>
+<span class="nc" id="L82">                subBeforeContext.setTimeStamp(Long.parseLong(line[1]));</span>
+<span class="nc" id="L83">                subBeforeContext.setRegionId(line[2]);</span>
+<span class="nc" id="L84">                subBeforeContext.setGroupName(line[3]);</span>
+<span class="nc" id="L85">                subBeforeContext.setRequestId(line[4]);</span>
+<span class="nc" id="L86">                TraceBean bean = new TraceBean();</span>
+<span class="nc" id="L87">                bean.setMsgId(line[5]);</span>
+<span class="nc" id="L88">                bean.setRetryTimes(Integer.parseInt(line[6]));</span>
+<span class="nc" id="L89">                bean.setKeys(line[7]);</span>
+<span class="nc" id="L90">                subBeforeContext.setTraceBeans(new ArrayList&lt;TraceBean&gt;(1));</span>
+<span class="nc" id="L91">                subBeforeContext.getTraceBeans().add(bean);</span>
+<span class="nc" id="L92">                resList.add(subBeforeContext);</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            } else if (line[0].equals(TraceType.SubAfter.name())) {</span>
+<span class="nc" id="L94">                TraceContext subAfterContext = new TraceContext();</span>
+<span class="nc" id="L95">                subAfterContext.setTraceType(TraceType.SubAfter);</span>
+<span class="nc" id="L96">                subAfterContext.setRequestId(line[1]);</span>
+<span class="nc" id="L97">                TraceBean bean = new TraceBean();</span>
+<span class="nc" id="L98">                bean.setMsgId(line[2]);</span>
+<span class="nc" id="L99">                bean.setKeys(line[5]);</span>
+<span class="nc" id="L100">                subAfterContext.setTraceBeans(new ArrayList&lt;TraceBean&gt;(1));</span>
+<span class="nc" id="L101">                subAfterContext.getTraceBeans().add(bean);</span>
+<span class="nc" id="L102">                subAfterContext.setCostTime(Integer.parseInt(line[3]));</span>
+<span class="nc" id="L103">                subAfterContext.setSuccess(Boolean.parseBoolean(line[4]));</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">                if (line.length &gt;= 7) {</span>
+                    // add the context type
+<span class="nc" id="L106">                    subAfterContext.setContextCode(Integer.parseInt(line[6]));</span>
+                }
+                // compatible with the old version
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                if (line.length &gt;= 9) {</span>
+<span class="nc" id="L110">                    subAfterContext.setTimeStamp(Long.parseLong(line[7]));</span>
+<span class="nc" id="L111">                    subAfterContext.setGroupName(line[8]);</span>
+                }
+<span class="nc" id="L113">                resList.add(subAfterContext);</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            } else if (line[0].equals(TraceType.EndTransaction.name())) {</span>
+<span class="fc" id="L115">                TraceContext endTransactionContext = new TraceContext();</span>
+<span class="fc" id="L116">                endTransactionContext.setTraceType(TraceType.EndTransaction);</span>
+<span class="fc" id="L117">                endTransactionContext.setTimeStamp(Long.parseLong(line[1]));</span>
+<span class="fc" id="L118">                endTransactionContext.setRegionId(line[2]);</span>
+<span class="fc" id="L119">                endTransactionContext.setGroupName(line[3]);</span>
+<span class="fc" id="L120">                TraceBean bean = new TraceBean();</span>
+<span class="fc" id="L121">                bean.setTopic(line[4]);</span>
+<span class="fc" id="L122">                bean.setMsgId(line[5]);</span>
+<span class="fc" id="L123">                bean.setTags(line[6]);</span>
+<span class="fc" id="L124">                bean.setKeys(line[7]);</span>
+<span class="fc" id="L125">                bean.setStoreHost(line[8]);</span>
+<span class="fc" id="L126">                bean.setMsgType(MessageType.values()[Integer.parseInt(line[9])]);</span>
+<span class="fc" id="L127">                bean.setTransactionId(line[10]);</span>
+<span class="fc" id="L128">                bean.setTransactionState(LocalTransactionState.valueOf(line[11]));</span>
+<span class="fc" id="L129">                bean.setFromTransactionCheck(Boolean.parseBoolean(line[12]));</span>
+
+<span class="fc" id="L131">                endTransactionContext.setTraceBeans(new ArrayList&lt;TraceBean&gt;(1));</span>
+<span class="fc" id="L132">                endTransactionContext.getTraceBeans().add(bean);</span>
+<span class="fc" id="L133">                resList.add(endTransactionContext);</span>
+            }
+        }
+<span class="fc" id="L136">        return resList;</span>
+    }
+
+    /**
+     * Encoding the trace context into data strings and keyset sets
+     *
+     * @param ctx
+     * @return
+     */
+    public static TraceTransferBean encoderFromContextBean(TraceContext ctx) {
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (ctx == null) {</span>
+<span class="nc" id="L147">            return null;</span>
+        }
+        //build message trace of the transfering entity content bean
+<span class="fc" id="L150">        TraceTransferBean transferBean = new TraceTransferBean();</span>
+<span class="fc" id="L151">        StringBuilder sb = new StringBuilder(256);</span>
+<span class="pc bpc" id="L152" title="1 of 5 branches missed.">        switch (ctx.getTraceType()) {</span>
+            case Pub: {
+<span class="fc" id="L154">                TraceBean bean = ctx.getTraceBeans().get(0);</span>
+                //append the content of context and traceBean to transferBean's TransData
+<span class="fc" id="L156">                sb.append(ctx.getTraceType()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L157">                    .append(ctx.getTimeStamp()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L158">                    .append(ctx.getRegionId()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L159">                    .append(ctx.getGroupName()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L160">                    .append(bean.getTopic()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L161">                    .append(bean.getMsgId()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L162">                    .append(bean.getTags()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L163">                    .append(bean.getKeys()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L164">                    .append(bean.getStoreHost()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L165">                    .append(bean.getBodyLength()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L166">                    .append(ctx.getCostTime()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L167">                    .append(bean.getMsgType().ordinal()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L168">                    .append(bean.getOffsetMsgId()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L169">                    .append(ctx.isSuccess()).append(TraceConstants.FIELD_SPLITOR);//</span>
+            }
+<span class="fc" id="L171">            break;</span>
+            case SubBefore: {
+<span class="fc bfc" id="L173" title="All 2 branches covered.">                for (TraceBean bean : ctx.getTraceBeans()) {</span>
+<span class="fc" id="L174">                    sb.append(ctx.getTraceType()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L175">                        .append(ctx.getTimeStamp()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L176">                        .append(ctx.getRegionId()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L177">                        .append(ctx.getGroupName()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L178">                        .append(ctx.getRequestId()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L179">                        .append(bean.getMsgId()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L180">                        .append(bean.getRetryTimes()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L181">                        .append(bean.getKeys()).append(TraceConstants.FIELD_SPLITOR);//</span>
+<span class="fc" id="L182">                }</span>
+            }
+<span class="fc" id="L184">            break;</span>
+            case SubAfter: {
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                for (TraceBean bean : ctx.getTraceBeans()) {</span>
+<span class="fc" id="L187">                    sb.append(ctx.getTraceType()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L188">                        .append(ctx.getRequestId()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L189">                        .append(bean.getMsgId()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L190">                        .append(ctx.getCostTime()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L191">                        .append(ctx.isSuccess()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L192">                        .append(bean.getKeys()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L193">                        .append(ctx.getContextCode()).append(TraceConstants.CONTENT_SPLITOR)</span>
+<span class="fc" id="L194">                        .append(ctx.getTimeStamp()).append(TraceConstants.CONTENT_SPLITOR)</span>
+<span class="fc" id="L195">                        .append(ctx.getGroupName()).append(TraceConstants.FIELD_SPLITOR);</span>
+<span class="fc" id="L196">                }</span>
+            }
+<span class="fc" id="L198">            break;</span>
+            case EndTransaction: {
+<span class="fc" id="L200">                TraceBean bean = ctx.getTraceBeans().get(0);</span>
+<span class="fc" id="L201">                sb.append(ctx.getTraceType()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L202">                    .append(ctx.getTimeStamp()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L203">                    .append(ctx.getRegionId()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L204">                    .append(ctx.getGroupName()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L205">                    .append(bean.getTopic()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L206">                    .append(bean.getMsgId()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L207">                    .append(bean.getTags()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L208">                    .append(bean.getKeys()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L209">                    .append(bean.getStoreHost()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L210">                    .append(bean.getMsgType().ordinal()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L211">                    .append(bean.getTransactionId()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L212">                    .append(bean.getTransactionState().name()).append(TraceConstants.CONTENT_SPLITOR)//</span>
+<span class="fc" id="L213">                    .append(bean.isFromTransactionCheck()).append(TraceConstants.FIELD_SPLITOR);</span>
+            }
+<span class="fc" id="L215">            break;</span>
+            default:
+        }
+<span class="fc" id="L218">        transferBean.setTransData(sb.toString());</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        for (TraceBean bean : ctx.getTraceBeans()) {</span>
+
+<span class="fc" id="L221">            transferBean.getTransKey().add(bean.getMsgId());</span>
+<span class="pc bpc" id="L222" title="1 of 4 branches missed.">            if (bean.getKeys() != null &amp;&amp; bean.getKeys().length() &gt; 0) {</span>
+<span class="fc" id="L223">                String[] keys = bean.getKeys().split(MessageConst.KEY_SEPARATOR);</span>
+<span class="fc" id="L224">                transferBean.getTransKey().addAll(Arrays.asList(keys));</span>
+            }
+<span class="fc" id="L226">        }</span>
+<span class="fc" id="L227">        return transferBean;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumeMessageTraceHookImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.trace.hook</a> &gt; <span class="el_source">ConsumeMessageTraceHookImpl.java</span></div><h1>ConsumeMessageTraceHookImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.trace.hook;
+
+import java.util.Map;
+import org.apache.rocketmq.client.consumer.listener.ConsumeReturnType;
+import org.apache.rocketmq.client.hook.ConsumeMessageContext;
+import org.apache.rocketmq.client.hook.ConsumeMessageHook;
+import org.apache.rocketmq.client.trace.TraceContext;
+import org.apache.rocketmq.client.trace.TraceDispatcher;
+import org.apache.rocketmq.client.trace.TraceBean;
+import org.apache.rocketmq.client.trace.TraceType;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.message.MessageConst;
+import org.apache.rocketmq.common.message.MessageExt;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.rocketmq.common.protocol.NamespaceUtil;
+
+public class ConsumeMessageTraceHookImpl implements ConsumeMessageHook {
+
+    private TraceDispatcher localDispatcher;
+
+<span class="fc" id="L39">    public ConsumeMessageTraceHookImpl(TraceDispatcher localDispatcher) {</span>
+<span class="fc" id="L40">        this.localDispatcher = localDispatcher;</span>
+<span class="fc" id="L41">    }</span>
+
+    @Override
+    public String hookName() {
+<span class="fc" id="L45">        return &quot;ConsumeMessageTraceHook&quot;;</span>
+    }
+
+    @Override
+    public void consumeMessageBefore(ConsumeMessageContext context) {
+<span class="pc bpc" id="L50" title="3 of 6 branches missed.">        if (context == null || context.getMsgList() == null || context.getMsgList().isEmpty()) {</span>
+<span class="nc" id="L51">            return;</span>
+        }
+<span class="fc" id="L53">        TraceContext traceContext = new TraceContext();</span>
+<span class="fc" id="L54">        context.setMqTraceContext(traceContext);</span>
+<span class="fc" id="L55">        traceContext.setTraceType(TraceType.SubBefore);//</span>
+<span class="fc" id="L56">        traceContext.setGroupName(NamespaceUtil.withoutNamespace(context.getConsumerGroup()));//</span>
+<span class="fc" id="L57">        List&lt;TraceBean&gt; beans = new ArrayList&lt;TraceBean&gt;();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (MessageExt msg : context.getMsgList()) {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (msg == null) {</span>
+<span class="nc" id="L60">                continue;</span>
+            }
+<span class="fc" id="L62">            String regionId = msg.getProperty(MessageConst.PROPERTY_MSG_REGION);</span>
+<span class="fc" id="L63">            String traceOn = msg.getProperty(MessageConst.PROPERTY_TRACE_SWITCH);</span>
+
+<span class="pc bpc" id="L65" title="3 of 4 branches missed.">            if (traceOn != null &amp;&amp; traceOn.equals(&quot;false&quot;)) {</span>
+                // If trace switch is false ,skip it
+<span class="nc" id="L67">                continue;</span>
+            }
+<span class="fc" id="L69">            TraceBean traceBean = new TraceBean();</span>
+<span class="fc" id="L70">            traceBean.setTopic(NamespaceUtil.withoutNamespace(msg.getTopic()));//</span>
+<span class="fc" id="L71">            traceBean.setMsgId(msg.getMsgId());//</span>
+<span class="fc" id="L72">            traceBean.setTags(msg.getTags());//</span>
+<span class="fc" id="L73">            traceBean.setKeys(msg.getKeys());//</span>
+<span class="fc" id="L74">            traceBean.setStoreTime(msg.getStoreTimestamp());//</span>
+<span class="fc" id="L75">            traceBean.setBodyLength(msg.getStoreSize());//</span>
+<span class="fc" id="L76">            traceBean.setRetryTimes(msg.getReconsumeTimes());//</span>
+<span class="fc" id="L77">            traceContext.setRegionId(regionId);//</span>
+<span class="fc" id="L78">            beans.add(traceBean);</span>
+<span class="fc" id="L79">        }</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (beans.size() &gt; 0) {</span>
+<span class="fc" id="L81">            traceContext.setTraceBeans(beans);</span>
+<span class="fc" id="L82">            traceContext.setTimeStamp(System.currentTimeMillis());</span>
+<span class="fc" id="L83">            localDispatcher.append(traceContext);</span>
+        }
+<span class="fc" id="L85">    }</span>
+
+    @Override
+    public void consumeMessageAfter(ConsumeMessageContext context) {
+<span class="pc bpc" id="L89" title="3 of 6 branches missed.">        if (context == null || context.getMsgList() == null || context.getMsgList().isEmpty()) {</span>
+<span class="nc" id="L90">            return;</span>
+        }
+<span class="fc" id="L92">        TraceContext subBeforeContext = (TraceContext) context.getMqTraceContext();</span>
+
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">        if (subBeforeContext.getTraceBeans() == null || subBeforeContext.getTraceBeans().size() &lt; 1) {</span>
+            // If subBefore bean is null ,skip it
+<span class="nc" id="L96">            return;</span>
+        }
+<span class="fc" id="L98">        TraceContext subAfterContext = new TraceContext();</span>
+<span class="fc" id="L99">        subAfterContext.setTraceType(TraceType.SubAfter);//</span>
+<span class="fc" id="L100">        subAfterContext.setRegionId(subBeforeContext.getRegionId());//</span>
+<span class="fc" id="L101">        subAfterContext.setGroupName(NamespaceUtil.withoutNamespace(subBeforeContext.getGroupName()));//</span>
+<span class="fc" id="L102">        subAfterContext.setRequestId(subBeforeContext.getRequestId());//</span>
+<span class="fc" id="L103">        subAfterContext.setSuccess(context.isSuccess());//</span>
+
+        // Calculate the cost time for processing messages
+<span class="fc" id="L106">        int costTime = (int) ((System.currentTimeMillis() - subBeforeContext.getTimeStamp()) / context.getMsgList().size());</span>
+<span class="fc" id="L107">        subAfterContext.setCostTime(costTime);//</span>
+<span class="fc" id="L108">        subAfterContext.setTraceBeans(subBeforeContext.getTraceBeans());</span>
+<span class="fc" id="L109">        Map&lt;String, String&gt; props = context.getProps();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (props != null) {</span>
+<span class="fc" id="L111">            String contextType = props.get(MixAll.CONSUME_CONTEXT_TYPE);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (contextType != null) {</span>
+<span class="fc" id="L113">                subAfterContext.setContextCode(ConsumeReturnType.valueOf(contextType).ordinal());</span>
+            }
+        }
+<span class="fc" id="L116">        localDispatcher.append(subAfterContext);</span>
+<span class="fc" id="L117">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

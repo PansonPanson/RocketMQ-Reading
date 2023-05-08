@@ -1,0 +1,1642 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultMQProducerImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.impl.producer</a> &gt; <span class="el_source">DefaultMQProducerImpl.java</span></div><h1>DefaultMQProducerImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.impl.producer;
+
+import java.io.IOException;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.rocketmq.client.QueryResult;
+import org.apache.rocketmq.client.Validators;
+import org.apache.rocketmq.client.common.ClientErrorCode;
+import org.apache.rocketmq.client.exception.MQBrokerException;
+import org.apache.rocketmq.client.exception.MQClientException;
+import org.apache.rocketmq.client.exception.RequestTimeoutException;
+import org.apache.rocketmq.client.hook.CheckForbiddenContext;
+import org.apache.rocketmq.client.hook.CheckForbiddenHook;
+import org.apache.rocketmq.client.hook.EndTransactionContext;
+import org.apache.rocketmq.client.hook.EndTransactionHook;
+import org.apache.rocketmq.client.hook.SendMessageContext;
+import org.apache.rocketmq.client.hook.SendMessageHook;
+import org.apache.rocketmq.client.impl.CommunicationMode;
+import org.apache.rocketmq.client.impl.MQClientManager;
+import org.apache.rocketmq.client.impl.factory.MQClientInstance;
+import org.apache.rocketmq.client.latency.MQFaultStrategy;
+import org.apache.rocketmq.client.log.ClientLogger;
+import org.apache.rocketmq.client.producer.DefaultMQProducer;
+import org.apache.rocketmq.client.producer.LocalTransactionExecuter;
+import org.apache.rocketmq.client.producer.LocalTransactionState;
+import org.apache.rocketmq.client.producer.MessageQueueSelector;
+import org.apache.rocketmq.client.producer.RequestCallback;
+import org.apache.rocketmq.client.producer.RequestFutureHolder;
+import org.apache.rocketmq.client.producer.RequestResponseFuture;
+import org.apache.rocketmq.client.producer.SendCallback;
+import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.rocketmq.client.producer.SendStatus;
+import org.apache.rocketmq.client.producer.TransactionCheckListener;
+import org.apache.rocketmq.client.producer.TransactionListener;
+import org.apache.rocketmq.client.producer.TransactionMQProducer;
+import org.apache.rocketmq.client.producer.TransactionSendResult;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.ServiceState;
+import org.apache.rocketmq.common.compression.CompressionType;
+import org.apache.rocketmq.common.compression.Compressor;
+import org.apache.rocketmq.common.compression.CompressorFactory;
+import org.apache.rocketmq.common.help.FAQUrl;
+import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.common.message.MessageAccessor;
+import org.apache.rocketmq.common.message.MessageBatch;
+import org.apache.rocketmq.common.message.MessageClientIDSetter;
+import org.apache.rocketmq.common.message.MessageConst;
+import org.apache.rocketmq.common.message.MessageDecoder;
+import org.apache.rocketmq.common.message.MessageExt;
+import org.apache.rocketmq.common.message.MessageId;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.message.MessageType;
+import org.apache.rocketmq.common.protocol.NamespaceUtil;
+import org.apache.rocketmq.common.protocol.header.CheckTransactionStateRequestHeader;
+import org.apache.rocketmq.common.protocol.header.EndTransactionRequestHeader;
+import org.apache.rocketmq.common.protocol.header.SendMessageRequestHeader;
+import org.apache.rocketmq.common.sysflag.MessageSysFlag;
+import org.apache.rocketmq.common.utils.CorrelationIdUtil;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.remoting.RPCHook;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
+import org.apache.rocketmq.remoting.exception.RemotingConnectException;
+import org.apache.rocketmq.remoting.exception.RemotingException;
+import org.apache.rocketmq.remoting.exception.RemotingTimeoutException;
+import org.apache.rocketmq.remoting.exception.RemotingTooMuchRequestException;
+
+;
+
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">public class DefaultMQProducerImpl implements MQProducerInner {</span>
+<span class="fc" id="L101">    private final InternalLogger log = ClientLogger.getLog();</span>
+<span class="fc" id="L102">    private final Random random = new Random();</span>
+    private final DefaultMQProducer defaultMQProducer;
+<span class="fc" id="L104">    private final ConcurrentMap&lt;String/* topic */, TopicPublishInfo&gt; topicPublishInfoTable =</span>
+        new ConcurrentHashMap&lt;String, TopicPublishInfo&gt;();
+<span class="fc" id="L106">    private final ArrayList&lt;SendMessageHook&gt; sendMessageHookList = new ArrayList&lt;SendMessageHook&gt;();</span>
+<span class="fc" id="L107">    private final ArrayList&lt;EndTransactionHook&gt; endTransactionHookList = new ArrayList&lt;EndTransactionHook&gt;();</span>
+    private final RPCHook rpcHook;
+    private final BlockingQueue&lt;Runnable&gt; asyncSenderThreadPoolQueue;
+    private final ExecutorService defaultAsyncSenderExecutor;
+    protected BlockingQueue&lt;Runnable&gt; checkRequestQueue;
+    protected ExecutorService checkExecutor;
+<span class="fc" id="L113">    private ServiceState serviceState = ServiceState.CREATE_JUST;</span>
+    private MQClientInstance mQClientFactory;
+<span class="fc" id="L115">    private ArrayList&lt;CheckForbiddenHook&gt; checkForbiddenHookList = new ArrayList&lt;CheckForbiddenHook&gt;();</span>
+<span class="fc" id="L116">    private MQFaultStrategy mqFaultStrategy = new MQFaultStrategy();</span>
+    private ExecutorService asyncSenderExecutor;
+
+    // compression related
+<span class="fc" id="L120">    private int compressLevel = Integer.parseInt(System.getProperty(MixAll.MESSAGE_COMPRESS_LEVEL, &quot;5&quot;));</span>
+<span class="fc" id="L121">    private CompressionType compressType = CompressionType.of(System.getProperty(MixAll.MESSAGE_COMPRESS_TYPE, &quot;ZLIB&quot;));</span>
+<span class="fc" id="L122">    private final Compressor compressor = CompressorFactory.getCompressor(compressType);</span>
+
+    public DefaultMQProducerImpl(final DefaultMQProducer defaultMQProducer) {
+<span class="fc" id="L125">        this(defaultMQProducer, null);</span>
+<span class="fc" id="L126">    }</span>
+
+<span class="fc" id="L128">    public DefaultMQProducerImpl(final DefaultMQProducer defaultMQProducer, RPCHook rpcHook) {</span>
+<span class="fc" id="L129">        this.defaultMQProducer = defaultMQProducer;</span>
+<span class="fc" id="L130">        this.rpcHook = rpcHook;</span>
+
+<span class="fc" id="L132">        this.asyncSenderThreadPoolQueue = new LinkedBlockingQueue&lt;Runnable&gt;(50000);</span>
+<span class="fc" id="L133">        this.defaultAsyncSenderExecutor = new ThreadPoolExecutor(</span>
+<span class="fc" id="L134">            Runtime.getRuntime().availableProcessors(),</span>
+<span class="fc" id="L135">            Runtime.getRuntime().availableProcessors(),</span>
+            1000 * 60,
+            TimeUnit.MILLISECONDS,
+            this.asyncSenderThreadPoolQueue,
+<span class="fc" id="L139">            new ThreadFactory() {</span>
+<span class="fc" id="L140">                private AtomicInteger threadIndex = new AtomicInteger(0);</span>
+
+                @Override
+                public Thread newThread(Runnable r) {
+<span class="fc" id="L144">                    return new Thread(r, &quot;AsyncSenderExecutor_&quot; + this.threadIndex.incrementAndGet());</span>
+                }
+            });
+<span class="fc" id="L147">    }</span>
+
+    public void registerCheckForbiddenHook(CheckForbiddenHook checkForbiddenHook) {
+<span class="nc" id="L150">        this.checkForbiddenHookList.add(checkForbiddenHook);</span>
+<span class="nc" id="L151">        log.info(&quot;register a new checkForbiddenHook. hookName={}, allHookSize={}&quot;, checkForbiddenHook.hookName(),</span>
+<span class="nc" id="L152">            checkForbiddenHookList.size());</span>
+<span class="nc" id="L153">    }</span>
+
+    public void initTransactionEnv() {
+<span class="fc" id="L156">        TransactionMQProducer producer = (TransactionMQProducer) this.defaultMQProducer;</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (producer.getExecutorService() != null) {</span>
+<span class="nc" id="L158">            this.checkExecutor = producer.getExecutorService();</span>
+        } else {
+<span class="fc" id="L160">            this.checkRequestQueue = new LinkedBlockingQueue&lt;Runnable&gt;(producer.getCheckRequestHoldMax());</span>
+<span class="fc" id="L161">            this.checkExecutor = new ThreadPoolExecutor(</span>
+<span class="fc" id="L162">                producer.getCheckThreadPoolMinSize(),</span>
+<span class="fc" id="L163">                producer.getCheckThreadPoolMaxSize(),</span>
+                1000 * 60,
+                TimeUnit.MILLISECONDS,
+                this.checkRequestQueue);
+        }
+<span class="fc" id="L168">    }</span>
+
+    public void destroyTransactionEnv() {
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (this.checkExecutor != null) {</span>
+<span class="fc" id="L172">            this.checkExecutor.shutdown();</span>
+        }
+<span class="fc" id="L174">    }</span>
+
+    public void registerSendMessageHook(final SendMessageHook hook) {
+<span class="fc" id="L177">        this.sendMessageHookList.add(hook);</span>
+<span class="fc" id="L178">        log.info(&quot;register sendMessage Hook, {}&quot;, hook.hookName());</span>
+<span class="fc" id="L179">    }</span>
+
+    public void registerEndTransactionHook(final EndTransactionHook hook) {
+<span class="fc" id="L182">        this.endTransactionHookList.add(hook);</span>
+<span class="fc" id="L183">        log.info(&quot;register endTransaction Hook, {}&quot;, hook.hookName());</span>
+<span class="fc" id="L184">    }</span>
+
+    public void start() throws MQClientException {
+<span class="fc" id="L187">        this.start(true);</span>
+<span class="fc" id="L188">    }</span>
+
+    public void start(final boolean startFactory) throws MQClientException {
+<span class="pc bpc" id="L191" title="2 of 3 branches missed.">        switch (this.serviceState) {</span>
+            case CREATE_JUST:
+<span class="fc" id="L193">                this.serviceState = ServiceState.START_FAILED;</span>
+
+<span class="fc" id="L195">                this.checkConfig();</span>
+
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                if (!this.defaultMQProducer.getProducerGroup().equals(MixAll.CLIENT_INNER_PRODUCER_GROUP)) {</span>
+<span class="fc" id="L198">                    this.defaultMQProducer.changeInstanceNameToPID();</span>
+                }
+
+<span class="fc" id="L201">                this.mQClientFactory = MQClientManager.getInstance().getOrCreateMQClientInstance(this.defaultMQProducer, rpcHook);</span>
+
+<span class="fc" id="L203">                boolean registerOK = mQClientFactory.registerProducer(this.defaultMQProducer.getProducerGroup(), this);</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                if (!registerOK) {</span>
+<span class="nc" id="L205">                    this.serviceState = ServiceState.CREATE_JUST;</span>
+<span class="nc" id="L206">                    throw new MQClientException(&quot;The producer group[&quot; + this.defaultMQProducer.getProducerGroup()</span>
+<span class="nc" id="L207">                        + &quot;] has been created before, specify another name please.&quot; + FAQUrl.suggestTodo(FAQUrl.GROUP_NAME_DUPLICATE_URL),</span>
+                        null);
+                }
+
+<span class="fc" id="L211">                this.topicPublishInfoTable.put(this.defaultMQProducer.getCreateTopicKey(), new TopicPublishInfo());</span>
+
+<span class="fc bfc" id="L213" title="All 2 branches covered.">                if (startFactory) {</span>
+<span class="fc" id="L214">                    mQClientFactory.start();</span>
+                }
+
+<span class="fc" id="L217">                log.info(&quot;the producer [{}] start OK. sendMessageWithVIPChannel={}&quot;, this.defaultMQProducer.getProducerGroup(),</span>
+<span class="fc" id="L218">                    this.defaultMQProducer.isSendMessageWithVIPChannel());</span>
+<span class="fc" id="L219">                this.serviceState = ServiceState.RUNNING;</span>
+<span class="fc" id="L220">                break;</span>
+            case RUNNING:
+            case START_FAILED:
+            case SHUTDOWN_ALREADY:
+<span class="nc" id="L224">                throw new MQClientException(&quot;The producer service state not OK, maybe started once, &quot;</span>
+                    + this.serviceState
+<span class="nc" id="L226">                    + FAQUrl.suggestTodo(FAQUrl.CLIENT_SERVICE_NOT_OK),</span>
+                    null);
+            default:
+                break;
+        }
+
+<span class="fc" id="L232">        this.mQClientFactory.sendHeartbeatToAllBrokerWithLock();</span>
+
+<span class="fc" id="L234">        RequestFutureHolder.getInstance().startScheduledTask(this);</span>
+
+<span class="fc" id="L236">    }</span>
+
+    private void checkConfig() throws MQClientException {
+<span class="fc" id="L239">        Validators.checkGroup(this.defaultMQProducer.getProducerGroup());</span>
+
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (this.defaultMQProducer.getProducerGroup().equals(MixAll.DEFAULT_PRODUCER_GROUP)) {</span>
+<span class="nc" id="L242">            throw new MQClientException(&quot;producerGroup can not equal &quot; + MixAll.DEFAULT_PRODUCER_GROUP + &quot;, please specify another one.&quot;,</span>
+                null);
+        }
+<span class="fc" id="L245">    }</span>
+
+    public void shutdown() {
+<span class="fc" id="L248">        this.shutdown(true);</span>
+<span class="fc" id="L249">    }</span>
+
+    public void shutdown(final boolean shutdownFactory) {
+<span class="pc bpc" id="L252" title="2 of 4 branches missed.">        switch (this.serviceState) {</span>
+            case CREATE_JUST:
+<span class="nc" id="L254">                break;</span>
+            case RUNNING:
+<span class="fc" id="L256">                this.mQClientFactory.unregisterProducer(this.defaultMQProducer.getProducerGroup());</span>
+<span class="fc" id="L257">                this.defaultAsyncSenderExecutor.shutdown();</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                if (shutdownFactory) {</span>
+<span class="fc" id="L259">                    this.mQClientFactory.shutdown();</span>
+                }
+<span class="fc" id="L261">                RequestFutureHolder.getInstance().shutdown(this);</span>
+<span class="fc" id="L262">                log.info(&quot;the producer [{}] shutdown OK&quot;, this.defaultMQProducer.getProducerGroup());</span>
+<span class="fc" id="L263">                this.serviceState = ServiceState.SHUTDOWN_ALREADY;</span>
+<span class="fc" id="L264">                break;</span>
+            case SHUTDOWN_ALREADY:
+<span class="fc" id="L266">                break;</span>
+            default:
+                break;
+        }
+<span class="fc" id="L270">    }</span>
+
+    @Override
+    public Set&lt;String&gt; getPublishTopicList() {
+<span class="fc" id="L274">        return new HashSet&lt;String&gt;(this.topicPublishInfoTable.keySet());</span>
+    }
+
+    @Override
+    public boolean isPublishTopicNeedUpdate(String topic) {
+<span class="fc" id="L279">        TopicPublishInfo prev = this.topicPublishInfoTable.get(topic);</span>
+
+<span class="fc bfc" id="L281" title="All 4 branches covered.">        return null == prev || !prev.ok();</span>
+    }
+
+    /**
+     * @deprecated This method will be removed in the version 5.0.0 and {@link DefaultMQProducerImpl#getCheckListener} is recommended.
+     */
+    @Override
+    @Deprecated
+    public TransactionCheckListener checkListener() {
+<span class="nc bnc" id="L290" title="All 2 branches missed.">        if (this.defaultMQProducer instanceof TransactionMQProducer) {</span>
+<span class="nc" id="L291">            TransactionMQProducer producer = (TransactionMQProducer) defaultMQProducer;</span>
+<span class="nc" id="L292">            return producer.getTransactionCheckListener();</span>
+        }
+
+<span class="nc" id="L295">        return null;</span>
+    }
+
+    @Override
+    public TransactionListener getCheckListener() {
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (this.defaultMQProducer instanceof TransactionMQProducer) {</span>
+<span class="fc" id="L301">            TransactionMQProducer producer = (TransactionMQProducer) defaultMQProducer;</span>
+<span class="fc" id="L302">            return producer.getTransactionListener();</span>
+        }
+<span class="nc" id="L304">        return null;</span>
+    }
+
+    @Override
+    public void checkTransactionState(final String addr, final MessageExt msg,
+        final CheckTransactionStateRequestHeader header) {
+<span class="nc" id="L310">        Runnable request = new Runnable() {</span>
+<span class="nc" id="L311">            private final String brokerAddr = addr;</span>
+<span class="nc" id="L312">            private final MessageExt message = msg;</span>
+<span class="nc" id="L313">            private final CheckTransactionStateRequestHeader checkRequestHeader = header;</span>
+<span class="nc" id="L314">            private final String group = DefaultMQProducerImpl.this.defaultMQProducer.getProducerGroup();</span>
+
+            @Override
+            public void run() {
+<span class="nc" id="L318">                TransactionCheckListener transactionCheckListener = DefaultMQProducerImpl.this.checkListener();</span>
+<span class="nc" id="L319">                TransactionListener transactionListener = getCheckListener();</span>
+<span class="nc bnc" id="L320" title="All 4 branches missed.">                if (transactionCheckListener != null || transactionListener != null) {</span>
+<span class="nc" id="L321">                    LocalTransactionState localTransactionState = LocalTransactionState.UNKNOW;</span>
+<span class="nc" id="L322">                    Throwable exception = null;</span>
+                    try {
+<span class="nc bnc" id="L324" title="All 2 branches missed.">                        if (transactionCheckListener != null) {</span>
+<span class="nc" id="L325">                            localTransactionState = transactionCheckListener.checkLocalTransactionState(message);</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">                        } else if (transactionListener != null) {</span>
+<span class="nc" id="L327">                            log.debug(&quot;Used new check API in transaction message&quot;);</span>
+<span class="nc" id="L328">                            localTransactionState = transactionListener.checkLocalTransaction(message);</span>
+                        } else {
+<span class="nc" id="L330">                            log.warn(&quot;CheckTransactionState, pick transactionListener by group[{}] failed&quot;, group);</span>
+                        }
+<span class="nc" id="L332">                    } catch (Throwable e) {</span>
+<span class="nc" id="L333">                        log.error(&quot;Broker call checkTransactionState, but checkLocalTransactionState exception&quot;, e);</span>
+<span class="nc" id="L334">                        exception = e;</span>
+<span class="nc" id="L335">                    }</span>
+
+<span class="nc" id="L337">                    this.processTransactionState(</span>
+                        localTransactionState,
+                        group,
+                        exception);
+<span class="nc" id="L341">                } else {</span>
+<span class="nc" id="L342">                    log.warn(&quot;CheckTransactionState, pick transactionCheckListener by group[{}] failed&quot;, group);</span>
+                }
+<span class="nc" id="L344">            }</span>
+
+            private void processTransactionState(
+                final LocalTransactionState localTransactionState,
+                final String producerGroup,
+                final Throwable exception) {
+<span class="nc" id="L350">                final EndTransactionRequestHeader thisHeader = new EndTransactionRequestHeader();</span>
+<span class="nc" id="L351">                thisHeader.setCommitLogOffset(checkRequestHeader.getCommitLogOffset());</span>
+<span class="nc" id="L352">                thisHeader.setProducerGroup(producerGroup);</span>
+<span class="nc" id="L353">                thisHeader.setTranStateTableOffset(checkRequestHeader.getTranStateTableOffset());</span>
+<span class="nc" id="L354">                thisHeader.setFromTransactionCheck(true);</span>
+
+<span class="nc" id="L356">                String uniqueKey = message.getProperties().get(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX);</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">                if (uniqueKey == null) {</span>
+<span class="nc" id="L358">                    uniqueKey = message.getMsgId();</span>
+                }
+<span class="nc" id="L360">                thisHeader.setMsgId(uniqueKey);</span>
+<span class="nc" id="L361">                thisHeader.setTransactionId(checkRequestHeader.getTransactionId());</span>
+<span class="nc bnc" id="L362" title="All 4 branches missed.">                switch (localTransactionState) {</span>
+                    case COMMIT_MESSAGE:
+<span class="nc" id="L364">                        thisHeader.setCommitOrRollback(MessageSysFlag.TRANSACTION_COMMIT_TYPE);</span>
+<span class="nc" id="L365">                        break;</span>
+                    case ROLLBACK_MESSAGE:
+<span class="nc" id="L367">                        thisHeader.setCommitOrRollback(MessageSysFlag.TRANSACTION_ROLLBACK_TYPE);</span>
+<span class="nc" id="L368">                        log.warn(&quot;when broker check, client rollback this transaction, {}&quot;, thisHeader);</span>
+<span class="nc" id="L369">                        break;</span>
+                    case UNKNOW:
+<span class="nc" id="L371">                        thisHeader.setCommitOrRollback(MessageSysFlag.TRANSACTION_NOT_TYPE);</span>
+<span class="nc" id="L372">                        log.warn(&quot;when broker check, client does not know this transaction state, {}&quot;, thisHeader);</span>
+<span class="nc" id="L373">                        break;</span>
+                    default:
+                        break;
+                }
+
+<span class="nc" id="L378">                String remark = null;</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">                if (exception != null) {</span>
+<span class="nc" id="L380">                    remark = &quot;checkLocalTransactionState Exception: &quot; + RemotingHelper.exceptionSimpleDesc(exception);</span>
+                }
+<span class="nc" id="L382">                doExecuteEndTransactionHook(msg, uniqueKey, brokerAddr, localTransactionState, true);</span>
+
+                try {
+<span class="nc" id="L385">                    DefaultMQProducerImpl.this.mQClientFactory.getMQClientAPIImpl().endTransactionOneway(brokerAddr, thisHeader, remark,</span>
+                        3000);
+<span class="nc" id="L387">                } catch (Exception e) {</span>
+<span class="nc" id="L388">                    log.error(&quot;endTransactionOneway exception&quot;, e);</span>
+<span class="nc" id="L389">                }</span>
+<span class="nc" id="L390">            }</span>
+        };
+
+<span class="nc" id="L393">        this.checkExecutor.submit(request);</span>
+<span class="nc" id="L394">    }</span>
+
+    @Override
+    public void updateTopicPublishInfo(final String topic, final TopicPublishInfo info) {
+<span class="pc bpc" id="L398" title="2 of 4 branches missed.">        if (info != null &amp;&amp; topic != null) {</span>
+<span class="fc" id="L399">            TopicPublishInfo prev = this.topicPublishInfoTable.put(topic, info);</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">            if (prev != null) {</span>
+<span class="fc" id="L401">                log.info(&quot;updateTopicPublishInfo prev is not null, &quot; + prev);</span>
+            }
+        }
+<span class="fc" id="L404">    }</span>
+
+    @Override
+    public boolean isUnitMode() {
+<span class="fc" id="L408">        return this.defaultMQProducer.isUnitMode();</span>
+    }
+
+    public void createTopic(String key, String newTopic, int queueNum) throws MQClientException {
+<span class="nc" id="L412">        createTopic(key, newTopic, queueNum, 0);</span>
+<span class="nc" id="L413">    }</span>
+
+    public void createTopic(String key, String newTopic, int queueNum, int topicSysFlag) throws MQClientException {
+<span class="nc" id="L416">        this.makeSureStateOK();</span>
+<span class="nc" id="L417">        Validators.checkTopic(newTopic);</span>
+<span class="nc" id="L418">        Validators.isSystemTopic(newTopic);</span>
+
+<span class="nc" id="L420">        this.mQClientFactory.getMQAdminImpl().createTopic(key, newTopic, queueNum, topicSysFlag, null);</span>
+<span class="nc" id="L421">    }</span>
+
+    private void makeSureStateOK() throws MQClientException {
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">        if (this.serviceState != ServiceState.RUNNING) {</span>
+<span class="nc" id="L425">            throw new MQClientException(&quot;The producer service state not OK, &quot;</span>
+                + this.serviceState
+<span class="nc" id="L427">                + FAQUrl.suggestTodo(FAQUrl.CLIENT_SERVICE_NOT_OK),</span>
+                null);
+        }
+<span class="fc" id="L430">    }</span>
+
+    public List&lt;MessageQueue&gt; fetchPublishMessageQueues(String topic) throws MQClientException {
+<span class="nc" id="L433">        this.makeSureStateOK();</span>
+<span class="nc" id="L434">        return this.mQClientFactory.getMQAdminImpl().fetchPublishMessageQueues(topic);</span>
+    }
+
+    public long searchOffset(MessageQueue mq, long timestamp) throws MQClientException {
+<span class="nc" id="L438">        this.makeSureStateOK();</span>
+<span class="nc" id="L439">        return this.mQClientFactory.getMQAdminImpl().searchOffset(mq, timestamp);</span>
+    }
+
+    public long maxOffset(MessageQueue mq) throws MQClientException {
+<span class="nc" id="L443">        this.makeSureStateOK();</span>
+<span class="nc" id="L444">        return this.mQClientFactory.getMQAdminImpl().maxOffset(mq);</span>
+    }
+
+    public long minOffset(MessageQueue mq) throws MQClientException {
+<span class="nc" id="L448">        this.makeSureStateOK();</span>
+<span class="nc" id="L449">        return this.mQClientFactory.getMQAdminImpl().minOffset(mq);</span>
+    }
+
+    public long earliestMsgStoreTime(MessageQueue mq) throws MQClientException {
+<span class="nc" id="L453">        this.makeSureStateOK();</span>
+<span class="nc" id="L454">        return this.mQClientFactory.getMQAdminImpl().earliestMsgStoreTime(mq);</span>
+    }
+
+    public MessageExt viewMessage(
+        String msgId) throws RemotingException, MQBrokerException, InterruptedException, MQClientException {
+<span class="nc" id="L459">        this.makeSureStateOK();</span>
+
+<span class="nc" id="L461">        return this.mQClientFactory.getMQAdminImpl().viewMessage(msgId);</span>
+    }
+
+    public QueryResult queryMessage(String topic, String key, int maxNum, long begin, long end)
+        throws MQClientException, InterruptedException {
+<span class="nc" id="L466">        this.makeSureStateOK();</span>
+<span class="nc" id="L467">        return this.mQClientFactory.getMQAdminImpl().queryMessage(topic, key, maxNum, begin, end);</span>
+    }
+
+    public MessageExt queryMessageByUniqKey(String topic, String uniqKey)
+        throws MQClientException, InterruptedException {
+<span class="nc" id="L472">        this.makeSureStateOK();</span>
+<span class="nc" id="L473">        return this.mQClientFactory.getMQAdminImpl().queryMessageByUniqKey(topic, uniqKey);</span>
+    }
+
+    /**
+     * DEFAULT ASYNC -------------------------------------------------------
+     */
+    public void send(Message msg,
+        SendCallback sendCallback) throws MQClientException, RemotingException, InterruptedException {
+<span class="fc" id="L481">        send(msg, sendCallback, this.defaultMQProducer.getSendMsgTimeout());</span>
+<span class="fc" id="L482">    }</span>
+
+    /**
+     * @param msg
+     * @param sendCallback
+     * @param timeout      the &lt;code&gt;sendCallback&lt;/code&gt; will be invoked at most time
+     * @throws RejectedExecutionException
+     * @deprecated It will be removed at 4.4.0 cause for exception handling and the wrong Semantics of timeout. A new one will be
+     * provided in next version
+     */
+    @Deprecated
+    public void send(final Message msg, final SendCallback sendCallback, final long timeout)
+        throws MQClientException, RemotingException, InterruptedException {
+<span class="fc" id="L495">        final long beginStartTime = System.currentTimeMillis();</span>
+<span class="fc" id="L496">        ExecutorService executor = this.getAsyncSenderExecutor();</span>
+        try {
+<span class="fc" id="L498">            executor.submit(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L501">                    long costTime = System.currentTimeMillis() - beginStartTime;</span>
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">                    if (timeout &gt; costTime) {</span>
+                        try {
+<span class="fc" id="L504">                            sendDefaultImpl(msg, CommunicationMode.ASYNC, sendCallback, timeout - costTime);</span>
+<span class="fc" id="L505">                        } catch (Exception e) {</span>
+<span class="fc" id="L506">                            sendCallback.onException(e);</span>
+<span class="fc" id="L507">                        }</span>
+                    } else {
+<span class="nc" id="L509">                        sendCallback.onException(</span>
+                            new RemotingTooMuchRequestException(&quot;DEFAULT ASYNC send call timeout&quot;));
+                    }
+<span class="fc" id="L512">                }</span>
+
+            });
+<span class="nc" id="L515">        } catch (RejectedExecutionException e) {</span>
+<span class="nc" id="L516">            throw new MQClientException(&quot;executor rejected &quot;, e);</span>
+<span class="fc" id="L517">        }</span>
+
+<span class="fc" id="L519">    }</span>
+
+    public MessageQueue selectOneMessageQueue(final TopicPublishInfo tpInfo, final String lastBrokerName) {
+<span class="fc" id="L522">        return this.mqFaultStrategy.selectOneMessageQueue(tpInfo, lastBrokerName);</span>
+    }
+
+    public void updateFaultItem(final String brokerName, final long currentLatency, boolean isolation) {
+<span class="fc" id="L526">        this.mqFaultStrategy.updateFaultItem(brokerName, currentLatency, isolation);</span>
+<span class="fc" id="L527">    }</span>
+
+    private void validateNameServerSetting() throws MQClientException {
+<span class="fc" id="L530">        List&lt;String&gt; nsList = this.getMqClientFactory().getMQClientAPIImpl().getNameServerAddressList();</span>
+<span class="pc bpc" id="L531" title="1 of 4 branches missed.">        if (null == nsList || nsList.isEmpty()) {</span>
+<span class="fc" id="L532">            throw new MQClientException(</span>
+<span class="fc" id="L533">                &quot;No name server address, please set it.&quot; + FAQUrl.suggestTodo(FAQUrl.NAME_SERVER_ADDR_NOT_EXIST_URL), null).setResponseCode(ClientErrorCode.NO_NAME_SERVER_EXCEPTION);</span>
+        }
+
+<span class="fc" id="L536">    }</span>
+
+    private SendResult sendDefaultImpl(
+        Message msg,
+        final CommunicationMode communicationMode,
+        final SendCallback sendCallback,
+        final long timeout
+    ) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="fc" id="L544">        this.makeSureStateOK();</span>
+<span class="fc" id="L545">        Validators.checkMessage(msg, this.defaultMQProducer);</span>
+<span class="fc" id="L546">        final long invokeID = random.nextLong();</span>
+<span class="fc" id="L547">        long beginTimestampFirst = System.currentTimeMillis();</span>
+<span class="fc" id="L548">        long beginTimestampPrev = beginTimestampFirst;</span>
+<span class="fc" id="L549">        long endTimestamp = beginTimestampFirst;</span>
+<span class="fc" id="L550">        TopicPublishInfo topicPublishInfo = this.tryToFindTopicPublishInfo(msg.getTopic());</span>
+<span class="pc bpc" id="L551" title="1 of 4 branches missed.">        if (topicPublishInfo != null &amp;&amp; topicPublishInfo.ok()) {</span>
+<span class="fc" id="L552">            boolean callTimeout = false;</span>
+<span class="fc" id="L553">            MessageQueue mq = null;</span>
+<span class="fc" id="L554">            Exception exception = null;</span>
+<span class="fc" id="L555">            SendResult sendResult = null;</span>
+<span class="fc bfc" id="L556" title="All 2 branches covered.">            int timesTotal = communicationMode == CommunicationMode.SYNC ? 1 + this.defaultMQProducer.getRetryTimesWhenSendFailed() : 1;</span>
+<span class="fc" id="L557">            int times = 0;</span>
+<span class="fc" id="L558">            String[] brokersSent = new String[timesTotal];</span>
+<span class="pc bpc" id="L559" title="1 of 2 branches missed.">            for (; times &lt; timesTotal; times++) {</span>
+<span class="pc bpc" id="L560" title="1 of 2 branches missed.">                String lastBrokerName = null == mq ? null : mq.getBrokerName();</span>
+<span class="fc" id="L561">                MessageQueue mqSelected = this.selectOneMessageQueue(topicPublishInfo, lastBrokerName);</span>
+<span class="pc bpc" id="L562" title="1 of 2 branches missed.">                if (mqSelected != null) {</span>
+<span class="fc" id="L563">                    mq = mqSelected;</span>
+<span class="fc" id="L564">                    brokersSent[times] = mq.getBrokerName();</span>
+                    try {
+<span class="fc" id="L566">                        beginTimestampPrev = System.currentTimeMillis();</span>
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">                        if (times &gt; 0) {</span>
+                            //Reset topic with namespace during resend.
+<span class="nc" id="L569">                            msg.setTopic(this.defaultMQProducer.withNamespace(msg.getTopic()));</span>
+                        }
+<span class="fc" id="L571">                        long costTime = beginTimestampPrev - beginTimestampFirst;</span>
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">                        if (timeout &lt; costTime) {</span>
+<span class="nc" id="L573">                            callTimeout = true;</span>
+<span class="nc" id="L574">                            break;</span>
+                        }
+
+<span class="fc" id="L577">                        sendResult = this.sendKernelImpl(msg, mq, communicationMode, sendCallback, topicPublishInfo, timeout - costTime);</span>
+<span class="fc" id="L578">                        endTimestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L579">                        this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, false);</span>
+<span class="pc bpc" id="L580" title="2 of 4 branches missed.">                        switch (communicationMode) {</span>
+                            case ASYNC:
+<span class="fc" id="L582">                                return null;</span>
+                            case ONEWAY:
+<span class="nc" id="L584">                                return null;</span>
+                            case SYNC:
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">                                if (sendResult.getSendStatus() != SendStatus.SEND_OK) {</span>
+<span class="nc bnc" id="L587" title="All 2 branches missed.">                                    if (this.defaultMQProducer.isRetryAnotherBrokerWhenNotStoreOK()) {</span>
+<span class="nc" id="L588">                                        continue;</span>
+                                    }
+                                }
+
+<span class="fc" id="L592">                                return sendResult;</span>
+                            default:
+                                break;
+                        }
+<span class="nc" id="L596">                    } catch (RemotingException e) {</span>
+<span class="nc" id="L597">                        endTimestamp = System.currentTimeMillis();</span>
+<span class="nc" id="L598">                        this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, true);</span>
+<span class="nc" id="L599">                        log.warn(String.format(&quot;sendKernelImpl exception, resend at once, InvokeID: %s, RT: %sms, Broker: %s&quot;, invokeID, endTimestamp - beginTimestampPrev, mq), e);</span>
+<span class="nc" id="L600">                        log.warn(msg.toString());</span>
+<span class="nc" id="L601">                        exception = e;</span>
+<span class="nc" id="L602">                        continue;</span>
+<span class="nc" id="L603">                    } catch (MQClientException e) {</span>
+<span class="nc" id="L604">                        endTimestamp = System.currentTimeMillis();</span>
+<span class="nc" id="L605">                        this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, true);</span>
+<span class="nc" id="L606">                        log.warn(String.format(&quot;sendKernelImpl exception, resend at once, InvokeID: %s, RT: %sms, Broker: %s&quot;, invokeID, endTimestamp - beginTimestampPrev, mq), e);</span>
+<span class="nc" id="L607">                        log.warn(msg.toString());</span>
+<span class="nc" id="L608">                        exception = e;</span>
+<span class="nc" id="L609">                        continue;</span>
+<span class="nc" id="L610">                    } catch (MQBrokerException e) {</span>
+<span class="nc" id="L611">                        endTimestamp = System.currentTimeMillis();</span>
+<span class="nc" id="L612">                        this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, true);</span>
+<span class="nc" id="L613">                        log.warn(String.format(&quot;sendKernelImpl exception, resend at once, InvokeID: %s, RT: %sms, Broker: %s&quot;, invokeID, endTimestamp - beginTimestampPrev, mq), e);</span>
+<span class="nc" id="L614">                        log.warn(msg.toString());</span>
+<span class="nc" id="L615">                        exception = e;</span>
+<span class="nc bnc" id="L616" title="All 2 branches missed.">                        if (this.defaultMQProducer.getRetryResponseCodes().contains(e.getResponseCode())) {</span>
+<span class="nc" id="L617">                            continue;</span>
+                        } else {
+<span class="nc bnc" id="L619" title="All 2 branches missed.">                            if (sendResult != null) {</span>
+<span class="nc" id="L620">                                return sendResult;</span>
+                            }
+
+<span class="nc" id="L623">                            throw e;</span>
+                        }
+<span class="nc" id="L625">                    } catch (InterruptedException e) {</span>
+<span class="nc" id="L626">                        endTimestamp = System.currentTimeMillis();</span>
+<span class="nc" id="L627">                        this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, false);</span>
+<span class="nc" id="L628">                        log.warn(String.format(&quot;sendKernelImpl exception, throw exception, InvokeID: %s, RT: %sms, Broker: %s&quot;, invokeID, endTimestamp - beginTimestampPrev, mq), e);</span>
+<span class="nc" id="L629">                        log.warn(msg.toString());</span>
+<span class="nc" id="L630">                        throw e;</span>
+<span class="nc" id="L631">                    }</span>
+                } else {
+                    break;
+                }
+            }
+
+<span class="nc bnc" id="L637" title="All 2 branches missed.">            if (sendResult != null) {</span>
+<span class="nc" id="L638">                return sendResult;</span>
+            }
+
+<span class="nc" id="L641">            String info = String.format(&quot;Send [%d] times, still failed, cost [%d]ms, Topic: %s, BrokersSent: %s&quot;,</span>
+<span class="nc" id="L642">                times,</span>
+<span class="nc" id="L643">                System.currentTimeMillis() - beginTimestampFirst,</span>
+<span class="nc" id="L644">                msg.getTopic(),</span>
+<span class="nc" id="L645">                Arrays.toString(brokersSent));</span>
+
+<span class="nc" id="L647">            info += FAQUrl.suggestTodo(FAQUrl.SEND_MSG_FAILED);</span>
+
+<span class="nc" id="L649">            MQClientException mqClientException = new MQClientException(info, exception);</span>
+<span class="nc bnc" id="L650" title="All 2 branches missed.">            if (callTimeout) {</span>
+<span class="nc" id="L651">                throw new RemotingTooMuchRequestException(&quot;sendDefaultImpl call timeout&quot;);</span>
+            }
+
+<span class="nc bnc" id="L654" title="All 2 branches missed.">            if (exception instanceof MQBrokerException) {</span>
+<span class="nc" id="L655">                mqClientException.setResponseCode(((MQBrokerException) exception).getResponseCode());</span>
+<span class="nc bnc" id="L656" title="All 2 branches missed.">            } else if (exception instanceof RemotingConnectException) {</span>
+<span class="nc" id="L657">                mqClientException.setResponseCode(ClientErrorCode.CONNECT_BROKER_EXCEPTION);</span>
+<span class="nc bnc" id="L658" title="All 2 branches missed.">            } else if (exception instanceof RemotingTimeoutException) {</span>
+<span class="nc" id="L659">                mqClientException.setResponseCode(ClientErrorCode.ACCESS_BROKER_TIMEOUT);</span>
+<span class="nc bnc" id="L660" title="All 2 branches missed.">            } else if (exception instanceof MQClientException) {</span>
+<span class="nc" id="L661">                mqClientException.setResponseCode(ClientErrorCode.BROKER_NOT_EXIST_EXCEPTION);</span>
+            }
+
+<span class="nc" id="L664">            throw mqClientException;</span>
+        }
+
+<span class="fc" id="L667">        validateNameServerSetting();</span>
+
+<span class="fc" id="L669">        throw new MQClientException(&quot;No route info of this topic: &quot; + msg.getTopic() + FAQUrl.suggestTodo(FAQUrl.NO_TOPIC_ROUTE_INFO),</span>
+<span class="fc" id="L670">            null).setResponseCode(ClientErrorCode.NOT_FOUND_TOPIC_EXCEPTION);</span>
+    }
+
+    private TopicPublishInfo tryToFindTopicPublishInfo(final String topic) {
+<span class="fc" id="L674">        TopicPublishInfo topicPublishInfo = this.topicPublishInfoTable.get(topic);</span>
+<span class="fc bfc" id="L675" title="All 4 branches covered.">        if (null == topicPublishInfo || !topicPublishInfo.ok()) {</span>
+<span class="fc" id="L676">            this.topicPublishInfoTable.putIfAbsent(topic, new TopicPublishInfo());</span>
+<span class="fc" id="L677">            this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic);</span>
+<span class="fc" id="L678">            topicPublishInfo = this.topicPublishInfoTable.get(topic);</span>
+        }
+
+<span class="pc bpc" id="L681" title="1 of 4 branches missed.">        if (topicPublishInfo.isHaveTopicRouterInfo() || topicPublishInfo.ok()) {</span>
+<span class="fc" id="L682">            return topicPublishInfo;</span>
+        } else {
+<span class="fc" id="L684">            this.mQClientFactory.updateTopicRouteInfoFromNameServer(topic, true, this.defaultMQProducer);</span>
+<span class="fc" id="L685">            topicPublishInfo = this.topicPublishInfoTable.get(topic);</span>
+<span class="fc" id="L686">            return topicPublishInfo;</span>
+        }
+    }
+
+    private SendResult sendKernelImpl(final Message msg,
+        final MessageQueue mq,
+        final CommunicationMode communicationMode,
+        final SendCallback sendCallback,
+        final TopicPublishInfo topicPublishInfo,
+        final long timeout) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="fc" id="L696">        long beginStartTime = System.currentTimeMillis();</span>
+<span class="fc" id="L697">        String brokerName = this.mQClientFactory.getBrokerNameFromMessageQueue(mq);</span>
+<span class="fc" id="L698">        String brokerAddr = this.mQClientFactory.findBrokerAddressInPublish(brokerName);</span>
+<span class="pc bpc" id="L699" title="1 of 2 branches missed.">        if (null == brokerAddr) {</span>
+<span class="nc" id="L700">            tryToFindTopicPublishInfo(mq.getTopic());</span>
+<span class="nc" id="L701">            brokerName = this.mQClientFactory.getBrokerNameFromMessageQueue(mq);</span>
+<span class="nc" id="L702">            brokerAddr = this.mQClientFactory.findBrokerAddressInPublish(brokerName);</span>
+        }
+
+<span class="fc" id="L705">        SendMessageContext context = null;</span>
+<span class="pc bpc" id="L706" title="1 of 2 branches missed.">        if (brokerAddr != null) {</span>
+<span class="fc" id="L707">            brokerAddr = MixAll.brokerVIPChannel(this.defaultMQProducer.isSendMessageWithVIPChannel(), brokerAddr);</span>
+
+<span class="fc" id="L709">            byte[] prevBody = msg.getBody();</span>
+            try {
+                //for MessageBatch,ID has been set in the generating process
+<span class="fc bfc" id="L712" title="All 2 branches covered.">                if (!(msg instanceof MessageBatch)) {</span>
+<span class="fc" id="L713">                    MessageClientIDSetter.setUniqID(msg);</span>
+                }
+
+<span class="fc" id="L716">                boolean topicWithNamespace = false;</span>
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">                if (null != this.mQClientFactory.getClientConfig().getNamespace()) {</span>
+<span class="nc" id="L718">                    msg.setInstanceId(this.mQClientFactory.getClientConfig().getNamespace());</span>
+<span class="nc" id="L719">                    topicWithNamespace = true;</span>
+                }
+
+<span class="fc" id="L722">                int sysFlag = 0;</span>
+<span class="fc" id="L723">                boolean msgBodyCompressed = false;</span>
+<span class="fc bfc" id="L724" title="All 2 branches covered.">                if (this.tryToCompressMessage(msg)) {</span>
+<span class="fc" id="L725">                    sysFlag |= MessageSysFlag.COMPRESSED_FLAG;</span>
+<span class="fc" id="L726">                    sysFlag |= compressType.getCompressionFlag();</span>
+<span class="fc" id="L727">                    msgBodyCompressed = true;</span>
+                }
+
+<span class="fc" id="L730">                final String tranMsg = msg.getProperty(MessageConst.PROPERTY_TRANSACTION_PREPARED);</span>
+<span class="fc bfc" id="L731" title="All 2 branches covered.">                if (Boolean.parseBoolean(tranMsg)) {</span>
+<span class="fc" id="L732">                    sysFlag |= MessageSysFlag.TRANSACTION_PREPARED_TYPE;</span>
+                }
+
+<span class="pc bpc" id="L735" title="1 of 2 branches missed.">                if (hasCheckForbiddenHook()) {</span>
+<span class="nc" id="L736">                    CheckForbiddenContext checkForbiddenContext = new CheckForbiddenContext();</span>
+<span class="nc" id="L737">                    checkForbiddenContext.setNameSrvAddr(this.defaultMQProducer.getNamesrvAddr());</span>
+<span class="nc" id="L738">                    checkForbiddenContext.setGroup(this.defaultMQProducer.getProducerGroup());</span>
+<span class="nc" id="L739">                    checkForbiddenContext.setCommunicationMode(communicationMode);</span>
+<span class="nc" id="L740">                    checkForbiddenContext.setBrokerAddr(brokerAddr);</span>
+<span class="nc" id="L741">                    checkForbiddenContext.setMessage(msg);</span>
+<span class="nc" id="L742">                    checkForbiddenContext.setMq(mq);</span>
+<span class="nc" id="L743">                    checkForbiddenContext.setUnitMode(this.isUnitMode());</span>
+<span class="nc" id="L744">                    this.executeCheckForbiddenHook(checkForbiddenContext);</span>
+                }
+
+<span class="fc bfc" id="L747" title="All 2 branches covered.">                if (this.hasSendMessageHook()) {</span>
+<span class="fc" id="L748">                    context = new SendMessageContext();</span>
+<span class="fc" id="L749">                    context.setProducer(this);</span>
+<span class="fc" id="L750">                    context.setProducerGroup(this.defaultMQProducer.getProducerGroup());</span>
+<span class="fc" id="L751">                    context.setCommunicationMode(communicationMode);</span>
+<span class="fc" id="L752">                    context.setBornHost(this.defaultMQProducer.getClientIP());</span>
+<span class="fc" id="L753">                    context.setBrokerAddr(brokerAddr);</span>
+<span class="fc" id="L754">                    context.setMessage(msg);</span>
+<span class="fc" id="L755">                    context.setMq(mq);</span>
+<span class="fc" id="L756">                    context.setNamespace(this.defaultMQProducer.getNamespace());</span>
+<span class="fc" id="L757">                    String isTrans = msg.getProperty(MessageConst.PROPERTY_TRANSACTION_PREPARED);</span>
+<span class="pc bpc" id="L758" title="1 of 4 branches missed.">                    if (isTrans != null &amp;&amp; isTrans.equals(&quot;true&quot;)) {</span>
+<span class="fc" id="L759">                        context.setMsgType(MessageType.Trans_Msg_Half);</span>
+                    }
+
+<span class="pc bpc" id="L762" title="2 of 4 branches missed.">                    if (msg.getProperty(&quot;__STARTDELIVERTIME&quot;) != null || msg.getProperty(MessageConst.PROPERTY_DELAY_TIME_LEVEL) != null) {</span>
+<span class="nc" id="L763">                        context.setMsgType(MessageType.Delay_Msg);</span>
+                    }
+<span class="fc" id="L765">                    this.executeSendMessageHookBefore(context);</span>
+                }
+
+<span class="fc" id="L768">                SendMessageRequestHeader requestHeader = new SendMessageRequestHeader();</span>
+<span class="fc" id="L769">                requestHeader.setProducerGroup(this.defaultMQProducer.getProducerGroup());</span>
+<span class="fc" id="L770">                requestHeader.setTopic(msg.getTopic());</span>
+<span class="fc" id="L771">                requestHeader.setDefaultTopic(this.defaultMQProducer.getCreateTopicKey());</span>
+<span class="fc" id="L772">                requestHeader.setDefaultTopicQueueNums(this.defaultMQProducer.getDefaultTopicQueueNums());</span>
+<span class="fc" id="L773">                requestHeader.setQueueId(mq.getQueueId());</span>
+<span class="fc" id="L774">                requestHeader.setSysFlag(sysFlag);</span>
+<span class="fc" id="L775">                requestHeader.setBornTimestamp(System.currentTimeMillis());</span>
+<span class="fc" id="L776">                requestHeader.setFlag(msg.getFlag());</span>
+<span class="fc" id="L777">                requestHeader.setProperties(MessageDecoder.messageProperties2String(msg.getProperties()));</span>
+<span class="fc" id="L778">                requestHeader.setReconsumeTimes(0);</span>
+<span class="fc" id="L779">                requestHeader.setUnitMode(this.isUnitMode());</span>
+<span class="fc" id="L780">                requestHeader.setBatch(msg instanceof MessageBatch);</span>
+<span class="pc bpc" id="L781" title="1 of 2 branches missed.">                if (requestHeader.getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {</span>
+<span class="nc" id="L782">                    String reconsumeTimes = MessageAccessor.getReconsumeTime(msg);</span>
+<span class="nc bnc" id="L783" title="All 2 branches missed.">                    if (reconsumeTimes != null) {</span>
+<span class="nc" id="L784">                        requestHeader.setReconsumeTimes(Integer.valueOf(reconsumeTimes));</span>
+<span class="nc" id="L785">                        MessageAccessor.clearProperty(msg, MessageConst.PROPERTY_RECONSUME_TIME);</span>
+                    }
+
+<span class="nc" id="L788">                    String maxReconsumeTimes = MessageAccessor.getMaxReconsumeTimes(msg);</span>
+<span class="nc bnc" id="L789" title="All 2 branches missed.">                    if (maxReconsumeTimes != null) {</span>
+<span class="nc" id="L790">                        requestHeader.setMaxReconsumeTimes(Integer.valueOf(maxReconsumeTimes));</span>
+<span class="nc" id="L791">                        MessageAccessor.clearProperty(msg, MessageConst.PROPERTY_MAX_RECONSUME_TIMES);</span>
+                    }
+                }
+
+<span class="fc" id="L795">                SendResult sendResult = null;</span>
+<span class="pc bpc" id="L796" title="1 of 3 branches missed.">                switch (communicationMode) {</span>
+                    case ASYNC:
+<span class="fc" id="L798">                        Message tmpMessage = msg;</span>
+<span class="fc" id="L799">                        boolean messageCloned = false;</span>
+<span class="fc bfc" id="L800" title="All 2 branches covered.">                        if (msgBodyCompressed) {</span>
+                            //If msg body was compressed, msgbody should be reset using prevBody.
+                            //Clone new message using commpressed message body and recover origin massage.
+                            //Fix bug:https://github.com/apache/rocketmq-externals/issues/66
+<span class="fc" id="L804">                            tmpMessage = MessageAccessor.cloneMessage(msg);</span>
+<span class="fc" id="L805">                            messageCloned = true;</span>
+<span class="fc" id="L806">                            msg.setBody(prevBody);</span>
+                        }
+
+<span class="pc bpc" id="L809" title="1 of 2 branches missed.">                        if (topicWithNamespace) {</span>
+<span class="nc bnc" id="L810" title="All 2 branches missed.">                            if (!messageCloned) {</span>
+<span class="nc" id="L811">                                tmpMessage = MessageAccessor.cloneMessage(msg);</span>
+<span class="nc" id="L812">                                messageCloned = true;</span>
+                            }
+<span class="nc" id="L814">                            msg.setTopic(NamespaceUtil.withoutNamespace(msg.getTopic(), this.defaultMQProducer.getNamespace()));</span>
+                        }
+
+<span class="fc" id="L817">                        long costTimeAsync = System.currentTimeMillis() - beginStartTime;</span>
+<span class="pc bpc" id="L818" title="1 of 2 branches missed.">                        if (timeout &lt; costTimeAsync) {</span>
+<span class="nc" id="L819">                            throw new RemotingTooMuchRequestException(&quot;sendKernelImpl call timeout&quot;);</span>
+                        }
+<span class="fc" id="L821">                        sendResult = this.mQClientFactory.getMQClientAPIImpl().sendMessage(</span>
+                            brokerAddr,
+                            brokerName,
+                            tmpMessage,
+                            requestHeader,
+                            timeout - costTimeAsync,
+                            communicationMode,
+                            sendCallback,
+                            topicPublishInfo,
+                            this.mQClientFactory,
+<span class="fc" id="L831">                            this.defaultMQProducer.getRetryTimesWhenSendAsyncFailed(),</span>
+                            context,
+                            this);
+<span class="fc" id="L834">                        break;</span>
+                    case ONEWAY:
+                    case SYNC:
+<span class="fc" id="L837">                        long costTimeSync = System.currentTimeMillis() - beginStartTime;</span>
+<span class="pc bpc" id="L838" title="1 of 2 branches missed.">                        if (timeout &lt; costTimeSync) {</span>
+<span class="nc" id="L839">                            throw new RemotingTooMuchRequestException(&quot;sendKernelImpl call timeout&quot;);</span>
+                        }
+<span class="fc" id="L841">                        sendResult = this.mQClientFactory.getMQClientAPIImpl().sendMessage(</span>
+                            brokerAddr,
+                            brokerName,
+                            msg,
+                            requestHeader,
+                            timeout - costTimeSync,
+                            communicationMode,
+                            context,
+                            this);
+<span class="fc" id="L850">                        break;</span>
+                    default:
+<span class="nc bnc" id="L852" title="All 2 branches missed.">                        assert false;</span>
+                        break;
+                }
+
+<span class="fc bfc" id="L856" title="All 2 branches covered.">                if (this.hasSendMessageHook()) {</span>
+<span class="fc" id="L857">                    context.setSendResult(sendResult);</span>
+<span class="fc" id="L858">                    this.executeSendMessageHookAfter(context);</span>
+                }
+
+<span class="fc" id="L861">                return sendResult;</span>
+<span class="nc" id="L862">            } catch (RemotingException e) {</span>
+<span class="nc bnc" id="L863" title="All 2 branches missed.">                if (this.hasSendMessageHook()) {</span>
+<span class="nc" id="L864">                    context.setException(e);</span>
+<span class="nc" id="L865">                    this.executeSendMessageHookAfter(context);</span>
+                }
+<span class="nc" id="L867">                throw e;</span>
+<span class="nc" id="L868">            } catch (MQBrokerException e) {</span>
+<span class="nc bnc" id="L869" title="All 2 branches missed.">                if (this.hasSendMessageHook()) {</span>
+<span class="nc" id="L870">                    context.setException(e);</span>
+<span class="nc" id="L871">                    this.executeSendMessageHookAfter(context);</span>
+                }
+<span class="nc" id="L873">                throw e;</span>
+<span class="nc" id="L874">            } catch (InterruptedException e) {</span>
+<span class="nc bnc" id="L875" title="All 2 branches missed.">                if (this.hasSendMessageHook()) {</span>
+<span class="nc" id="L876">                    context.setException(e);</span>
+<span class="nc" id="L877">                    this.executeSendMessageHookAfter(context);</span>
+                }
+<span class="nc" id="L879">                throw e;</span>
+            } finally {
+<span class="fc" id="L881">                msg.setBody(prevBody);</span>
+<span class="fc" id="L882">                msg.setTopic(NamespaceUtil.withoutNamespace(msg.getTopic(), this.defaultMQProducer.getNamespace()));</span>
+            }
+        }
+
+<span class="nc" id="L886">        throw new MQClientException(&quot;The broker[&quot; + brokerName + &quot;] not exist&quot;, null);</span>
+    }
+
+    public MQClientInstance getMqClientFactory() {
+<span class="fc" id="L890">        return mQClientFactory;</span>
+    }
+
+    @Deprecated
+    public MQClientInstance getmQClientFactory() {
+<span class="nc" id="L895">        return mQClientFactory;</span>
+    }
+
+    private boolean tryToCompressMessage(final Message msg) {
+<span class="fc bfc" id="L899" title="All 2 branches covered.">        if (msg instanceof MessageBatch) {</span>
+            //batch does not support compressing right now
+<span class="fc" id="L901">            return false;</span>
+        }
+<span class="fc" id="L903">        byte[] body = msg.getBody();</span>
+<span class="pc bpc" id="L904" title="1 of 2 branches missed.">        if (body != null) {</span>
+<span class="fc bfc" id="L905" title="All 2 branches covered.">            if (body.length &gt;= this.defaultMQProducer.getCompressMsgBodyOverHowmuch()) {</span>
+                try {
+<span class="fc" id="L907">                    byte[] data = compressor.compress(body, compressLevel);</span>
+<span class="pc bpc" id="L908" title="1 of 2 branches missed.">                    if (data != null) {</span>
+<span class="fc" id="L909">                        msg.setBody(data);</span>
+<span class="fc" id="L910">                        return true;</span>
+                    }
+<span class="nc" id="L912">                } catch (IOException e) {</span>
+<span class="nc" id="L913">                    log.error(&quot;tryToCompressMessage exception&quot;, e);</span>
+<span class="nc" id="L914">                    log.warn(msg.toString());</span>
+<span class="nc" id="L915">                }</span>
+            }
+        }
+
+<span class="fc" id="L919">        return false;</span>
+    }
+
+    public boolean hasCheckForbiddenHook() {
+<span class="pc bpc" id="L923" title="1 of 2 branches missed.">        return !checkForbiddenHookList.isEmpty();</span>
+    }
+
+    public void executeCheckForbiddenHook(final CheckForbiddenContext context) throws MQClientException {
+<span class="nc bnc" id="L927" title="All 2 branches missed.">        if (hasCheckForbiddenHook()) {</span>
+<span class="nc bnc" id="L928" title="All 2 branches missed.">            for (CheckForbiddenHook hook : checkForbiddenHookList) {</span>
+<span class="nc" id="L929">                hook.checkForbidden(context);</span>
+<span class="nc" id="L930">            }</span>
+        }
+<span class="nc" id="L932">    }</span>
+
+    public boolean hasSendMessageHook() {
+<span class="fc bfc" id="L935" title="All 2 branches covered.">        return !this.sendMessageHookList.isEmpty();</span>
+    }
+
+    public void executeSendMessageHookBefore(final SendMessageContext context) {
+<span class="pc bpc" id="L939" title="1 of 2 branches missed.">        if (!this.sendMessageHookList.isEmpty()) {</span>
+<span class="fc bfc" id="L940" title="All 2 branches covered.">            for (SendMessageHook hook : this.sendMessageHookList) {</span>
+                try {
+<span class="fc" id="L942">                    hook.sendMessageBefore(context);</span>
+<span class="nc" id="L943">                } catch (Throwable e) {</span>
+<span class="nc" id="L944">                    log.warn(&quot;failed to executeSendMessageHookBefore&quot;, e);</span>
+<span class="fc" id="L945">                }</span>
+<span class="fc" id="L946">            }</span>
+        }
+<span class="fc" id="L948">    }</span>
+
+    public void executeSendMessageHookAfter(final SendMessageContext context) {
+<span class="fc bfc" id="L951" title="All 2 branches covered.">        if (!this.sendMessageHookList.isEmpty()) {</span>
+<span class="fc bfc" id="L952" title="All 2 branches covered.">            for (SendMessageHook hook : this.sendMessageHookList) {</span>
+                try {
+<span class="fc" id="L954">                    hook.sendMessageAfter(context);</span>
+<span class="nc" id="L955">                } catch (Throwable e) {</span>
+<span class="nc" id="L956">                    log.warn(&quot;failed to executeSendMessageHookAfter&quot;, e);</span>
+<span class="fc" id="L957">                }</span>
+<span class="fc" id="L958">            }</span>
+        }
+<span class="fc" id="L960">    }</span>
+
+    public boolean hasEndTransactionHook() {
+<span class="pc bpc" id="L963" title="1 of 2 branches missed.">        return !this.endTransactionHookList.isEmpty();</span>
+    }
+
+    public void executeEndTransactionHook(final EndTransactionContext context) {
+<span class="pc bpc" id="L967" title="1 of 2 branches missed.">        if (!this.endTransactionHookList.isEmpty()) {</span>
+<span class="fc bfc" id="L968" title="All 2 branches covered.">            for (EndTransactionHook hook : this.endTransactionHookList) {</span>
+                try {
+<span class="fc" id="L970">                    hook.endTransaction(context);</span>
+<span class="nc" id="L971">                } catch (Throwable e) {</span>
+<span class="nc" id="L972">                    log.warn(&quot;failed to executeEndTransactionHook&quot;, e);</span>
+<span class="fc" id="L973">                }</span>
+<span class="fc" id="L974">            }</span>
+        }
+<span class="fc" id="L976">    }</span>
+
+    public void doExecuteEndTransactionHook(Message msg, String msgId, String brokerAddr, LocalTransactionState state,
+        boolean fromTransactionCheck) {
+<span class="pc bpc" id="L980" title="1 of 2 branches missed.">        if (hasEndTransactionHook()) {</span>
+<span class="fc" id="L981">            EndTransactionContext context = new EndTransactionContext();</span>
+<span class="fc" id="L982">            context.setProducerGroup(defaultMQProducer.getProducerGroup());</span>
+<span class="fc" id="L983">            context.setBrokerAddr(brokerAddr);</span>
+<span class="fc" id="L984">            context.setMessage(msg);</span>
+<span class="fc" id="L985">            context.setMsgId(msgId);</span>
+<span class="fc" id="L986">            context.setTransactionId(msg.getTransactionId());</span>
+<span class="fc" id="L987">            context.setTransactionState(state);</span>
+<span class="fc" id="L988">            context.setFromTransactionCheck(fromTransactionCheck);</span>
+<span class="fc" id="L989">            executeEndTransactionHook(context);</span>
+        }
+<span class="fc" id="L991">    }</span>
+    /**
+     * DEFAULT ONEWAY -------------------------------------------------------
+     */
+    public void sendOneway(Message msg) throws MQClientException, RemotingException, InterruptedException {
+        try {
+<span class="nc" id="L997">            this.sendDefaultImpl(msg, CommunicationMode.ONEWAY, null, this.defaultMQProducer.getSendMsgTimeout());</span>
+<span class="nc" id="L998">        } catch (MQBrokerException e) {</span>
+<span class="nc" id="L999">            throw new MQClientException(&quot;unknown exception&quot;, e);</span>
+<span class="nc" id="L1000">        }</span>
+<span class="nc" id="L1001">    }</span>
+
+    /**
+     * KERNEL SYNC -------------------------------------------------------
+     */
+    public SendResult send(Message msg, MessageQueue mq)
+        throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="nc" id="L1008">        return send(msg, mq, this.defaultMQProducer.getSendMsgTimeout());</span>
+    }
+
+    public SendResult send(Message msg, MessageQueue mq, long timeout)
+        throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="nc" id="L1013">        long beginStartTime = System.currentTimeMillis();</span>
+<span class="nc" id="L1014">        this.makeSureStateOK();</span>
+<span class="nc" id="L1015">        Validators.checkMessage(msg, this.defaultMQProducer);</span>
+
+<span class="nc bnc" id="L1017" title="All 2 branches missed.">        if (!msg.getTopic().equals(mq.getTopic())) {</span>
+<span class="nc" id="L1018">            throw new MQClientException(&quot;message's topic not equal mq's topic&quot;, null);</span>
+        }
+
+<span class="nc" id="L1021">        long costTime = System.currentTimeMillis() - beginStartTime;</span>
+<span class="nc bnc" id="L1022" title="All 2 branches missed.">        if (timeout &lt; costTime) {</span>
+<span class="nc" id="L1023">            throw new RemotingTooMuchRequestException(&quot;call timeout&quot;);</span>
+        }
+
+<span class="nc" id="L1026">        return this.sendKernelImpl(msg, mq, CommunicationMode.SYNC, null, null, timeout);</span>
+    }
+
+    /**
+     * KERNEL ASYNC -------------------------------------------------------
+     */
+    public void send(Message msg, MessageQueue mq, SendCallback sendCallback)
+        throws MQClientException, RemotingException, InterruptedException {
+<span class="fc" id="L1034">        send(msg, mq, sendCallback, this.defaultMQProducer.getSendMsgTimeout());</span>
+<span class="fc" id="L1035">    }</span>
+
+    /**
+     * @param msg
+     * @param mq
+     * @param sendCallback
+     * @param timeout      the &lt;code&gt;sendCallback&lt;/code&gt; will be invoked at most time
+     * @throws MQClientException
+     * @throws RemotingException
+     * @throws InterruptedException
+     * @deprecated It will be removed at 4.4.0 cause for exception handling and the wrong Semantics of timeout. A new one will be
+     * provided in next version
+     */
+    @Deprecated
+    public void send(final Message msg, final MessageQueue mq, final SendCallback sendCallback, final long timeout)
+        throws MQClientException, RemotingException, InterruptedException {
+<span class="fc" id="L1051">        final long beginStartTime = System.currentTimeMillis();</span>
+<span class="fc" id="L1052">        ExecutorService executor = this.getAsyncSenderExecutor();</span>
+        try {
+<span class="fc" id="L1054">            executor.submit(new Runnable() {</span>
+                @Override
+                public void run() {
+                    try {
+<span class="fc" id="L1058">                        makeSureStateOK();</span>
+<span class="fc" id="L1059">                        Validators.checkMessage(msg, defaultMQProducer);</span>
+
+<span class="fc bfc" id="L1061" title="All 2 branches covered.">                        if (!msg.getTopic().equals(mq.getTopic())) {</span>
+<span class="fc" id="L1062">                            throw new MQClientException(&quot;message's topic not equal mq's topic&quot;, null);</span>
+                        }
+<span class="fc" id="L1064">                        long costTime = System.currentTimeMillis() - beginStartTime;</span>
+<span class="pc bpc" id="L1065" title="1 of 2 branches missed.">                        if (timeout &gt; costTime) {</span>
+                            try {
+<span class="fc" id="L1067">                                sendKernelImpl(msg, mq, CommunicationMode.ASYNC, sendCallback, null,</span>
+                                    timeout - costTime);
+<span class="nc" id="L1069">                            } catch (MQBrokerException e) {</span>
+<span class="nc" id="L1070">                                throw new MQClientException(&quot;unknown exception&quot;, e);</span>
+<span class="fc" id="L1071">                            }</span>
+                        } else {
+<span class="nc" id="L1073">                            sendCallback.onException(new RemotingTooMuchRequestException(&quot;call timeout&quot;));</span>
+                        }
+<span class="fc" id="L1075">                    } catch (Exception e) {</span>
+<span class="fc" id="L1076">                        sendCallback.onException(e);</span>
+<span class="fc" id="L1077">                    }</span>
+
+<span class="fc" id="L1079">                }</span>
+
+            });
+<span class="nc" id="L1082">        } catch (RejectedExecutionException e) {</span>
+<span class="nc" id="L1083">            throw new MQClientException(&quot;executor rejected &quot;, e);</span>
+<span class="fc" id="L1084">        }</span>
+
+<span class="fc" id="L1086">    }</span>
+
+    /**
+     * KERNEL ONEWAY -------------------------------------------------------
+     */
+    public void sendOneway(Message msg,
+        MessageQueue mq) throws MQClientException, RemotingException, InterruptedException {
+<span class="nc" id="L1093">        this.makeSureStateOK();</span>
+<span class="nc" id="L1094">        Validators.checkMessage(msg, this.defaultMQProducer);</span>
+
+        try {
+<span class="nc" id="L1097">            this.sendKernelImpl(msg, mq, CommunicationMode.ONEWAY, null, null, this.defaultMQProducer.getSendMsgTimeout());</span>
+<span class="nc" id="L1098">        } catch (MQBrokerException e) {</span>
+<span class="nc" id="L1099">            throw new MQClientException(&quot;unknown exception&quot;, e);</span>
+<span class="nc" id="L1100">        }</span>
+<span class="nc" id="L1101">    }</span>
+
+    /**
+     * SELECT SYNC -------------------------------------------------------
+     */
+    public SendResult send(Message msg, MessageQueueSelector selector, Object arg)
+        throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="nc" id="L1108">        return send(msg, selector, arg, this.defaultMQProducer.getSendMsgTimeout());</span>
+    }
+
+    public SendResult send(Message msg, MessageQueueSelector selector, Object arg, long timeout)
+        throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="nc" id="L1113">        return this.sendSelectImpl(msg, selector, arg, CommunicationMode.SYNC, null, timeout);</span>
+    }
+
+    private SendResult sendSelectImpl(
+        Message msg,
+        MessageQueueSelector selector,
+        Object arg,
+        final CommunicationMode communicationMode,
+        final SendCallback sendCallback, final long timeout
+    ) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="fc" id="L1123">        long beginStartTime = System.currentTimeMillis();</span>
+<span class="fc" id="L1124">        this.makeSureStateOK();</span>
+<span class="fc" id="L1125">        Validators.checkMessage(msg, this.defaultMQProducer);</span>
+
+<span class="fc" id="L1127">        TopicPublishInfo topicPublishInfo = this.tryToFindTopicPublishInfo(msg.getTopic());</span>
+<span class="pc bpc" id="L1128" title="2 of 4 branches missed.">        if (topicPublishInfo != null &amp;&amp; topicPublishInfo.ok()) {</span>
+<span class="fc" id="L1129">            MessageQueue mq = null;</span>
+            try {
+<span class="fc" id="L1131">                List&lt;MessageQueue&gt; messageQueueList =</span>
+<span class="fc" id="L1132">                    mQClientFactory.getMQAdminImpl().parsePublishMessageQueues(topicPublishInfo.getMessageQueueList());</span>
+<span class="fc" id="L1133">                Message userMessage = MessageAccessor.cloneMessage(msg);</span>
+<span class="fc" id="L1134">                String userTopic = NamespaceUtil.withoutNamespace(userMessage.getTopic(), mQClientFactory.getClientConfig().getNamespace());</span>
+<span class="fc" id="L1135">                userMessage.setTopic(userTopic);</span>
+
+<span class="fc" id="L1137">                mq = mQClientFactory.getClientConfig().queueWithNamespace(selector.select(messageQueueList, userMessage, arg));</span>
+<span class="nc" id="L1138">            } catch (Throwable e) {</span>
+<span class="nc" id="L1139">                throw new MQClientException(&quot;select message queue threw exception.&quot;, e);</span>
+<span class="fc" id="L1140">            }</span>
+
+<span class="fc" id="L1142">            long costTime = System.currentTimeMillis() - beginStartTime;</span>
+<span class="pc bpc" id="L1143" title="1 of 2 branches missed.">            if (timeout &lt; costTime) {</span>
+<span class="nc" id="L1144">                throw new RemotingTooMuchRequestException(&quot;sendSelectImpl call timeout&quot;);</span>
+            }
+<span class="fc bfc" id="L1146" title="All 2 branches covered.">            if (mq != null) {</span>
+<span class="fc" id="L1147">                return this.sendKernelImpl(msg, mq, communicationMode, sendCallback, null, timeout - costTime);</span>
+            } else {
+<span class="fc" id="L1149">                throw new MQClientException(&quot;select message queue return null.&quot;, null);</span>
+            }
+        }
+
+<span class="nc" id="L1153">        validateNameServerSetting();</span>
+<span class="nc" id="L1154">        throw new MQClientException(&quot;No route info for this topic, &quot; + msg.getTopic(), null);</span>
+    }
+
+    /**
+     * SELECT ASYNC -------------------------------------------------------
+     */
+    public void send(Message msg, MessageQueueSelector selector, Object arg, SendCallback sendCallback)
+        throws MQClientException, RemotingException, InterruptedException {
+<span class="fc" id="L1162">        send(msg, selector, arg, sendCallback, this.defaultMQProducer.getSendMsgTimeout());</span>
+<span class="fc" id="L1163">    }</span>
+
+    /**
+     * It will be removed at 4.4.0 cause for exception handling and the wrong Semantics of timeout. A new one will be
+     * provided in next version
+     *
+     * @param msg
+     * @param selector
+     * @param arg
+     * @param sendCallback
+     * @param timeout      the &lt;code&gt;sendCallback&lt;/code&gt; will be invoked at most time
+     * @throws MQClientException
+     * @throws RemotingException
+     * @throws InterruptedException
+     */
+    @Deprecated
+    public void send(final Message msg, final MessageQueueSelector selector, final Object arg,
+        final SendCallback sendCallback, final long timeout)
+        throws MQClientException, RemotingException, InterruptedException {
+<span class="fc" id="L1182">        final long beginStartTime = System.currentTimeMillis();</span>
+<span class="fc" id="L1183">        ExecutorService executor = this.getAsyncSenderExecutor();</span>
+        try {
+<span class="fc" id="L1185">            executor.submit(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L1188">                    long costTime = System.currentTimeMillis() - beginStartTime;</span>
+<span class="pc bpc" id="L1189" title="1 of 2 branches missed.">                    if (timeout &gt; costTime) {</span>
+                        try {
+                            try {
+<span class="fc" id="L1192">                                sendSelectImpl(msg, selector, arg, CommunicationMode.ASYNC, sendCallback,</span>
+                                    timeout - costTime);
+<span class="nc" id="L1194">                            } catch (MQBrokerException e) {</span>
+<span class="nc" id="L1195">                                throw new MQClientException(&quot;unknown exception&quot;, e);</span>
+<span class="fc" id="L1196">                            }</span>
+<span class="fc" id="L1197">                        } catch (Exception e) {</span>
+<span class="fc" id="L1198">                            sendCallback.onException(e);</span>
+<span class="fc" id="L1199">                        }</span>
+                    } else {
+<span class="nc" id="L1201">                        sendCallback.onException(new RemotingTooMuchRequestException(&quot;call timeout&quot;));</span>
+                    }
+<span class="fc" id="L1203">                }</span>
+
+            });
+<span class="nc" id="L1206">        } catch (RejectedExecutionException e) {</span>
+<span class="nc" id="L1207">            throw new MQClientException(&quot;executor rejected &quot;, e);</span>
+<span class="fc" id="L1208">        }</span>
+<span class="fc" id="L1209">    }</span>
+
+    /**
+     * SELECT ONEWAY -------------------------------------------------------
+     */
+    public void sendOneway(Message msg, MessageQueueSelector selector, Object arg)
+        throws MQClientException, RemotingException, InterruptedException {
+        try {
+<span class="nc" id="L1217">            this.sendSelectImpl(msg, selector, arg, CommunicationMode.ONEWAY, null, this.defaultMQProducer.getSendMsgTimeout());</span>
+<span class="nc" id="L1218">        } catch (MQBrokerException e) {</span>
+<span class="nc" id="L1219">            throw new MQClientException(&quot;unknown exception&quot;, e);</span>
+<span class="nc" id="L1220">        }</span>
+<span class="nc" id="L1221">    }</span>
+
+    public TransactionSendResult sendMessageInTransaction(final Message msg,
+        final LocalTransactionExecuter localTransactionExecuter, final Object arg)
+        throws MQClientException {
+<span class="fc" id="L1226">        TransactionListener transactionListener = getCheckListener();</span>
+<span class="pc bpc" id="L1227" title="2 of 4 branches missed.">        if (null == localTransactionExecuter &amp;&amp; null == transactionListener) {</span>
+<span class="nc" id="L1228">            throw new MQClientException(&quot;tranExecutor is null&quot;, null);</span>
+        }
+
+        // ignore DelayTimeLevel parameter
+<span class="pc bpc" id="L1232" title="1 of 2 branches missed.">        if (msg.getDelayTimeLevel() != 0) {</span>
+<span class="nc" id="L1233">            MessageAccessor.clearProperty(msg, MessageConst.PROPERTY_DELAY_TIME_LEVEL);</span>
+        }
+
+<span class="fc" id="L1236">        Validators.checkMessage(msg, this.defaultMQProducer);</span>
+
+<span class="fc" id="L1238">        SendResult sendResult = null;</span>
+<span class="fc" id="L1239">        MessageAccessor.putProperty(msg, MessageConst.PROPERTY_TRANSACTION_PREPARED, &quot;true&quot;);</span>
+<span class="fc" id="L1240">        MessageAccessor.putProperty(msg, MessageConst.PROPERTY_PRODUCER_GROUP, this.defaultMQProducer.getProducerGroup());</span>
+        try {
+<span class="fc" id="L1242">            sendResult = this.send(msg);</span>
+<span class="nc" id="L1243">        } catch (Exception e) {</span>
+<span class="nc" id="L1244">            throw new MQClientException(&quot;send message Exception&quot;, e);</span>
+<span class="fc" id="L1245">        }</span>
+
+<span class="fc" id="L1247">        LocalTransactionState localTransactionState = LocalTransactionState.UNKNOW;</span>
+<span class="fc" id="L1248">        Throwable localException = null;</span>
+<span class="pc bpc" id="L1249" title="2 of 3 branches missed.">        switch (sendResult.getSendStatus()) {</span>
+            case SEND_OK: {
+                try {
+<span class="pc bpc" id="L1252" title="1 of 2 branches missed.">                    if (sendResult.getTransactionId() != null) {</span>
+<span class="nc" id="L1253">                        msg.putUserProperty(&quot;__transactionId__&quot;, sendResult.getTransactionId());</span>
+                    }
+<span class="fc" id="L1255">                    String transactionId = msg.getProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX);</span>
+<span class="pc bpc" id="L1256" title="2 of 4 branches missed.">                    if (null != transactionId &amp;&amp; !&quot;&quot;.equals(transactionId)) {</span>
+<span class="fc" id="L1257">                        msg.setTransactionId(transactionId);</span>
+                    }
+<span class="pc bpc" id="L1259" title="1 of 2 branches missed.">                    if (null != localTransactionExecuter) {</span>
+<span class="nc" id="L1260">                        localTransactionState = localTransactionExecuter.executeLocalTransactionBranch(msg, arg);</span>
+<span class="pc bpc" id="L1261" title="1 of 2 branches missed.">                    } else if (transactionListener != null) {</span>
+<span class="fc" id="L1262">                        log.debug(&quot;Used new transaction API&quot;);</span>
+<span class="fc" id="L1263">                        localTransactionState = transactionListener.executeLocalTransaction(msg, arg);</span>
+                    }
+<span class="pc bpc" id="L1265" title="1 of 2 branches missed.">                    if (null == localTransactionState) {</span>
+<span class="nc" id="L1266">                        localTransactionState = LocalTransactionState.UNKNOW;</span>
+                    }
+
+<span class="pc bpc" id="L1269" title="1 of 2 branches missed.">                    if (localTransactionState != LocalTransactionState.COMMIT_MESSAGE) {</span>
+<span class="nc" id="L1270">                        log.info(&quot;executeLocalTransactionBranch return {}&quot;, localTransactionState);</span>
+<span class="nc" id="L1271">                        log.info(msg.toString());</span>
+                    }
+<span class="nc" id="L1273">                } catch (Throwable e) {</span>
+<span class="nc" id="L1274">                    log.info(&quot;executeLocalTransactionBranch exception&quot;, e);</span>
+<span class="nc" id="L1275">                    log.info(msg.toString());</span>
+<span class="nc" id="L1276">                    localException = e;</span>
+<span class="fc" id="L1277">                }</span>
+            }
+<span class="nc" id="L1279">            break;</span>
+            case FLUSH_DISK_TIMEOUT:
+            case FLUSH_SLAVE_TIMEOUT:
+            case SLAVE_NOT_AVAILABLE:
+<span class="nc" id="L1283">                localTransactionState = LocalTransactionState.ROLLBACK_MESSAGE;</span>
+<span class="nc" id="L1284">                break;</span>
+            default:
+                break;
+        }
+
+        try {
+<span class="fc" id="L1290">            this.endTransaction(msg, sendResult, localTransactionState, localException);</span>
+<span class="nc" id="L1291">        } catch (Exception e) {</span>
+<span class="nc" id="L1292">            log.warn(&quot;local transaction execute &quot; + localTransactionState + &quot;, but end broker transaction failed&quot;, e);</span>
+<span class="fc" id="L1293">        }</span>
+
+<span class="fc" id="L1295">        TransactionSendResult transactionSendResult = new TransactionSendResult();</span>
+<span class="fc" id="L1296">        transactionSendResult.setSendStatus(sendResult.getSendStatus());</span>
+<span class="fc" id="L1297">        transactionSendResult.setMessageQueue(sendResult.getMessageQueue());</span>
+<span class="fc" id="L1298">        transactionSendResult.setMsgId(sendResult.getMsgId());</span>
+<span class="fc" id="L1299">        transactionSendResult.setQueueOffset(sendResult.getQueueOffset());</span>
+<span class="fc" id="L1300">        transactionSendResult.setTransactionId(sendResult.getTransactionId());</span>
+<span class="fc" id="L1301">        transactionSendResult.setLocalTransactionState(localTransactionState);</span>
+<span class="fc" id="L1302">        return transactionSendResult;</span>
+    }
+
+    /**
+     * DEFAULT SYNC -------------------------------------------------------
+     */
+    public SendResult send(
+        Message msg) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="fc" id="L1310">        return send(msg, this.defaultMQProducer.getSendMsgTimeout());</span>
+    }
+
+    public void endTransaction(
+        final Message msg,
+        final SendResult sendResult,
+        final LocalTransactionState localTransactionState,
+        final Throwable localException) throws RemotingException, MQBrokerException, InterruptedException, UnknownHostException {
+        final MessageId id;
+<span class="pc bpc" id="L1319" title="1 of 2 branches missed.">        if (sendResult.getOffsetMsgId() != null) {</span>
+<span class="fc" id="L1320">            id = MessageDecoder.decodeMessageId(sendResult.getOffsetMsgId());</span>
+        } else {
+<span class="nc" id="L1322">            id = MessageDecoder.decodeMessageId(sendResult.getMsgId());</span>
+        }
+<span class="fc" id="L1324">        String transactionId = sendResult.getTransactionId();</span>
+<span class="fc" id="L1325">        final String destBrokerName = this.mQClientFactory.getBrokerNameFromMessageQueue(defaultMQProducer.queueWithNamespace(sendResult.getMessageQueue()));</span>
+<span class="fc" id="L1326">        final String brokerAddr = this.mQClientFactory.findBrokerAddressInPublish(destBrokerName);</span>
+<span class="fc" id="L1327">        EndTransactionRequestHeader requestHeader = new EndTransactionRequestHeader();</span>
+<span class="fc" id="L1328">        requestHeader.setTransactionId(transactionId);</span>
+<span class="fc" id="L1329">        requestHeader.setCommitLogOffset(id.getOffset());</span>
+<span class="pc bpc" id="L1330" title="3 of 4 branches missed.">        switch (localTransactionState) {</span>
+            case COMMIT_MESSAGE:
+<span class="fc" id="L1332">                requestHeader.setCommitOrRollback(MessageSysFlag.TRANSACTION_COMMIT_TYPE);</span>
+<span class="fc" id="L1333">                break;</span>
+            case ROLLBACK_MESSAGE:
+<span class="nc" id="L1335">                requestHeader.setCommitOrRollback(MessageSysFlag.TRANSACTION_ROLLBACK_TYPE);</span>
+<span class="nc" id="L1336">                break;</span>
+            case UNKNOW:
+<span class="nc" id="L1338">                requestHeader.setCommitOrRollback(MessageSysFlag.TRANSACTION_NOT_TYPE);</span>
+<span class="nc" id="L1339">                break;</span>
+            default:
+                break;
+        }
+
+<span class="fc" id="L1344">        doExecuteEndTransactionHook(msg, sendResult.getMsgId(), brokerAddr, localTransactionState, false);</span>
+<span class="fc" id="L1345">        requestHeader.setProducerGroup(this.defaultMQProducer.getProducerGroup());</span>
+<span class="fc" id="L1346">        requestHeader.setTranStateTableOffset(sendResult.getQueueOffset());</span>
+<span class="fc" id="L1347">        requestHeader.setMsgId(sendResult.getMsgId());</span>
+<span class="pc bpc" id="L1348" title="1 of 2 branches missed.">        String remark = localException != null ? (&quot;executeLocalTransactionBranch exception: &quot; + localException.toString()) : null;</span>
+<span class="fc" id="L1349">        this.mQClientFactory.getMQClientAPIImpl().endTransactionOneway(brokerAddr, requestHeader, remark,</span>
+<span class="fc" id="L1350">            this.defaultMQProducer.getSendMsgTimeout());</span>
+<span class="fc" id="L1351">    }</span>
+
+    public void setCallbackExecutor(final ExecutorService callbackExecutor) {
+<span class="fc" id="L1354">        this.mQClientFactory.getMQClientAPIImpl().getRemotingClient().setCallbackExecutor(callbackExecutor);</span>
+<span class="fc" id="L1355">    }</span>
+
+    public ExecutorService getAsyncSenderExecutor() {
+<span class="pc bpc" id="L1358" title="1 of 2 branches missed.">        return null == asyncSenderExecutor ? defaultAsyncSenderExecutor : asyncSenderExecutor;</span>
+    }
+
+    public void setAsyncSenderExecutor(ExecutorService asyncSenderExecutor) {
+<span class="nc" id="L1362">        this.asyncSenderExecutor = asyncSenderExecutor;</span>
+<span class="nc" id="L1363">    }</span>
+
+    public SendResult send(Message msg,
+        long timeout) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="fc" id="L1367">        return this.sendDefaultImpl(msg, CommunicationMode.SYNC, null, timeout);</span>
+    }
+
+    public Message request(final Message msg,
+        long timeout) throws RequestTimeoutException, MQClientException, RemotingException, MQBrokerException, InterruptedException {
+<span class="fc" id="L1372">        long beginTimestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L1373">        prepareSendRequest(msg, timeout);</span>
+<span class="fc" id="L1374">        final String correlationId = msg.getProperty(MessageConst.PROPERTY_CORRELATION_ID);</span>
+
+        try {
+<span class="fc" id="L1377">            final RequestResponseFuture requestResponseFuture = new RequestResponseFuture(correlationId, timeout, null);</span>
+<span class="fc" id="L1378">            RequestFutureHolder.getInstance().getRequestFutureTable().put(correlationId, requestResponseFuture);</span>
+
+<span class="fc" id="L1380">            long cost = System.currentTimeMillis() - beginTimestamp;</span>
+<span class="fc" id="L1381">            this.sendDefaultImpl(msg, CommunicationMode.ASYNC, new SendCallback() {</span>
+                @Override
+                public void onSuccess(SendResult sendResult) {
+<span class="nc" id="L1384">                    requestResponseFuture.setSendRequestOk(true);</span>
+<span class="nc" id="L1385">                    requestResponseFuture.putResponseMessage(msg);</span>
+<span class="nc" id="L1386">                }</span>
+
+                @Override
+                public void onException(Throwable e) {
+<span class="nc" id="L1390">                    requestResponseFuture.setSendRequestOk(false);</span>
+<span class="nc" id="L1391">                    requestResponseFuture.putResponseMessage(null);</span>
+<span class="nc" id="L1392">                    requestResponseFuture.setCause(e);</span>
+<span class="nc" id="L1393">                }</span>
+            }, timeout - cost);
+
+<span class="fc" id="L1396">            return waitResponse(msg, timeout, requestResponseFuture, cost);</span>
+        } finally {
+<span class="fc" id="L1398">            RequestFutureHolder.getInstance().getRequestFutureTable().remove(correlationId);</span>
+        }
+    }
+
+    public void request(Message msg, final RequestCallback requestCallback, long timeout)
+        throws RemotingException, InterruptedException, MQClientException, MQBrokerException {
+<span class="fc" id="L1404">        long beginTimestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L1405">        prepareSendRequest(msg, timeout);</span>
+<span class="fc" id="L1406">        final String correlationId = msg.getProperty(MessageConst.PROPERTY_CORRELATION_ID);</span>
+
+<span class="fc" id="L1408">        final RequestResponseFuture requestResponseFuture = new RequestResponseFuture(correlationId, timeout, requestCallback);</span>
+<span class="fc" id="L1409">        RequestFutureHolder.getInstance().getRequestFutureTable().put(correlationId, requestResponseFuture);</span>
+
+<span class="fc" id="L1411">        long cost = System.currentTimeMillis() - beginTimestamp;</span>
+<span class="fc" id="L1412">        this.sendDefaultImpl(msg, CommunicationMode.ASYNC, new SendCallback() {</span>
+            @Override
+            public void onSuccess(SendResult sendResult) {
+<span class="nc" id="L1415">                requestResponseFuture.setSendRequestOk(true);</span>
+<span class="nc" id="L1416">                requestResponseFuture.executeRequestCallback();</span>
+<span class="nc" id="L1417">            }</span>
+
+            @Override
+            public void onException(Throwable e) {
+<span class="nc" id="L1421">                requestResponseFuture.setCause(e);</span>
+<span class="nc" id="L1422">                requestFail(correlationId);</span>
+<span class="nc" id="L1423">            }</span>
+        }, timeout - cost);
+<span class="fc" id="L1425">    }</span>
+
+    public Message request(final Message msg, final MessageQueueSelector selector, final Object arg,
+        final long timeout) throws MQClientException, RemotingException, MQBrokerException,
+        InterruptedException, RequestTimeoutException {
+<span class="nc" id="L1430">        long beginTimestamp = System.currentTimeMillis();</span>
+<span class="nc" id="L1431">        prepareSendRequest(msg, timeout);</span>
+<span class="nc" id="L1432">        final String correlationId = msg.getProperty(MessageConst.PROPERTY_CORRELATION_ID);</span>
+
+        try {
+<span class="nc" id="L1435">            final RequestResponseFuture requestResponseFuture = new RequestResponseFuture(correlationId, timeout, null);</span>
+<span class="nc" id="L1436">            RequestFutureHolder.getInstance().getRequestFutureTable().put(correlationId, requestResponseFuture);</span>
+
+<span class="nc" id="L1438">            long cost = System.currentTimeMillis() - beginTimestamp;</span>
+<span class="nc" id="L1439">            this.sendSelectImpl(msg, selector, arg, CommunicationMode.ASYNC, new SendCallback() {</span>
+                @Override
+                public void onSuccess(SendResult sendResult) {
+<span class="nc" id="L1442">                    requestResponseFuture.setSendRequestOk(true);</span>
+<span class="nc" id="L1443">                }</span>
+
+                @Override
+                public void onException(Throwable e) {
+<span class="nc" id="L1447">                    requestResponseFuture.setSendRequestOk(false);</span>
+<span class="nc" id="L1448">                    requestResponseFuture.putResponseMessage(null);</span>
+<span class="nc" id="L1449">                    requestResponseFuture.setCause(e);</span>
+<span class="nc" id="L1450">                }</span>
+            }, timeout - cost);
+
+<span class="nc" id="L1453">            return waitResponse(msg, timeout, requestResponseFuture, cost);</span>
+        } finally {
+<span class="nc" id="L1455">            RequestFutureHolder.getInstance().getRequestFutureTable().remove(correlationId);</span>
+        }
+    }
+
+    public void request(final Message msg, final MessageQueueSelector selector, final Object arg,
+        final RequestCallback requestCallback, final long timeout)
+        throws RemotingException, InterruptedException, MQClientException, MQBrokerException {
+<span class="nc" id="L1462">        long beginTimestamp = System.currentTimeMillis();</span>
+<span class="nc" id="L1463">        prepareSendRequest(msg, timeout);</span>
+<span class="nc" id="L1464">        final String correlationId = msg.getProperty(MessageConst.PROPERTY_CORRELATION_ID);</span>
+
+<span class="nc" id="L1466">        final RequestResponseFuture requestResponseFuture = new RequestResponseFuture(correlationId, timeout, requestCallback);</span>
+<span class="nc" id="L1467">        RequestFutureHolder.getInstance().getRequestFutureTable().put(correlationId, requestResponseFuture);</span>
+
+<span class="nc" id="L1469">        long cost = System.currentTimeMillis() - beginTimestamp;</span>
+<span class="nc" id="L1470">        this.sendSelectImpl(msg, selector, arg, CommunicationMode.ASYNC, new SendCallback() {</span>
+            @Override
+            public void onSuccess(SendResult sendResult) {
+<span class="nc" id="L1473">                requestResponseFuture.setSendRequestOk(true);</span>
+<span class="nc" id="L1474">            }</span>
+
+            @Override
+            public void onException(Throwable e) {
+<span class="nc" id="L1478">                requestResponseFuture.setCause(e);</span>
+<span class="nc" id="L1479">                requestFail(correlationId);</span>
+<span class="nc" id="L1480">            }</span>
+        }, timeout - cost);
+
+<span class="nc" id="L1483">    }</span>
+
+    public Message request(final Message msg, final MessageQueue mq, final long timeout)
+        throws MQClientException, RemotingException, MQBrokerException, InterruptedException, RequestTimeoutException {
+<span class="nc" id="L1487">        long beginTimestamp = System.currentTimeMillis();</span>
+<span class="nc" id="L1488">        prepareSendRequest(msg, timeout);</span>
+<span class="nc" id="L1489">        final String correlationId = msg.getProperty(MessageConst.PROPERTY_CORRELATION_ID);</span>
+
+        try {
+<span class="nc" id="L1492">            final RequestResponseFuture requestResponseFuture = new RequestResponseFuture(correlationId, timeout, null);</span>
+<span class="nc" id="L1493">            RequestFutureHolder.getInstance().getRequestFutureTable().put(correlationId, requestResponseFuture);</span>
+
+<span class="nc" id="L1495">            long cost = System.currentTimeMillis() - beginTimestamp;</span>
+<span class="nc" id="L1496">            this.sendKernelImpl(msg, mq, CommunicationMode.ASYNC, new SendCallback() {</span>
+                @Override
+                public void onSuccess(SendResult sendResult) {
+<span class="nc" id="L1499">                    requestResponseFuture.setSendRequestOk(true);</span>
+<span class="nc" id="L1500">                }</span>
+
+                @Override
+                public void onException(Throwable e) {
+<span class="nc" id="L1504">                    requestResponseFuture.setSendRequestOk(false);</span>
+<span class="nc" id="L1505">                    requestResponseFuture.putResponseMessage(null);</span>
+<span class="nc" id="L1506">                    requestResponseFuture.setCause(e);</span>
+<span class="nc" id="L1507">                }</span>
+            }, null, timeout - cost);
+
+<span class="nc" id="L1510">            return waitResponse(msg, timeout, requestResponseFuture, cost);</span>
+        } finally {
+<span class="nc" id="L1512">            RequestFutureHolder.getInstance().getRequestFutureTable().remove(correlationId);</span>
+        }
+    }
+
+    private Message waitResponse(Message msg, long timeout, RequestResponseFuture requestResponseFuture,
+        long cost) throws InterruptedException, RequestTimeoutException, MQClientException {
+<span class="fc" id="L1518">        Message responseMessage = requestResponseFuture.waitResponseMessage(timeout - cost);</span>
+<span class="fc bfc" id="L1519" title="All 2 branches covered.">        if (responseMessage == null) {</span>
+<span class="pc bpc" id="L1520" title="1 of 2 branches missed.">            if (requestResponseFuture.isSendRequestOk()) {</span>
+<span class="fc" id="L1521">                throw new RequestTimeoutException(ClientErrorCode.REQUEST_TIMEOUT_EXCEPTION,</span>
+<span class="fc" id="L1522">                    &quot;send request message to &lt;&quot; + msg.getTopic() + &quot;&gt; OK, but wait reply message timeout, &quot; + timeout + &quot; ms.&quot;);</span>
+            } else {
+<span class="nc" id="L1524">                throw new MQClientException(&quot;send request message to &lt;&quot; + msg.getTopic() + &quot;&gt; fail&quot;, requestResponseFuture.getCause());</span>
+            }
+        }
+<span class="fc" id="L1527">        return responseMessage;</span>
+    }
+
+    public void request(final Message msg, final MessageQueue mq, final RequestCallback requestCallback, long timeout)
+        throws RemotingException, InterruptedException, MQClientException, MQBrokerException {
+<span class="nc" id="L1532">        long beginTimestamp = System.currentTimeMillis();</span>
+<span class="nc" id="L1533">        prepareSendRequest(msg, timeout);</span>
+<span class="nc" id="L1534">        final String correlationId = msg.getProperty(MessageConst.PROPERTY_CORRELATION_ID);</span>
+
+<span class="nc" id="L1536">        final RequestResponseFuture requestResponseFuture = new RequestResponseFuture(correlationId, timeout, requestCallback);</span>
+<span class="nc" id="L1537">        RequestFutureHolder.getInstance().getRequestFutureTable().put(correlationId, requestResponseFuture);</span>
+
+<span class="nc" id="L1539">        long cost = System.currentTimeMillis() - beginTimestamp;</span>
+<span class="nc" id="L1540">        this.sendKernelImpl(msg, mq, CommunicationMode.ASYNC, new SendCallback() {</span>
+            @Override
+            public void onSuccess(SendResult sendResult) {
+<span class="nc" id="L1543">                requestResponseFuture.setSendRequestOk(true);</span>
+<span class="nc" id="L1544">            }</span>
+
+            @Override
+            public void onException(Throwable e) {
+<span class="nc" id="L1548">                requestResponseFuture.setCause(e);</span>
+<span class="nc" id="L1549">                requestFail(correlationId);</span>
+<span class="nc" id="L1550">            }</span>
+        }, null, timeout - cost);
+<span class="nc" id="L1552">    }</span>
+
+    private void requestFail(final String correlationId) {
+<span class="nc" id="L1555">        RequestResponseFuture responseFuture = RequestFutureHolder.getInstance().getRequestFutureTable().remove(correlationId);</span>
+<span class="nc bnc" id="L1556" title="All 2 branches missed.">        if (responseFuture != null) {</span>
+<span class="nc" id="L1557">            responseFuture.setSendRequestOk(false);</span>
+<span class="nc" id="L1558">            responseFuture.putResponseMessage(null);</span>
+            try {
+<span class="nc" id="L1560">                responseFuture.executeRequestCallback();</span>
+<span class="nc" id="L1561">            } catch (Exception e) {</span>
+<span class="nc" id="L1562">                log.warn(&quot;execute requestCallback in requestFail, and callback throw&quot;, e);</span>
+<span class="nc" id="L1563">            }</span>
+        }
+<span class="nc" id="L1565">    }</span>
+
+    private void prepareSendRequest(final Message msg, long timeout) {
+<span class="fc" id="L1568">        String correlationId = CorrelationIdUtil.createCorrelationId();</span>
+<span class="fc" id="L1569">        String requestClientId = this.getMqClientFactory().getClientId();</span>
+<span class="fc" id="L1570">        MessageAccessor.putProperty(msg, MessageConst.PROPERTY_CORRELATION_ID, correlationId);</span>
+<span class="fc" id="L1571">        MessageAccessor.putProperty(msg, MessageConst.PROPERTY_MESSAGE_REPLY_TO_CLIENT, requestClientId);</span>
+<span class="fc" id="L1572">        MessageAccessor.putProperty(msg, MessageConst.PROPERTY_MESSAGE_TTL, String.valueOf(timeout));</span>
+
+<span class="fc" id="L1574">        boolean hasRouteData = this.getMqClientFactory().getTopicRouteTable().containsKey(msg.getTopic());</span>
+<span class="pc bpc" id="L1575" title="1 of 2 branches missed.">        if (!hasRouteData) {</span>
+<span class="nc" id="L1576">            long beginTimestamp = System.currentTimeMillis();</span>
+<span class="nc" id="L1577">            this.tryToFindTopicPublishInfo(msg.getTopic());</span>
+<span class="nc" id="L1578">            this.getMqClientFactory().sendHeartbeatToAllBrokerWithLock();</span>
+<span class="nc" id="L1579">            long cost = System.currentTimeMillis() - beginTimestamp;</span>
+<span class="nc bnc" id="L1580" title="All 2 branches missed.">            if (cost &gt; 500) {</span>
+<span class="nc" id="L1581">                log.warn(&quot;prepare send request for &lt;{}&gt; cost {} ms&quot;, msg.getTopic(), cost);</span>
+            }
+        }
+<span class="fc" id="L1584">    }</span>
+
+    public ConcurrentMap&lt;String, TopicPublishInfo&gt; getTopicPublishInfoTable() {
+<span class="fc" id="L1587">        return topicPublishInfoTable;</span>
+    }
+
+    public int getCompressLevel() {
+<span class="nc" id="L1591">        return compressLevel;</span>
+    }
+
+    public void setCompressLevel(int compressLevel) {
+<span class="nc" id="L1595">        this.compressLevel = compressLevel;</span>
+<span class="nc" id="L1596">    }</span>
+
+    public CompressionType getCompressType() {
+<span class="nc" id="L1599">        return compressType;</span>
+    }
+
+    public void setCompressType(CompressionType compressType) {
+<span class="nc" id="L1603">        this.compressType = compressType;</span>
+<span class="nc" id="L1604">    }</span>
+
+    public ServiceState getServiceState() {
+<span class="nc" id="L1607">        return serviceState;</span>
+    }
+
+    public void setServiceState(ServiceState serviceState) {
+<span class="nc" id="L1611">        this.serviceState = serviceState;</span>
+<span class="nc" id="L1612">    }</span>
+
+    public long[] getNotAvailableDuration() {
+<span class="nc" id="L1615">        return this.mqFaultStrategy.getNotAvailableDuration();</span>
+    }
+
+    public void setNotAvailableDuration(final long[] notAvailableDuration) {
+<span class="nc" id="L1619">        this.mqFaultStrategy.setNotAvailableDuration(notAvailableDuration);</span>
+<span class="nc" id="L1620">    }</span>
+
+    public long[] getLatencyMax() {
+<span class="nc" id="L1623">        return this.mqFaultStrategy.getLatencyMax();</span>
+    }
+
+    public void setLatencyMax(final long[] latencyMax) {
+<span class="nc" id="L1627">        this.mqFaultStrategy.setLatencyMax(latencyMax);</span>
+<span class="nc" id="L1628">    }</span>
+
+    public boolean isSendLatencyFaultEnable() {
+<span class="nc" id="L1631">        return this.mqFaultStrategy.isSendLatencyFaultEnable();</span>
+    }
+
+    public void setSendLatencyFaultEnable(final boolean sendLatencyFaultEnable) {
+<span class="nc" id="L1635">        this.mqFaultStrategy.setSendLatencyFaultEnable(sendLatencyFaultEnable);</span>
+<span class="nc" id="L1636">    }</span>
+
+    public DefaultMQProducer getDefaultMQProducer() {
+<span class="nc" id="L1639">        return defaultMQProducer;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

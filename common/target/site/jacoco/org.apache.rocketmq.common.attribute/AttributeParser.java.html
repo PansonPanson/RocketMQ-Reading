@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AttributeParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.attribute</a> &gt; <span class="el_source">AttributeParser.java</span></div><h1>AttributeParser.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.attribute;
+
+import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+<span class="nc" id="L27">public class AttributeParser {</span>
+    public static Map&lt;String, String&gt; parseToMap(String attributesModification) {
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (Strings.isNullOrEmpty(attributesModification)) {</span>
+<span class="fc" id="L30">            return new HashMap&lt;&gt;();</span>
+        }
+
+        // format: +key1=value1,+key2=value2,-key3,+key4=value4
+<span class="fc" id="L34">        Map&lt;String, String&gt; attributes = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L35">        String arraySeparator = &quot;,&quot;;</span>
+<span class="fc" id="L36">        String kvSeparator = &quot;=&quot;;</span>
+<span class="fc" id="L37">        String[] kvs = attributesModification.split(arraySeparator);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (String kv : kvs) {</span>
+            String key;
+            String value;
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            if (kv.contains(kvSeparator)) {</span>
+<span class="fc" id="L42">                key = kv.split(kvSeparator)[0];</span>
+<span class="fc" id="L43">                value = kv.split(kvSeparator)[1];</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                if (!key.contains(&quot;+&quot;)) {</span>
+<span class="nc" id="L45">                    throw new RuntimeException(&quot;add/alter attribute format is wrong: &quot; + key);</span>
+                }
+            } else {
+<span class="fc" id="L48">                key = kv;</span>
+<span class="fc" id="L49">                value = &quot;&quot;;</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                if (!key.contains(&quot;-&quot;)) {</span>
+<span class="fc" id="L51">                    throw new RuntimeException(&quot;delete attribute format is wrong: &quot; + key);</span>
+                }
+            }
+<span class="fc" id="L54">            String old = attributes.put(key, value);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            if (old != null) {</span>
+<span class="nc" id="L56">                throw new RuntimeException(&quot;key duplication: &quot; + key);</span>
+            }
+        }
+<span class="fc" id="L59">        return attributes;</span>
+    }
+
+    public static String parseToString(Map&lt;String, String&gt; attributes) {
+<span class="fc bfc" id="L63" title="All 4 branches covered.">        if (attributes == null || attributes.size() == 0) {</span>
+<span class="fc" id="L64">            return &quot;&quot;;</span>
+        }
+
+<span class="fc" id="L67">        List&lt;String&gt; kvs = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : attributes.entrySet()) {</span>
+
+<span class="fc" id="L70">            String value = entry.getValue();</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (Strings.isNullOrEmpty(value)) {</span>
+<span class="fc" id="L72">                kvs.add(entry.getKey());</span>
+            } else {
+<span class="fc" id="L74">                kvs.add(entry.getKey() + &quot;=&quot; + entry.getValue());</span>
+            }
+<span class="fc" id="L76">        }</span>
+<span class="fc" id="L77">        return Joiner.on(&quot;,&quot;).join(kvs);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

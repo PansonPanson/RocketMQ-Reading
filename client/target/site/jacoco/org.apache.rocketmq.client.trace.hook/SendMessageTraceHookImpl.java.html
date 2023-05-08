@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SendMessageTraceHookImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.trace.hook</a> &gt; <span class="el_source">SendMessageTraceHookImpl.java</span></div><h1>SendMessageTraceHookImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.trace.hook;
+
+import java.util.ArrayList;
+import org.apache.rocketmq.client.hook.SendMessageContext;
+import org.apache.rocketmq.client.hook.SendMessageHook;
+import org.apache.rocketmq.client.producer.SendStatus;
+import org.apache.rocketmq.client.trace.AsyncTraceDispatcher;
+import org.apache.rocketmq.client.trace.TraceBean;
+import org.apache.rocketmq.client.trace.TraceContext;
+import org.apache.rocketmq.client.trace.TraceDispatcher;
+import org.apache.rocketmq.client.trace.TraceType;
+import org.apache.rocketmq.common.protocol.NamespaceUtil;
+
+public class SendMessageTraceHookImpl implements SendMessageHook {
+
+    private TraceDispatcher localDispatcher;
+
+<span class="fc" id="L34">    public SendMessageTraceHookImpl(TraceDispatcher localDispatcher) {</span>
+<span class="fc" id="L35">        this.localDispatcher = localDispatcher;</span>
+<span class="fc" id="L36">    }</span>
+
+    @Override
+    public String hookName() {
+<span class="fc" id="L40">        return &quot;SendMessageTraceHook&quot;;</span>
+    }
+
+    @Override
+    public void sendMessageBefore(SendMessageContext context) {
+        //if it is message trace data,then it doesn't recorded
+<span class="pc bpc" id="L46" title="2 of 4 branches missed.">        if (context == null || context.getMessage().getTopic().startsWith(((AsyncTraceDispatcher) localDispatcher).getTraceTopicName())) {</span>
+<span class="nc" id="L47">            return;</span>
+        }
+        //build the context content of TraceContext
+<span class="fc" id="L50">        TraceContext traceContext = new TraceContext();</span>
+<span class="fc" id="L51">        traceContext.setTraceBeans(new ArrayList&lt;TraceBean&gt;(1));</span>
+<span class="fc" id="L52">        context.setMqTraceContext(traceContext);</span>
+<span class="fc" id="L53">        traceContext.setTraceType(TraceType.Pub);</span>
+<span class="fc" id="L54">        traceContext.setGroupName(NamespaceUtil.withoutNamespace(context.getProducerGroup()));</span>
+        //build the data bean object of message trace
+<span class="fc" id="L56">        TraceBean traceBean = new TraceBean();</span>
+<span class="fc" id="L57">        traceBean.setTopic(NamespaceUtil.withoutNamespace(context.getMessage().getTopic()));</span>
+<span class="fc" id="L58">        traceBean.setTags(context.getMessage().getTags());</span>
+<span class="fc" id="L59">        traceBean.setKeys(context.getMessage().getKeys());</span>
+<span class="fc" id="L60">        traceBean.setStoreHost(context.getBrokerAddr());</span>
+<span class="fc" id="L61">        traceBean.setBodyLength(context.getMessage().getBody().length);</span>
+<span class="fc" id="L62">        traceBean.setMsgType(context.getMsgType());</span>
+<span class="fc" id="L63">        traceContext.getTraceBeans().add(traceBean);</span>
+<span class="fc" id="L64">    }</span>
+
+    @Override
+    public void sendMessageAfter(SendMessageContext context) {
+        //if it is message trace data,then it doesn't recorded
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">        if (context == null || context.getMessage().getTopic().startsWith(((AsyncTraceDispatcher) localDispatcher).getTraceTopicName())</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            || context.getMqTraceContext() == null) {</span>
+<span class="nc" id="L71">            return;</span>
+        }
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (context.getSendResult() == null) {</span>
+<span class="nc" id="L74">            return;</span>
+        }
+
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (context.getSendResult().getRegionId() == null</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            || !context.getSendResult().isTraceOn()) {</span>
+            // if switch is false,skip it
+<span class="nc" id="L80">            return;</span>
+        }
+
+<span class="fc" id="L83">        TraceContext traceContext = (TraceContext) context.getMqTraceContext();</span>
+<span class="fc" id="L84">        TraceBean traceBean = traceContext.getTraceBeans().get(0);</span>
+<span class="fc" id="L85">        int costTime = (int) ((System.currentTimeMillis() - traceContext.getTimeStamp()) / traceContext.getTraceBeans().size());</span>
+<span class="fc" id="L86">        traceContext.setCostTime(costTime);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (context.getSendResult().getSendStatus().equals(SendStatus.SEND_OK)) {</span>
+<span class="fc" id="L88">            traceContext.setSuccess(true);</span>
+        } else {
+<span class="nc" id="L90">            traceContext.setSuccess(false);</span>
+        }
+<span class="fc" id="L92">        traceContext.setRegionId(context.getSendResult().getRegionId());</span>
+<span class="fc" id="L93">        traceBean.setMsgId(context.getSendResult().getMsgId());</span>
+<span class="fc" id="L94">        traceBean.setOffsetMsgId(context.getSendResult().getOffsetMsgId());</span>
+<span class="fc" id="L95">        traceBean.setStoreTime(traceContext.getTimeStamp() + costTime / 2);</span>
+<span class="fc" id="L96">        localDispatcher.append(traceContext);</span>
+<span class="fc" id="L97">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

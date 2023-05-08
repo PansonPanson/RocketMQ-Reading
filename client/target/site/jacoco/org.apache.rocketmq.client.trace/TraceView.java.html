@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraceView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.trace</a> &gt; <span class="el_source">TraceView.java</span></div><h1>TraceView.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.client.trace;
+
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.rocketmq.common.message.MessageExt;
+
+<span class="fc" id="L25">public class TraceView {</span>
+
+    private String msgId;
+    private String tags;
+    private String keys;
+    private String storeHost;
+    private String clientHost;
+    private int costTime;
+    private String msgType;
+    private String offSetMsgId;
+    private long timeStamp;
+    private long bornTime;
+    private String topic;
+    private String groupName;
+    private String status;
+
+    public static List&lt;TraceView&gt; decodeFromTraceTransData(String key, MessageExt messageExt) {
+<span class="fc" id="L42">        List&lt;TraceView&gt; messageTraceViewList = new ArrayList&lt;TraceView&gt;();</span>
+<span class="fc" id="L43">        String messageBody = new String(messageExt.getBody(), StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">        if (messageBody == null || messageBody.length() &lt;= 0) {</span>
+<span class="nc" id="L45">            return messageTraceViewList;</span>
+        }
+
+<span class="fc" id="L48">        List&lt;TraceContext&gt; traceContextList = TraceDataEncoder.decoderFromTraceDataString(messageBody);</span>
+
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (TraceContext context : traceContextList) {</span>
+<span class="fc" id="L51">            TraceView messageTraceView = new TraceView();</span>
+<span class="fc" id="L52">            TraceBean traceBean = context.getTraceBeans().get(0);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            if (!traceBean.getMsgId().equals(key)) {</span>
+<span class="fc" id="L54">                continue;</span>
+            }
+<span class="fc" id="L56">            messageTraceView.setCostTime(context.getCostTime());</span>
+<span class="fc" id="L57">            messageTraceView.setGroupName(context.getGroupName());</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            if (context.isSuccess()) {</span>
+<span class="fc" id="L59">                messageTraceView.setStatus(&quot;success&quot;);</span>
+            } else {
+<span class="nc" id="L61">                messageTraceView.setStatus(&quot;failed&quot;);</span>
+            }
+<span class="fc" id="L63">            messageTraceView.setKeys(traceBean.getKeys());</span>
+<span class="fc" id="L64">            messageTraceView.setMsgId(traceBean.getMsgId());</span>
+<span class="fc" id="L65">            messageTraceView.setTags(traceBean.getTags());</span>
+<span class="fc" id="L66">            messageTraceView.setTopic(traceBean.getTopic());</span>
+<span class="fc" id="L67">            messageTraceView.setMsgType(context.getTraceType().name());</span>
+<span class="fc" id="L68">            messageTraceView.setOffSetMsgId(traceBean.getOffsetMsgId());</span>
+<span class="fc" id="L69">            messageTraceView.setTimeStamp(context.getTimeStamp());</span>
+<span class="fc" id="L70">            messageTraceView.setStoreHost(traceBean.getStoreHost());</span>
+<span class="fc" id="L71">            messageTraceView.setClientHost(messageExt.getBornHostString());</span>
+<span class="fc" id="L72">            messageTraceViewList.add(messageTraceView);</span>
+<span class="fc" id="L73">        }</span>
+<span class="fc" id="L74">        return messageTraceViewList;</span>
+    }
+
+    public String getMsgId() {
+<span class="fc" id="L78">        return msgId;</span>
+    }
+
+    public void setMsgId(String msgId) {
+<span class="fc" id="L82">        this.msgId = msgId;</span>
+<span class="fc" id="L83">    }</span>
+
+    public String getTags() {
+<span class="nc" id="L86">        return tags;</span>
+    }
+
+    public void setTags(String tags) {
+<span class="fc" id="L90">        this.tags = tags;</span>
+<span class="fc" id="L91">    }</span>
+
+    public String getKeys() {
+<span class="nc" id="L94">        return keys;</span>
+    }
+
+    public void setKeys(String keys) {
+<span class="fc" id="L98">        this.keys = keys;</span>
+<span class="fc" id="L99">    }</span>
+
+    public String getStoreHost() {
+<span class="nc" id="L102">        return storeHost;</span>
+    }
+
+    public void setStoreHost(String storeHost) {
+<span class="fc" id="L106">        this.storeHost = storeHost;</span>
+<span class="fc" id="L107">    }</span>
+
+    public String getClientHost() {
+<span class="nc" id="L110">        return clientHost;</span>
+    }
+
+    public void setClientHost(String clientHost) {
+<span class="fc" id="L114">        this.clientHost = clientHost;</span>
+<span class="fc" id="L115">    }</span>
+
+    public int getCostTime() {
+<span class="nc" id="L118">        return costTime;</span>
+    }
+
+    public void setCostTime(int costTime) {
+<span class="fc" id="L122">        this.costTime = costTime;</span>
+<span class="fc" id="L123">    }</span>
+
+    public String getMsgType() {
+<span class="nc" id="L126">        return msgType;</span>
+    }
+
+    public void setMsgType(String msgType) {
+<span class="fc" id="L130">        this.msgType = msgType;</span>
+<span class="fc" id="L131">    }</span>
+
+    public String getOffSetMsgId() {
+<span class="nc" id="L134">        return offSetMsgId;</span>
+    }
+
+    public void setOffSetMsgId(String offSetMsgId) {
+<span class="fc" id="L138">        this.offSetMsgId = offSetMsgId;</span>
+<span class="fc" id="L139">    }</span>
+
+    public long getTimeStamp() {
+<span class="nc" id="L142">        return timeStamp;</span>
+    }
+
+    public void setTimeStamp(long timeStamp) {
+<span class="fc" id="L146">        this.timeStamp = timeStamp;</span>
+<span class="fc" id="L147">    }</span>
+
+    public long getBornTime() {
+<span class="nc" id="L150">        return bornTime;</span>
+    }
+
+    public void setBornTime(long bornTime) {
+<span class="nc" id="L154">        this.bornTime = bornTime;</span>
+<span class="nc" id="L155">    }</span>
+
+    public String getTopic() {
+<span class="nc" id="L158">        return topic;</span>
+    }
+
+    public void setTopic(String topic) {
+<span class="fc" id="L162">        this.topic = topic;</span>
+<span class="fc" id="L163">    }</span>
+
+    public String getGroupName() {
+<span class="nc" id="L166">        return groupName;</span>
+    }
+
+    public void setGroupName(String groupName) {
+<span class="fc" id="L170">        this.groupName = groupName;</span>
+<span class="fc" id="L171">    }</span>
+
+    public String getStatus() {
+<span class="nc" id="L174">        return status;</span>
+    }
+
+    public void setStatus(String status) {
+<span class="fc" id="L178">        this.status = status;</span>
+<span class="fc" id="L179">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

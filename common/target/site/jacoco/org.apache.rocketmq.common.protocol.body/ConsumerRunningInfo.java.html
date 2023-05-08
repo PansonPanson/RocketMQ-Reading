@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumerRunningInfo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.body</a> &gt; <span class="el_source">ConsumerRunningInfo.java</span></div><h1>ConsumerRunningInfo.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.protocol.body;
+
+import java.util.Iterator;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.protocol.heartbeat.ConsumeType;
+import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
+import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
+
+<span class="fc" id="L30">public class ConsumerRunningInfo extends RemotingSerializable {</span>
+    public static final String PROP_NAMESERVER_ADDR = &quot;PROP_NAMESERVER_ADDR&quot;;
+    public static final String PROP_THREADPOOL_CORE_SIZE = &quot;PROP_THREADPOOL_CORE_SIZE&quot;;
+    public static final String PROP_CONSUME_ORDERLY = &quot;PROP_CONSUMEORDERLY&quot;;
+    public static final String PROP_CONSUME_TYPE = &quot;PROP_CONSUME_TYPE&quot;;
+    public static final String PROP_CLIENT_VERSION = &quot;PROP_CLIENT_VERSION&quot;;
+    public static final String PROP_CONSUMER_START_TIMESTAMP = &quot;PROP_CONSUMER_START_TIMESTAMP&quot;;
+
+<span class="fc" id="L38">    private Properties properties = new Properties();</span>
+
+<span class="fc" id="L40">    private TreeSet&lt;SubscriptionData&gt; subscriptionSet = new TreeSet&lt;SubscriptionData&gt;();</span>
+
+<span class="fc" id="L42">    private TreeMap&lt;MessageQueue, ProcessQueueInfo&gt; mqTable = new TreeMap&lt;MessageQueue, ProcessQueueInfo&gt;();</span>
+
+<span class="fc" id="L44">    private TreeMap&lt;MessageQueue, PopProcessQueueInfo&gt; mqPopTable = new TreeMap&lt;MessageQueue, PopProcessQueueInfo&gt;();</span>
+
+<span class="fc" id="L46">    private TreeMap&lt;String/* Topic */, ConsumeStatus&gt; statusTable = new TreeMap&lt;String, ConsumeStatus&gt;();</span>
+
+<span class="fc" id="L48">    private TreeMap&lt;String, String&gt; userConsumerInfo = new TreeMap&lt;String, String&gt;();</span>
+
+    private String jstack;
+
+    public static boolean analyzeSubscription(final TreeMap&lt;String/* clientId */, ConsumerRunningInfo&gt; criTable) {
+<span class="fc" id="L53">        ConsumerRunningInfo prev = criTable.firstEntry().getValue();</span>
+
+<span class="fc" id="L55">        boolean push = false;</span>
+        {
+<span class="fc" id="L57">            String property = prev.getProperties().getProperty(ConsumerRunningInfo.PROP_CONSUME_TYPE);</span>
+
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (property == null) {</span>
+<span class="fc" id="L60">                property = ((ConsumeType) prev.getProperties().get(ConsumerRunningInfo.PROP_CONSUME_TYPE)).name();</span>
+            }
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            push = ConsumeType.valueOf(property) == ConsumeType.CONSUME_PASSIVELY;</span>
+        }
+
+<span class="fc" id="L65">        boolean startForAWhile = false;</span>
+        {
+
+<span class="fc" id="L68">            String property = prev.getProperties().getProperty(ConsumerRunningInfo.PROP_CONSUMER_START_TIMESTAMP);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (property == null) {</span>
+<span class="fc" id="L70">                property = String.valueOf(prev.getProperties().get(ConsumerRunningInfo.PROP_CONSUMER_START_TIMESTAMP));</span>
+            }
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            startForAWhile = (System.currentTimeMillis() - Long.parseLong(property)) &gt; (1000 * 60 * 2);</span>
+        }
+
+<span class="pc bpc" id="L75" title="3 of 4 branches missed.">        if (push &amp;&amp; startForAWhile) {</span>
+
+            {
+<span class="nc" id="L78">                Iterator&lt;Entry&lt;String, ConsumerRunningInfo&gt;&gt; it = criTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                while (it.hasNext()) {</span>
+<span class="nc" id="L80">                    Entry&lt;String, ConsumerRunningInfo&gt; next = it.next();</span>
+<span class="nc" id="L81">                    ConsumerRunningInfo current = next.getValue();</span>
+<span class="nc" id="L82">                    boolean equals = current.getSubscriptionSet().equals(prev.getSubscriptionSet());</span>
+
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                    if (!equals) {</span>
+                        // Different subscription in the same group of consumer
+<span class="nc" id="L86">                        return false;</span>
+                    }
+
+<span class="nc" id="L89">                    prev = next.getValue();</span>
+<span class="nc" id="L90">                }</span>
+
+                // after consumer.unsubscribe , SubscriptionSet is Empty
+                //if (prev != null) {
+                //
+                //    if (prev.getSubscriptionSet().isEmpty()) {
+                //        // Subscription empty!
+                //        return false;
+                //    }
+                //}
+            }
+        }
+
+<span class="fc" id="L103">        return true;</span>
+    }
+
+    public static boolean analyzeRebalance(final TreeMap&lt;String/* clientId */, ConsumerRunningInfo&gt; criTable) {
+<span class="fc" id="L107">        return true;</span>
+    }
+
+    public static String analyzeProcessQueue(final String clientId, ConsumerRunningInfo info) {
+<span class="fc" id="L111">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L112">        boolean push = false;</span>
+        {
+<span class="fc" id="L114">            String property = info.getProperties().getProperty(ConsumerRunningInfo.PROP_CONSUME_TYPE);</span>
+
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (property == null) {</span>
+<span class="fc" id="L117">                property = ((ConsumeType) info.getProperties().get(ConsumerRunningInfo.PROP_CONSUME_TYPE)).name();</span>
+            }
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            push = ConsumeType.valueOf(property) == ConsumeType.CONSUME_PASSIVELY;</span>
+        }
+
+<span class="fc" id="L122">        boolean orderMsg = false;</span>
+        {
+<span class="fc" id="L124">            String property = info.getProperties().getProperty(ConsumerRunningInfo.PROP_CONSUME_ORDERLY);</span>
+<span class="fc" id="L125">            orderMsg = Boolean.parseBoolean(property);</span>
+        }
+
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (push) {</span>
+<span class="nc" id="L129">            Iterator&lt;Entry&lt;MessageQueue, ProcessQueueInfo&gt;&gt; it = info.getMqTable().entrySet().iterator();</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L131">                Entry&lt;MessageQueue, ProcessQueueInfo&gt; next = it.next();</span>
+<span class="nc" id="L132">                MessageQueue mq = next.getKey();</span>
+<span class="nc" id="L133">                ProcessQueueInfo pq = next.getValue();</span>
+
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                if (orderMsg) {</span>
+
+<span class="nc bnc" id="L137" title="All 2 branches missed.">                    if (!pq.isLocked()) {</span>
+<span class="nc" id="L138">                        sb.append(String.format(&quot;%s %s can't lock for a while, %dms%n&quot;,</span>
+                            clientId,
+                            mq,
+<span class="nc" id="L141">                            System.currentTimeMillis() - pq.getLastLockTimestamp()));</span>
+                    } else {
+<span class="nc bnc" id="L143" title="All 4 branches missed.">                        if (pq.isDroped() &amp;&amp; (pq.getTryUnlockTimes() &gt; 0)) {</span>
+<span class="nc" id="L144">                            sb.append(String.format(&quot;%s %s unlock %d times, still failed%n&quot;,</span>
+                                clientId,
+                                mq,
+<span class="nc" id="L147">                                pq.getTryUnlockTimes()));</span>
+                        }
+                    }
+
+                } else {
+<span class="nc" id="L152">                    long diff = System.currentTimeMillis() - pq.getLastConsumeTimestamp();</span>
+
+<span class="nc bnc" id="L154" title="All 4 branches missed.">                    if (diff &gt; (1000 * 60) &amp;&amp; pq.getCachedMsgCount() &gt; 0) {</span>
+<span class="nc" id="L155">                        sb.append(String.format(&quot;%s %s can't consume for a while, maybe blocked, %dms%n&quot;,</span>
+                            clientId,
+                            mq,
+<span class="nc" id="L158">                            diff));</span>
+                    }
+                }
+<span class="nc" id="L161">            }</span>
+        }
+
+<span class="fc" id="L164">        return sb.toString();</span>
+    }
+
+    public Properties getProperties() {
+<span class="fc" id="L168">        return properties;</span>
+    }
+
+    public void setProperties(Properties properties) {
+<span class="fc" id="L172">        this.properties = properties;</span>
+<span class="fc" id="L173">    }</span>
+
+    public TreeSet&lt;SubscriptionData&gt; getSubscriptionSet() {
+<span class="fc" id="L176">        return subscriptionSet;</span>
+    }
+
+    public void setSubscriptionSet(TreeSet&lt;SubscriptionData&gt; subscriptionSet) {
+<span class="fc" id="L180">        this.subscriptionSet = subscriptionSet;</span>
+<span class="fc" id="L181">    }</span>
+
+    public TreeMap&lt;MessageQueue, ProcessQueueInfo&gt; getMqTable() {
+<span class="fc" id="L184">        return mqTable;</span>
+    }
+
+    public void setMqTable(TreeMap&lt;MessageQueue, ProcessQueueInfo&gt; mqTable) {
+<span class="fc" id="L188">        this.mqTable = mqTable;</span>
+<span class="fc" id="L189">    }</span>
+
+    public TreeMap&lt;String, ConsumeStatus&gt; getStatusTable() {
+<span class="fc" id="L192">        return statusTable;</span>
+    }
+
+    public void setStatusTable(TreeMap&lt;String, ConsumeStatus&gt; statusTable) {
+<span class="fc" id="L196">        this.statusTable = statusTable;</span>
+<span class="fc" id="L197">    }</span>
+
+    public TreeMap&lt;String, String&gt; getUserConsumerInfo() {
+<span class="fc" id="L200">        return userConsumerInfo;</span>
+    }
+
+    public String formatString() {
+<span class="nc" id="L204">        StringBuilder sb = new StringBuilder();</span>
+
+        {
+<span class="nc" id="L207">            sb.append(&quot;#Consumer Properties#\n&quot;);</span>
+<span class="nc" id="L208">            Iterator&lt;Entry&lt;Object, Object&gt;&gt; it = this.properties.entrySet().iterator();</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L210">                Entry&lt;Object, Object&gt; next = it.next();</span>
+<span class="nc" id="L211">                String item = String.format(&quot;%-40s: %s%n&quot;, next.getKey().toString(), next.getValue().toString());</span>
+<span class="nc" id="L212">                sb.append(item);</span>
+<span class="nc" id="L213">            }</span>
+        }
+
+        {
+<span class="nc" id="L217">            sb.append(&quot;\n\n#Consumer Subscription#\n&quot;);</span>
+
+<span class="nc" id="L219">            Iterator&lt;SubscriptionData&gt; it = this.subscriptionSet.iterator();</span>
+<span class="nc" id="L220">            int i = 0;</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L222">                SubscriptionData next = it.next();</span>
+<span class="nc" id="L223">                String item = String.format(&quot;%03d Topic: %-40s ClassFilter: %-8s SubExpression: %s%n&quot;,</span>
+<span class="nc" id="L224">                    ++i,</span>
+<span class="nc" id="L225">                    next.getTopic(),</span>
+<span class="nc" id="L226">                    next.isClassFilterMode(),</span>
+<span class="nc" id="L227">                    next.getSubString());</span>
+
+<span class="nc" id="L229">                sb.append(item);</span>
+<span class="nc" id="L230">            }</span>
+        }
+
+        {
+<span class="nc" id="L234">            sb.append(&quot;\n\n#Consumer Offset#\n&quot;);</span>
+<span class="nc" id="L235">            sb.append(String.format(&quot;%-64s  %-32s  %-4s  %-20s%n&quot;,</span>
+                &quot;#Topic&quot;,
+                &quot;#Broker Name&quot;,
+                &quot;#QID&quot;,
+                &quot;#Consumer Offset&quot;
+            ));
+
+<span class="nc" id="L242">            Iterator&lt;Entry&lt;MessageQueue, ProcessQueueInfo&gt;&gt; it = this.mqTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L244">                Entry&lt;MessageQueue, ProcessQueueInfo&gt; next = it.next();</span>
+<span class="nc" id="L245">                String item = String.format(&quot;%-32s  %-32s  %-4d  %-20d%n&quot;,</span>
+<span class="nc" id="L246">                    next.getKey().getTopic(),</span>
+<span class="nc" id="L247">                    next.getKey().getBrokerName(),</span>
+<span class="nc" id="L248">                    next.getKey().getQueueId(),</span>
+<span class="nc" id="L249">                    next.getValue().getCommitOffset());</span>
+
+<span class="nc" id="L251">                sb.append(item);</span>
+<span class="nc" id="L252">            }</span>
+        }
+
+        {
+<span class="nc" id="L256">            sb.append(&quot;\n\n#Consumer MQ Detail#\n&quot;);</span>
+<span class="nc" id="L257">            sb.append(String.format(&quot;%-64s  %-32s  %-4s  %-20s%n&quot;,</span>
+                &quot;#Topic&quot;,
+                &quot;#Broker Name&quot;,
+                &quot;#QID&quot;,
+                &quot;#ProcessQueueInfo&quot;
+            ));
+
+<span class="nc" id="L264">            Iterator&lt;Entry&lt;MessageQueue, ProcessQueueInfo&gt;&gt; it = this.mqTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L266">                Entry&lt;MessageQueue, ProcessQueueInfo&gt; next = it.next();</span>
+<span class="nc" id="L267">                String item = String.format(&quot;%-64s  %-32s  %-4d  %s%n&quot;,</span>
+<span class="nc" id="L268">                    next.getKey().getTopic(),</span>
+<span class="nc" id="L269">                    next.getKey().getBrokerName(),</span>
+<span class="nc" id="L270">                    next.getKey().getQueueId(),</span>
+<span class="nc" id="L271">                    next.getValue().toString());</span>
+
+<span class="nc" id="L273">                sb.append(item);</span>
+<span class="nc" id="L274">            }</span>
+        }
+
+        {
+<span class="nc" id="L278">            sb.append(&quot;\n\n#Consumer Pop Detail#\n&quot;);</span>
+<span class="nc" id="L279">            sb.append(String.format(&quot;%-32s  %-32s  %-4s  %-20s%n&quot;,</span>
+                &quot;#Topic&quot;,
+                &quot;#Broker Name&quot;,
+                &quot;#QID&quot;,
+                &quot;#ProcessQueueInfo&quot;
+            ));
+
+<span class="nc" id="L286">            Iterator&lt;Entry&lt;MessageQueue, PopProcessQueueInfo&gt;&gt; it = this.mqPopTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L288">                Entry&lt;MessageQueue, PopProcessQueueInfo&gt; next = it.next();</span>
+<span class="nc" id="L289">                String item = String.format(&quot;%-32s  %-32s  %-4d  %s%n&quot;,</span>
+<span class="nc" id="L290">                    next.getKey().getTopic(),</span>
+<span class="nc" id="L291">                    next.getKey().getBrokerName(),</span>
+<span class="nc" id="L292">                    next.getKey().getQueueId(),</span>
+<span class="nc" id="L293">                    next.getValue().toString());</span>
+
+<span class="nc" id="L295">                sb.append(item);</span>
+<span class="nc" id="L296">            }</span>
+        }
+
+        {
+<span class="nc" id="L300">            sb.append(&quot;\n\n#Consumer RT&amp;TPS#\n&quot;);</span>
+<span class="nc" id="L301">            sb.append(String.format(&quot;%-64s  %14s %14s %14s %14s %18s %25s%n&quot;,</span>
+                &quot;#Topic&quot;,
+                &quot;#Pull RT&quot;,
+                &quot;#Pull TPS&quot;,
+                &quot;#Consume RT&quot;,
+                &quot;#ConsumeOK TPS&quot;,
+                &quot;#ConsumeFailed TPS&quot;,
+                &quot;#ConsumeFailedMsgsInHour&quot;
+            ));
+
+<span class="nc" id="L311">            Iterator&lt;Entry&lt;String, ConsumeStatus&gt;&gt; it = this.statusTable.entrySet().iterator();</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L313">                Entry&lt;String, ConsumeStatus&gt; next = it.next();</span>
+<span class="nc" id="L314">                String item = String.format(&quot;%-32s  %14.2f %14.2f %14.2f %14.2f %18.2f %25d%n&quot;,</span>
+<span class="nc" id="L315">                    next.getKey(),</span>
+<span class="nc" id="L316">                    next.getValue().getPullRT(),</span>
+<span class="nc" id="L317">                    next.getValue().getPullTPS(),</span>
+<span class="nc" id="L318">                    next.getValue().getConsumeRT(),</span>
+<span class="nc" id="L319">                    next.getValue().getConsumeOKTPS(),</span>
+<span class="nc" id="L320">                    next.getValue().getConsumeFailedTPS(),</span>
+<span class="nc" id="L321">                    next.getValue().getConsumeFailedMsgs()</span>
+                );
+
+<span class="nc" id="L324">                sb.append(item);</span>
+<span class="nc" id="L325">            }</span>
+        }
+
+<span class="nc bnc" id="L328" title="All 2 branches missed.">        if (this.userConsumerInfo != null) {</span>
+<span class="nc" id="L329">            sb.append(&quot;\n\n#User Consume Info#\n&quot;);</span>
+<span class="nc" id="L330">            Iterator&lt;Entry&lt;String, String&gt;&gt; it = this.userConsumerInfo.entrySet().iterator();</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L332">                Entry&lt;String, String&gt; next = it.next();</span>
+<span class="nc" id="L333">                String item = String.format(&quot;%-40s: %s%n&quot;, next.getKey(), next.getValue());</span>
+<span class="nc" id="L334">                sb.append(item);</span>
+<span class="nc" id="L335">            }</span>
+        }
+
+<span class="nc bnc" id="L338" title="All 2 branches missed.">        if (this.jstack != null) {</span>
+<span class="nc" id="L339">            sb.append(&quot;\n\n#Consumer jstack#\n&quot;);</span>
+<span class="nc" id="L340">            sb.append(this.jstack);</span>
+        }
+
+<span class="nc" id="L343">        return sb.toString();</span>
+    }
+
+    public String getJstack() {
+<span class="fc" id="L347">        return jstack;</span>
+    }
+
+    public void setJstack(String jstack) {
+<span class="fc" id="L351">        this.jstack = jstack;</span>
+<span class="fc" id="L352">    }</span>
+
+    public TreeMap&lt;MessageQueue, PopProcessQueueInfo&gt; getMqPopTable() {
+<span class="fc" id="L355">        return mqPopTable;</span>
+    }
+
+    public void setMqPopTable(
+        TreeMap&lt;MessageQueue, PopProcessQueueInfo&gt; mqPopTable) {
+<span class="fc" id="L360">        this.mqPopTable = mqPopTable;</span>
+<span class="fc" id="L361">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

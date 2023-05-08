@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.rpc</a> &gt; <span class="el_source">RequestBuilder.java</span></div><h1>RequestBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.rpc;
+
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.protocol.RequestCode;
+import org.apache.rocketmq.common.protocol.header.PullMessageRequestHeader;
+
+import java.util.HashMap;
+import java.util.Map;
+
+<span class="nc" id="L26">public class RequestBuilder {</span>
+
+<span class="nc" id="L28">    private static Map&lt;Integer, Class&gt; requestCodeMap = new HashMap&lt;Integer, Class&gt;();</span>
+    static {
+<span class="nc" id="L30">        requestCodeMap.put(RequestCode.PULL_MESSAGE, PullMessageRequestHeader.class);</span>
+<span class="nc" id="L31">    }</span>
+
+    public static RpcRequestHeader buildCommonRpcHeader(int requestCode, String destBrokerName) {
+<span class="nc" id="L34">        return buildCommonRpcHeader(requestCode, null, destBrokerName);</span>
+    }
+
+    public static RpcRequestHeader buildCommonRpcHeader(int requestCode, Boolean oneway, String destBrokerName) {
+<span class="nc" id="L38">        Class requestHeaderClass = requestCodeMap.get(requestCode);</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        if (requestHeaderClass == null) {</span>
+<span class="nc" id="L40">            throw new UnsupportedOperationException(&quot;unknown &quot; + requestCode);</span>
+        }
+        try {
+<span class="nc" id="L43">            RpcRequestHeader requestHeader = (RpcRequestHeader) requestHeaderClass.newInstance();</span>
+<span class="nc" id="L44">            requestHeader.setOway(oneway);</span>
+<span class="nc" id="L45">            requestHeader.setBname(destBrokerName);</span>
+<span class="nc" id="L46">            return requestHeader;</span>
+<span class="nc" id="L47">        } catch (Throwable t) {</span>
+<span class="nc" id="L48">            throw new RuntimeException(t);</span>
+        }
+    }
+
+    public static TopicQueueRequestHeader buildTopicQueueRequestHeader(int requestCode, MessageQueue mq) {
+<span class="nc" id="L53">        return buildTopicQueueRequestHeader(requestCode, null, mq.getBrokerName(), mq.getTopic(), mq.getQueueId(), null);</span>
+    }
+
+    public static TopicQueueRequestHeader buildTopicQueueRequestHeader(int requestCode, MessageQueue mq, Boolean logic) {
+<span class="nc" id="L57">        return buildTopicQueueRequestHeader(requestCode, null, mq.getBrokerName(), mq.getTopic(), mq.getQueueId(), logic);</span>
+    }
+
+    public static TopicQueueRequestHeader buildTopicQueueRequestHeader(int requestCode, Boolean oneway, MessageQueue mq, Boolean logic) {
+<span class="nc" id="L61">        return buildTopicQueueRequestHeader(requestCode, oneway, mq.getBrokerName(), mq.getTopic(), mq.getQueueId(), logic);</span>
+    }
+
+    public static TopicQueueRequestHeader buildTopicQueueRequestHeader(int requestCode,  Boolean oneway, String destBrokerName, String topic, int queueId, Boolean logic) {
+<span class="nc" id="L65">        Class requestHeaderClass = requestCodeMap.get(requestCode);</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (requestHeaderClass == null) {</span>
+<span class="nc" id="L67">            throw new UnsupportedOperationException(&quot;unknown &quot; + requestCode);</span>
+        }
+        try {
+<span class="nc" id="L70">            TopicQueueRequestHeader requestHeader = (TopicQueueRequestHeader) requestHeaderClass.newInstance();</span>
+<span class="nc" id="L71">            requestHeader.setOway(oneway);</span>
+<span class="nc" id="L72">            requestHeader.setBname(destBrokerName);</span>
+<span class="nc" id="L73">            requestHeader.setTopic(topic);</span>
+<span class="nc" id="L74">            requestHeader.setQueueId(queueId);</span>
+<span class="nc" id="L75">            requestHeader.setLo(logic);</span>
+<span class="nc" id="L76">            return requestHeader;</span>
+<span class="nc" id="L77">        } catch (Throwable t) {</span>
+<span class="nc" id="L78">            throw new RuntimeException(t);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

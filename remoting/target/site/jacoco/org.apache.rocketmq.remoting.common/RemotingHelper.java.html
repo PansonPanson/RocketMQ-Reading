@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RemotingHelper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-remoting 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.remoting.common</a> &gt; <span class="el_source">RemotingHelper.java</span></div><h1>RemotingHelper.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.remoting.common;
+
+import io.netty.channel.Channel;
+import io.netty.util.Attribute;
+import io.netty.util.AttributeKey;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+import org.apache.rocketmq.remoting.exception.RemotingCommandException;
+import org.apache.rocketmq.remoting.exception.RemotingConnectException;
+import org.apache.rocketmq.remoting.exception.RemotingSendRequestException;
+import org.apache.rocketmq.remoting.exception.RemotingTimeoutException;
+import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+
+<span class="nc" id="L36">public class RemotingHelper {</span>
+    public static final String ROCKETMQ_REMOTING = &quot;RocketmqRemoting&quot;;
+    public static final String DEFAULT_CHARSET = &quot;UTF-8&quot;;
+
+<span class="fc" id="L40">    private static final InternalLogger log = InternalLoggerFactory.getLogger(ROCKETMQ_REMOTING);</span>
+<span class="fc" id="L41">    private static final AttributeKey&lt;String&gt; REMOTE_ADDR_KEY = AttributeKey.valueOf(&quot;RemoteAddr&quot;);</span>
+
+    public static String exceptionSimpleDesc(final Throwable e) {
+<span class="nc" id="L44">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (e != null) {</span>
+<span class="nc" id="L46">            sb.append(e.toString());</span>
+
+<span class="nc" id="L48">            StackTraceElement[] stackTrace = e.getStackTrace();</span>
+<span class="nc bnc" id="L49" title="All 4 branches missed.">            if (stackTrace != null &amp;&amp; stackTrace.length &gt; 0) {</span>
+<span class="nc" id="L50">                StackTraceElement element = stackTrace[0];</span>
+<span class="nc" id="L51">                sb.append(&quot;, &quot;);</span>
+<span class="nc" id="L52">                sb.append(element.toString());</span>
+            }
+        }
+
+<span class="nc" id="L56">        return sb.toString();</span>
+    }
+
+    public static SocketAddress string2SocketAddress(final String addr) {
+<span class="fc" id="L60">        int split = addr.lastIndexOf(&quot;:&quot;);</span>
+<span class="fc" id="L61">        String host = addr.substring(0, split);</span>
+<span class="fc" id="L62">        String port = addr.substring(split + 1);</span>
+<span class="fc" id="L63">        InetSocketAddress isa = new InetSocketAddress(host, Integer.parseInt(port));</span>
+<span class="fc" id="L64">        return isa;</span>
+    }
+
+    public static RemotingCommand invokeSync(final String addr, final RemotingCommand request,
+        final long timeoutMillis) throws InterruptedException, RemotingConnectException,
+        RemotingSendRequestException, RemotingTimeoutException, RemotingCommandException {
+<span class="nc" id="L70">        long beginTime = System.currentTimeMillis();</span>
+<span class="nc" id="L71">        SocketAddress socketAddress = RemotingUtil.string2SocketAddress(addr);</span>
+<span class="nc" id="L72">        SocketChannel socketChannel = RemotingUtil.connect(socketAddress);</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (socketChannel != null) {</span>
+<span class="nc" id="L74">            boolean sendRequestOK = false;</span>
+
+            try {
+
+<span class="nc" id="L78">                socketChannel.configureBlocking(true);</span>
+
+                //bugfix  http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4614802
+<span class="nc" id="L81">                socketChannel.socket().setSoTimeout((int) timeoutMillis);</span>
+
+<span class="nc" id="L83">                ByteBuffer byteBufferRequest = request.encode();</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                while (byteBufferRequest.hasRemaining()) {</span>
+<span class="nc" id="L85">                    int length = socketChannel.write(byteBufferRequest);</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                    if (length &gt; 0) {</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">                        if (byteBufferRequest.hasRemaining()) {</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                            if ((System.currentTimeMillis() - beginTime) &gt; timeoutMillis) {</span>
+
+<span class="nc" id="L90">                                throw new RemotingSendRequestException(addr);</span>
+                            }
+                        }
+                    } else {
+<span class="nc" id="L94">                        throw new RemotingSendRequestException(addr);</span>
+                    }
+
+<span class="nc" id="L97">                    Thread.sleep(1);</span>
+<span class="nc" id="L98">                }</span>
+
+<span class="nc" id="L100">                sendRequestOK = true;</span>
+
+<span class="nc" id="L102">                ByteBuffer byteBufferSize = ByteBuffer.allocate(4);</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                while (byteBufferSize.hasRemaining()) {</span>
+<span class="nc" id="L104">                    int length = socketChannel.read(byteBufferSize);</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                    if (length &gt; 0) {</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                        if (byteBufferSize.hasRemaining()) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                            if ((System.currentTimeMillis() - beginTime) &gt; timeoutMillis) {</span>
+
+<span class="nc" id="L109">                                throw new RemotingTimeoutException(addr, timeoutMillis);</span>
+                            }
+                        }
+                    } else {
+<span class="nc" id="L113">                        throw new RemotingTimeoutException(addr, timeoutMillis);</span>
+                    }
+
+<span class="nc" id="L116">                    Thread.sleep(1);</span>
+<span class="nc" id="L117">                }</span>
+
+<span class="nc" id="L119">                int size = byteBufferSize.getInt(0);</span>
+<span class="nc" id="L120">                ByteBuffer byteBufferBody = ByteBuffer.allocate(size);</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                while (byteBufferBody.hasRemaining()) {</span>
+<span class="nc" id="L122">                    int length = socketChannel.read(byteBufferBody);</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                    if (length &gt; 0) {</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                        if (byteBufferBody.hasRemaining()) {</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                            if ((System.currentTimeMillis() - beginTime) &gt; timeoutMillis) {</span>
+
+<span class="nc" id="L127">                                throw new RemotingTimeoutException(addr, timeoutMillis);</span>
+                            }
+                        }
+                    } else {
+<span class="nc" id="L131">                        throw new RemotingTimeoutException(addr, timeoutMillis);</span>
+                    }
+
+<span class="nc" id="L134">                    Thread.sleep(1);</span>
+<span class="nc" id="L135">                }</span>
+
+<span class="nc" id="L137">                byteBufferBody.flip();</span>
+<span class="nc" id="L138">                return RemotingCommand.decode(byteBufferBody);</span>
+<span class="nc" id="L139">            } catch (IOException e) {</span>
+<span class="nc" id="L140">                log.error(&quot;invokeSync failure&quot;, e);</span>
+
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                if (sendRequestOK) {</span>
+<span class="nc" id="L143">                    throw new RemotingTimeoutException(addr, timeoutMillis);</span>
+                } else {
+<span class="nc" id="L145">                    throw new RemotingSendRequestException(addr);</span>
+                }
+            } finally {
+                try {
+<span class="nc" id="L149">                    socketChannel.close();</span>
+<span class="nc" id="L150">                } catch (IOException e) {</span>
+<span class="nc" id="L151">                    e.printStackTrace();</span>
+<span class="nc" id="L152">                }</span>
+            }
+        } else {
+<span class="nc" id="L155">            throw new RemotingConnectException(addr);</span>
+        }
+    }
+
+    public static String parseChannelRemoteAddr(final Channel channel) {
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (null == channel) {</span>
+<span class="nc" id="L161">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L163">        Attribute&lt;String&gt; att = channel.attr(REMOTE_ADDR_KEY);</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (att == null) {</span>
+            // mocked in unit test
+<span class="nc" id="L166">            return parseChannelRemoteAddr0(channel);</span>
+        }
+<span class="fc" id="L168">        String addr = att.get();</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (addr == null) {</span>
+<span class="fc" id="L170">            addr = parseChannelRemoteAddr0(channel);</span>
+<span class="fc" id="L171">            att.set(addr);</span>
+        }
+<span class="fc" id="L173">        return addr;</span>
+    }
+
+    private static String parseChannelRemoteAddr0(final Channel channel) {
+<span class="fc" id="L177">        SocketAddress remote = channel.remoteAddress();</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        final String addr = remote != null ? remote.toString() : &quot;&quot;;</span>
+
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (addr.length() &gt; 0) {</span>
+<span class="fc" id="L181">            int index = addr.lastIndexOf(&quot;/&quot;);</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">            if (index &gt;= 0) {</span>
+<span class="fc" id="L183">                return addr.substring(index + 1);</span>
+            }
+
+<span class="nc" id="L186">            return addr;</span>
+        }
+
+<span class="nc" id="L189">        return &quot;&quot;;</span>
+    }
+
+    public static String parseHostFromAddress(String address) {
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (address == null) {</span>
+<span class="nc" id="L194">            return &quot;&quot;;</span>
+        }
+
+<span class="nc" id="L197">        String[] addressSplits = address.split(&quot;:&quot;);</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        if (addressSplits.length &lt; 1) {</span>
+<span class="nc" id="L199">            return &quot;&quot;;</span>
+        }
+
+<span class="nc" id="L202">        return addressSplits[0];</span>
+    }
+
+    public static String parseSocketAddressAddr(SocketAddress socketAddress) {
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (socketAddress != null) {</span>
+            // Default toString of InetSocketAddress is &quot;hostName/IP:port&quot;
+<span class="fc" id="L208">            final String addr = socketAddress.toString();</span>
+<span class="fc" id="L209">            int index = addr.lastIndexOf(&quot;/&quot;);</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            return (index != -1) ? addr.substring(index + 1) : addr;</span>
+        }
+<span class="nc" id="L212">        return &quot;&quot;;</span>
+    }
+
+    public static int parseSocketAddressPort(SocketAddress socketAddress) {
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (socketAddress instanceof InetSocketAddress) {</span>
+<span class="fc" id="L217">            return ((InetSocketAddress) socketAddress).getPort();</span>
+        }
+<span class="nc" id="L219">        return -1;</span>
+    }
+
+
+    public static int ipToInt(String ip) {
+<span class="nc" id="L224">        String[] ips = ip.split(&quot;\\.&quot;);</span>
+<span class="nc" id="L225">        return (Integer.parseInt(ips[0]) &lt;&lt; 24)</span>
+<span class="nc" id="L226">            | (Integer.parseInt(ips[1]) &lt;&lt; 16)</span>
+<span class="nc" id="L227">            | (Integer.parseInt(ips[2]) &lt;&lt; 8)</span>
+<span class="nc" id="L228">            | Integer.parseInt(ips[3]);</span>
+    }
+
+    public static boolean ipInCIDR(String ip, String cidr) {
+<span class="nc" id="L232">        int ipAddr = ipToInt(ip);</span>
+<span class="nc" id="L233">        String[] cidrArr = cidr.split(&quot;/&quot;);</span>
+<span class="nc" id="L234">        int netId = Integer.parseInt(cidrArr[1]);</span>
+<span class="nc" id="L235">        int mask = 0xFFFFFFFF &lt;&lt; (32 - netId);</span>
+<span class="nc" id="L236">        int cidrIpAddr = ipToInt(cidrArr[0]);</span>
+
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        return (ipAddr &amp; mask) == (cidrIpAddr &amp; mask);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RpcClientImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.rpc</a> &gt; <span class="el_source">RpcClientImpl.java</span></div><h1>RpcClientImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.rpc;
+
+import io.netty.util.concurrent.ImmediateEventExecutor;
+import io.netty.util.concurrent.Promise;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Future;
+import org.apache.rocketmq.common.admin.TopicStatsTable;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.protocol.RequestCode;
+import org.apache.rocketmq.common.protocol.ResponseCode;
+import org.apache.rocketmq.common.protocol.header.GetEarliestMsgStoretimeResponseHeader;
+import org.apache.rocketmq.common.protocol.header.GetMaxOffsetResponseHeader;
+import org.apache.rocketmq.common.protocol.header.GetMinOffsetResponseHeader;
+import org.apache.rocketmq.common.protocol.header.PullMessageResponseHeader;
+import org.apache.rocketmq.common.protocol.header.QueryConsumerOffsetResponseHeader;
+import org.apache.rocketmq.common.protocol.header.SearchOffsetResponseHeader;
+import org.apache.rocketmq.common.protocol.header.UpdateConsumerOffsetResponseHeader;
+import org.apache.rocketmq.common.statictopic.TopicConfigAndQueueMapping;
+import org.apache.rocketmq.remoting.InvokeCallback;
+import org.apache.rocketmq.remoting.RemotingClient;
+import org.apache.rocketmq.remoting.netty.ResponseFuture;
+import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
+
+<span class="nc bnc" id="L42" title="All 2 branches missed.">public class RpcClientImpl implements RpcClient {</span>
+
+    private ClientMetadata clientMetadata;
+
+    private RemotingClient remotingClient;
+
+<span class="nc" id="L48">    private List&lt;RpcClientHook&gt; clientHookList = new ArrayList&lt;RpcClientHook&gt;();</span>
+
+<span class="nc" id="L50">    public RpcClientImpl(ClientMetadata clientMetadata, RemotingClient remotingClient) {</span>
+<span class="nc" id="L51">        this.clientMetadata = clientMetadata;</span>
+<span class="nc" id="L52">        this.remotingClient = remotingClient;</span>
+<span class="nc" id="L53">    }</span>
+
+    public void registerHook(RpcClientHook hook) {
+<span class="nc" id="L56">        clientHookList.add(hook);</span>
+<span class="nc" id="L57">    }</span>
+
+    @Override
+    public Future&lt;RpcResponse&gt;  invoke(MessageQueue mq, RpcRequest request, long timeoutMs) throws RpcException {
+<span class="nc" id="L61">        String bname =  clientMetadata.getBrokerNameFromMessageQueue(mq);</span>
+<span class="nc" id="L62">        request.getHeader().setBname(bname);</span>
+<span class="nc" id="L63">        return invoke(request, timeoutMs);</span>
+    }
+
+
+    public Promise&lt;RpcResponse&gt; createResponseFuture()  {
+<span class="nc" id="L68">        return ImmediateEventExecutor.INSTANCE.newPromise();</span>
+    }
+
+    @Override
+    public Future&lt;RpcResponse&gt;  invoke(RpcRequest request, long timeoutMs) throws RpcException {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (clientHookList.size() &gt; 0) {</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            for (RpcClientHook rpcClientHook: clientHookList) {</span>
+<span class="nc" id="L75">                RpcResponse response = rpcClientHook.beforeRequest(request);</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                if (response != null) {</span>
+                    //For 1.6, there is not easy-to-use future impl
+<span class="nc" id="L78">                    return createResponseFuture().setSuccess(response);</span>
+                }
+<span class="nc" id="L80">            }</span>
+        }
+<span class="nc" id="L82">        String addr = getBrokerAddrByNameOrException(request.getHeader().bname);</span>
+<span class="nc" id="L83">        Promise&lt;RpcResponse&gt; rpcResponsePromise = null;</span>
+        try {
+<span class="nc bnc" id="L85" title="All 10 branches missed.">            switch (request.getCode()) {</span>
+                case RequestCode.PULL_MESSAGE:
+<span class="nc" id="L87">                    rpcResponsePromise = handlePullMessage(addr, request, timeoutMs);</span>
+<span class="nc" id="L88">                    break;</span>
+                case RequestCode.GET_MIN_OFFSET:
+<span class="nc" id="L90">                    rpcResponsePromise = handleGetMinOffset(addr, request, timeoutMs);</span>
+<span class="nc" id="L91">                    break;</span>
+                case RequestCode.GET_MAX_OFFSET:
+<span class="nc" id="L93">                    rpcResponsePromise = handleGetMaxOffset(addr, request, timeoutMs);</span>
+<span class="nc" id="L94">                    break;</span>
+                case RequestCode.SEARCH_OFFSET_BY_TIMESTAMP:
+<span class="nc" id="L96">                    rpcResponsePromise = handleSearchOffset(addr, request, timeoutMs);</span>
+<span class="nc" id="L97">                    break;</span>
+                case RequestCode.GET_EARLIEST_MSG_STORETIME:
+<span class="nc" id="L99">                    rpcResponsePromise = handleGetEarliestMsgStoretime(addr, request, timeoutMs);</span>
+<span class="nc" id="L100">                    break;</span>
+                case RequestCode.QUERY_CONSUMER_OFFSET:
+<span class="nc" id="L102">                    rpcResponsePromise = handleQueryConsumerOffset(addr, request, timeoutMs);</span>
+<span class="nc" id="L103">                    break;</span>
+                case RequestCode.UPDATE_CONSUMER_OFFSET:
+<span class="nc" id="L105">                    rpcResponsePromise = handleUpdateConsumerOffset(addr, request, timeoutMs);</span>
+<span class="nc" id="L106">                    break;</span>
+                case RequestCode.GET_TOPIC_STATS_INFO:
+<span class="nc" id="L108">                    rpcResponsePromise = handleCommonBodyRequest(addr, request, timeoutMs, TopicStatsTable.class);</span>
+<span class="nc" id="L109">                    break;</span>
+                case RequestCode.GET_TOPIC_CONFIG:
+<span class="nc" id="L111">                    rpcResponsePromise = handleCommonBodyRequest(addr, request, timeoutMs, TopicConfigAndQueueMapping.class);</span>
+<span class="nc" id="L112">                    break;</span>
+                default:
+<span class="nc" id="L114">                    throw new RpcException(ResponseCode.REQUEST_CODE_NOT_SUPPORTED, &quot;Unknown request code &quot; + request.getCode());</span>
+            }
+<span class="nc" id="L116">        } catch (RpcException rpcException) {</span>
+<span class="nc" id="L117">            throw rpcException;</span>
+<span class="nc" id="L118">        } catch (Exception e) {</span>
+<span class="nc" id="L119">            throw new RpcException(ResponseCode.RPC_UNKNOWN, &quot;error from remoting layer&quot;, e);</span>
+<span class="nc" id="L120">        }</span>
+<span class="nc" id="L121">        return rpcResponsePromise;</span>
+    }
+
+
+    private String getBrokerAddrByNameOrException(String bname) throws RpcException {
+<span class="nc" id="L126">        String addr = this.clientMetadata.findMasterBrokerAddr(bname);</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (addr == null) {</span>
+<span class="nc" id="L128">            throw new RpcException(ResponseCode.SYSTEM_ERROR, &quot;cannot find addr for broker &quot; + bname);</span>
+        }
+<span class="nc" id="L130">        return addr;</span>
+    }
+
+
+    private void processFailedResponse(String addr, RemotingCommand requestCommand,  ResponseFuture responseFuture, Promise&lt;RpcResponse&gt; rpcResponsePromise) {
+<span class="nc" id="L135">        RemotingCommand responseCommand = responseFuture.getResponseCommand();</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (responseCommand != null) {</span>
+            //this should not happen
+<span class="nc" id="L138">            return;</span>
+        }
+<span class="nc" id="L140">        int errorCode = ResponseCode.RPC_UNKNOWN;</span>
+<span class="nc" id="L141">        String errorMessage = null;</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (!responseFuture.isSendRequestOK()) {</span>
+<span class="nc" id="L143">            errorCode = ResponseCode.RPC_SEND_TO_CHANNEL_FAILED;</span>
+<span class="nc" id="L144">            errorMessage = &quot;send request failed to &quot; + addr + &quot;. Request: &quot; + requestCommand;</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        } else if (responseFuture.isTimeout()) {</span>
+<span class="nc" id="L146">            errorCode = ResponseCode.RPC_TIME_OUT;</span>
+<span class="nc" id="L147">            errorMessage = &quot;wait response from &quot; + addr + &quot; timeout :&quot; + responseFuture.getTimeoutMillis() + &quot;ms&quot; + &quot;. Request: &quot; + requestCommand;</span>
+        } else {
+<span class="nc" id="L149">            errorMessage = &quot;unknown reason. addr: &quot; + addr + &quot;, timeoutMillis: &quot; + responseFuture.getTimeoutMillis() + &quot;. Request: &quot; + requestCommand;</span>
+        }
+<span class="nc" id="L151">        rpcResponsePromise.setSuccess(new RpcResponse(new RpcException(errorCode, errorMessage)));</span>
+<span class="nc" id="L152">    }</span>
+
+
+    public Promise&lt;RpcResponse&gt; handlePullMessage(final String addr, RpcRequest rpcRequest, long timeoutMillis)  throws Exception {
+<span class="nc" id="L156">        final RemotingCommand requestCommand = RpcClientUtils.createCommandForRpcRequest(rpcRequest);</span>
+
+<span class="nc" id="L158">        final Promise&lt;RpcResponse&gt; rpcResponsePromise = createResponseFuture();</span>
+
+<span class="nc" id="L160">        InvokeCallback callback = new InvokeCallback() {</span>
+            @Override
+            public void operationComplete(ResponseFuture responseFuture) {
+<span class="nc" id="L163">                RemotingCommand responseCommand = responseFuture.getResponseCommand();</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">                if (responseCommand == null) {</span>
+<span class="nc" id="L165">                    processFailedResponse(addr, requestCommand, responseFuture, rpcResponsePromise);</span>
+<span class="nc" id="L166">                    return;</span>
+                }
+                try {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">                    switch (responseCommand.getCode()) {</span>
+                        case ResponseCode.SUCCESS:
+                        case ResponseCode.PULL_NOT_FOUND:
+                        case ResponseCode.PULL_RETRY_IMMEDIATELY:
+                        case ResponseCode.PULL_OFFSET_MOVED:
+<span class="nc" id="L174">                            PullMessageResponseHeader responseHeader =</span>
+<span class="nc" id="L175">                                    (PullMessageResponseHeader) responseCommand.decodeCommandCustomHeader(PullMessageResponseHeader.class);</span>
+<span class="nc" id="L176">                            rpcResponsePromise.setSuccess(new RpcResponse(responseCommand.getCode(), responseHeader, responseCommand.getBody()));</span>
+                        default:
+<span class="nc" id="L178">                            RpcResponse rpcResponse = new RpcResponse(new RpcException(responseCommand.getCode(), &quot;unexpected remote response code&quot;));</span>
+<span class="nc" id="L179">                            rpcResponsePromise.setSuccess(rpcResponse);</span>
+
+                    }
+<span class="nc" id="L182">                } catch (Exception e) {</span>
+<span class="nc" id="L183">                    String errorMessage = &quot;process failed. addr: &quot; + addr + &quot;, timeoutMillis: &quot; + responseFuture.getTimeoutMillis() + &quot;. Request: &quot; + requestCommand;</span>
+<span class="nc" id="L184">                    RpcResponse  rpcResponse = new RpcResponse(new RpcException(ResponseCode.RPC_UNKNOWN, errorMessage, e));</span>
+<span class="nc" id="L185">                    rpcResponsePromise.setSuccess(rpcResponse);</span>
+<span class="nc" id="L186">                }</span>
+<span class="nc" id="L187">            }</span>
+        };
+
+<span class="nc" id="L190">        this.remotingClient.invokeAsync(addr, requestCommand, timeoutMillis, callback);</span>
+<span class="nc" id="L191">        return rpcResponsePromise;</span>
+    }
+
+    public Promise&lt;RpcResponse&gt; handleSearchOffset(String addr, RpcRequest rpcRequest, long timeoutMillis) throws Exception {
+<span class="nc" id="L195">        final Promise&lt;RpcResponse&gt; rpcResponsePromise = createResponseFuture();</span>
+
+<span class="nc" id="L197">        RemotingCommand requestCommand = RpcClientUtils.createCommandForRpcRequest(rpcRequest);</span>
+<span class="nc" id="L198">        RemotingCommand responseCommand = this.remotingClient.invokeSync(addr, requestCommand, timeoutMillis);</span>
+<span class="nc bnc" id="L199" title="All 4 branches missed.">        assert responseCommand != null;</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        switch (responseCommand.getCode()) {</span>
+            case ResponseCode.SUCCESS: {
+<span class="nc" id="L202">                SearchOffsetResponseHeader responseHeader =</span>
+<span class="nc" id="L203">                        (SearchOffsetResponseHeader) responseCommand.decodeCommandCustomHeader(SearchOffsetResponseHeader.class);</span>
+<span class="nc" id="L204">                rpcResponsePromise.setSuccess(new RpcResponse(responseCommand.getCode(), responseHeader, responseCommand.getBody()));</span>
+<span class="nc" id="L205">                break;</span>
+            }
+            default: {
+<span class="nc" id="L208">                rpcResponsePromise.setSuccess(new RpcResponse(new RpcException(responseCommand.getCode(), &quot;unknown remote error&quot;)));</span>
+            }
+        }
+<span class="nc" id="L211">        return rpcResponsePromise;</span>
+    }
+
+
+
+    public Promise&lt;RpcResponse&gt; handleQueryConsumerOffset(String addr, RpcRequest rpcRequest, long timeoutMillis) throws Exception {
+<span class="nc" id="L217">        final Promise&lt;RpcResponse&gt; rpcResponsePromise = createResponseFuture();</span>
+
+<span class="nc" id="L219">        RemotingCommand requestCommand = RpcClientUtils.createCommandForRpcRequest(rpcRequest);</span>
+<span class="nc" id="L220">        RemotingCommand responseCommand = this.remotingClient.invokeSync(addr, requestCommand, timeoutMillis);</span>
+<span class="nc bnc" id="L221" title="All 4 branches missed.">        assert responseCommand != null;</span>
+<span class="nc bnc" id="L222" title="All 3 branches missed.">        switch (responseCommand.getCode()) {</span>
+            case ResponseCode.SUCCESS: {
+<span class="nc" id="L224">                QueryConsumerOffsetResponseHeader responseHeader =</span>
+<span class="nc" id="L225">                        (QueryConsumerOffsetResponseHeader) responseCommand.decodeCommandCustomHeader(QueryConsumerOffsetResponseHeader.class);</span>
+<span class="nc" id="L226">                rpcResponsePromise.setSuccess(new RpcResponse(responseCommand.getCode(), responseHeader, responseCommand.getBody()));</span>
+<span class="nc" id="L227">                break;</span>
+            }
+            case ResponseCode.QUERY_NOT_FOUND: {
+<span class="nc" id="L230">                rpcResponsePromise.setSuccess(new RpcResponse(responseCommand.getCode(), null, null));</span>
+<span class="nc" id="L231">                break;</span>
+            }
+            default: {
+<span class="nc" id="L234">                rpcResponsePromise.setSuccess(new RpcResponse(new RpcException(responseCommand.getCode(), &quot;unknown remote error&quot;)));</span>
+            }
+        }
+<span class="nc" id="L237">        return rpcResponsePromise;</span>
+    }
+
+    public Promise&lt;RpcResponse&gt; handleUpdateConsumerOffset(String addr, RpcRequest rpcRequest, long timeoutMillis) throws Exception {
+<span class="nc" id="L241">        final Promise&lt;RpcResponse&gt; rpcResponsePromise = createResponseFuture();</span>
+
+<span class="nc" id="L243">        RemotingCommand requestCommand = RpcClientUtils.createCommandForRpcRequest(rpcRequest);</span>
+<span class="nc" id="L244">        RemotingCommand responseCommand = this.remotingClient.invokeSync(addr, requestCommand, timeoutMillis);</span>
+<span class="nc bnc" id="L245" title="All 4 branches missed.">        assert responseCommand != null;</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        switch (responseCommand.getCode()) {</span>
+            case ResponseCode.SUCCESS: {
+<span class="nc" id="L248">                UpdateConsumerOffsetResponseHeader responseHeader =</span>
+<span class="nc" id="L249">                    (UpdateConsumerOffsetResponseHeader) responseCommand.decodeCommandCustomHeader(UpdateConsumerOffsetResponseHeader.class);</span>
+<span class="nc" id="L250">                rpcResponsePromise.setSuccess(new RpcResponse(responseCommand.getCode(), responseHeader, responseCommand.getBody()));</span>
+<span class="nc" id="L251">                break;</span>
+            }
+            default: {
+<span class="nc" id="L254">                rpcResponsePromise.setSuccess(new RpcResponse(new RpcException(responseCommand.getCode(), &quot;unknown remote error&quot;)));</span>
+            }
+        }
+<span class="nc" id="L257">        return rpcResponsePromise;</span>
+    }
+
+    public Promise&lt;RpcResponse&gt; handleCommonBodyRequest(final String addr, RpcRequest rpcRequest, long timeoutMillis, Class bodyClass) throws Exception {
+<span class="nc" id="L261">        final Promise&lt;RpcResponse&gt; rpcResponsePromise = createResponseFuture();</span>
+<span class="nc" id="L262">        RemotingCommand requestCommand = RpcClientUtils.createCommandForRpcRequest(rpcRequest);</span>
+<span class="nc" id="L263">        RemotingCommand responseCommand = this.remotingClient.invokeSync(addr, requestCommand, timeoutMillis);</span>
+<span class="nc bnc" id="L264" title="All 4 branches missed.">        assert responseCommand != null;</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        switch (responseCommand.getCode()) {</span>
+            case ResponseCode.SUCCESS: {
+<span class="nc" id="L267">                rpcResponsePromise.setSuccess(new RpcResponse(ResponseCode.SUCCESS, null, RemotingSerializable.decode(responseCommand.getBody(), bodyClass)));</span>
+<span class="nc" id="L268">                break;</span>
+            }
+            default: {
+<span class="nc" id="L271">                rpcResponsePromise.setSuccess(new RpcResponse(new RpcException(responseCommand.getCode(), &quot;unknown remote error&quot;)));</span>
+            }
+        }
+<span class="nc" id="L274">        return rpcResponsePromise;</span>
+    }
+
+    public Promise&lt;RpcResponse&gt; handleGetMinOffset(String addr, RpcRequest rpcRequest, long timeoutMillis) throws Exception {
+<span class="nc" id="L278">        final Promise&lt;RpcResponse&gt; rpcResponsePromise = createResponseFuture();</span>
+
+<span class="nc" id="L280">        RemotingCommand requestCommand = RpcClientUtils.createCommandForRpcRequest(rpcRequest);</span>
+
+<span class="nc" id="L282">        RemotingCommand responseCommand = this.remotingClient.invokeSync(addr, requestCommand, timeoutMillis);</span>
+<span class="nc bnc" id="L283" title="All 4 branches missed.">        assert responseCommand != null;</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        switch (responseCommand.getCode()) {</span>
+            case ResponseCode.SUCCESS: {
+<span class="nc" id="L286">                GetMinOffsetResponseHeader responseHeader =</span>
+<span class="nc" id="L287">                        (GetMinOffsetResponseHeader) responseCommand.decodeCommandCustomHeader(GetMinOffsetResponseHeader.class);</span>
+<span class="nc" id="L288">                rpcResponsePromise.setSuccess(new RpcResponse(responseCommand.getCode(), responseHeader, responseCommand.getBody()));</span>
+<span class="nc" id="L289">                break;</span>
+            }
+            default: {
+<span class="nc" id="L292">                rpcResponsePromise.setSuccess(new RpcResponse(new RpcException(responseCommand.getCode(), &quot;unknown remote error&quot;)));</span>
+            }
+        }
+<span class="nc" id="L295">        return rpcResponsePromise;</span>
+    }
+
+    public Promise&lt;RpcResponse&gt; handleGetMaxOffset(String addr, RpcRequest rpcRequest, long timeoutMillis) throws Exception {
+<span class="nc" id="L299">        final Promise&lt;RpcResponse&gt; rpcResponsePromise = createResponseFuture();</span>
+
+<span class="nc" id="L301">        RemotingCommand requestCommand = RpcClientUtils.createCommandForRpcRequest(rpcRequest);</span>
+
+<span class="nc" id="L303">        RemotingCommand responseCommand = this.remotingClient.invokeSync(addr, requestCommand, timeoutMillis);</span>
+<span class="nc bnc" id="L304" title="All 4 branches missed.">        assert responseCommand != null;</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        switch (responseCommand.getCode()) {</span>
+            case ResponseCode.SUCCESS: {
+<span class="nc" id="L307">                GetMaxOffsetResponseHeader responseHeader =</span>
+<span class="nc" id="L308">                        (GetMaxOffsetResponseHeader) responseCommand.decodeCommandCustomHeader(GetMaxOffsetResponseHeader.class);</span>
+<span class="nc" id="L309">                rpcResponsePromise.setSuccess(new RpcResponse(responseCommand.getCode(), responseHeader, responseCommand.getBody()));</span>
+<span class="nc" id="L310">                break;</span>
+            }
+            default: {
+<span class="nc" id="L313">                rpcResponsePromise.setSuccess(new RpcResponse(new RpcException(responseCommand.getCode(), &quot;unknown remote error&quot;)));</span>
+            }
+        }
+<span class="nc" id="L316">        return rpcResponsePromise;</span>
+    }
+
+    public Promise&lt;RpcResponse&gt; handleGetEarliestMsgStoretime(String addr, RpcRequest rpcRequest, long timeoutMillis) throws Exception {
+<span class="nc" id="L320">        final Promise&lt;RpcResponse&gt; rpcResponsePromise = createResponseFuture();</span>
+
+<span class="nc" id="L322">        RemotingCommand requestCommand = RpcClientUtils.createCommandForRpcRequest(rpcRequest);</span>
+
+<span class="nc" id="L324">        RemotingCommand responseCommand = this.remotingClient.invokeSync(addr, requestCommand, timeoutMillis);</span>
+<span class="nc bnc" id="L325" title="All 4 branches missed.">        assert responseCommand != null;</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        switch (responseCommand.getCode()) {</span>
+            case ResponseCode.SUCCESS: {
+<span class="nc" id="L328">                GetEarliestMsgStoretimeResponseHeader responseHeader =</span>
+<span class="nc" id="L329">                        (GetEarliestMsgStoretimeResponseHeader) responseCommand.decodeCommandCustomHeader(GetEarliestMsgStoretimeResponseHeader.class);</span>
+<span class="nc" id="L330">                rpcResponsePromise.setSuccess(new RpcResponse(responseCommand.getCode(), responseHeader, responseCommand.getBody()));</span>
+<span class="nc" id="L331">                break;</span>
+            }
+            default: {
+<span class="nc" id="L334">                rpcResponsePromise.setSuccess(new RpcResponse(new RpcException(responseCommand.getCode(), &quot;unknown remote error&quot;)));</span>
+            }
+        }
+<span class="nc" id="L337">        return rpcResponsePromise;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

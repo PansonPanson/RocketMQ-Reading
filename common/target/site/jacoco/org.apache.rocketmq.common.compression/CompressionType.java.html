@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompressionType.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.compression</a> &gt; <span class="el_source">CompressionType.java</span></div><h1>CompressionType.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.compression;
+
+import org.apache.rocketmq.common.sysflag.MessageSysFlag;
+
+<span class="fc" id="L22">public enum CompressionType {</span>
+
+    /**
+     *    Compression types number can be extended to seven {@link MessageSysFlag}
+     *
+     *    Benchmarks from https://github.com/facebook/zstd
+     *
+     *    |   Compressor   |  Ratio  | Compression | Decompress |
+     *    |----------------|---------|-------------|------------|
+     *    |   zstd 1.5.1   |  2.887  |   530 MB/s  |  1700 MB/s |
+     *    |  zlib 1.2.11   |  2.743  |    95 MB/s  |   400 MB/s |
+     *    |    lz4 1.9.3   |  2.101  |   740 MB/s  |  4500 MB/s |
+     *
+     */
+
+<span class="fc" id="L37">    LZ4(1),</span>
+<span class="fc" id="L38">    ZSTD(2),</span>
+<span class="fc" id="L39">    ZLIB(3);</span>
+
+    private final int value;
+
+<span class="fc" id="L43">    CompressionType(int value) {</span>
+<span class="fc" id="L44">        this.value = value;</span>
+<span class="fc" id="L45">    }</span>
+
+    public int getValue() {
+<span class="nc" id="L48">        return value;</span>
+    }
+
+    public static CompressionType of(String name) {
+<span class="fc bfc" id="L52" title="All 4 branches covered.">        switch (name.trim().toUpperCase()) {</span>
+            case &quot;LZ4&quot;:
+<span class="fc" id="L54">                return CompressionType.LZ4;</span>
+            case &quot;ZSTD&quot;:
+<span class="fc" id="L56">                return CompressionType.ZSTD;</span>
+            case &quot;ZLIB&quot;:
+<span class="fc" id="L58">                return CompressionType.ZLIB;</span>
+            default:
+<span class="fc" id="L60">                throw new RuntimeException(&quot;Unsupported compress type name: &quot; + name);</span>
+        }
+    }
+
+    public static CompressionType findByValue(int value) {
+<span class="fc bfc" id="L65" title="All 4 branches covered.">        switch (value) {</span>
+            case 1:
+<span class="fc" id="L67">                return LZ4;</span>
+            case 2:
+<span class="fc" id="L69">                return ZSTD;</span>
+            case 0: // To be compatible for older versions without compression type
+            case 3:
+<span class="fc" id="L72">                return ZLIB;</span>
+            default:
+<span class="fc" id="L74">                throw new RuntimeException(&quot;Unknown compress type value: &quot; + value);</span>
+        }
+    }
+
+    public int getCompressionFlag() {
+<span class="nc bnc" id="L79" title="All 4 branches missed.">        switch (value) {</span>
+            case 1:
+<span class="nc" id="L81">                return MessageSysFlag.COMPRESSION_LZ4_TYPE;</span>
+            case 2:
+<span class="nc" id="L83">                return MessageSysFlag.COMPRESSION_ZSTD_TYPE;</span>
+            case 3:
+<span class="nc" id="L85">                return MessageSysFlag.COMPRESSION_ZLIB_TYPE;</span>
+            default:
+<span class="nc" id="L87">                throw new RuntimeException(&quot;Unsupported compress type flag: &quot; + value);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

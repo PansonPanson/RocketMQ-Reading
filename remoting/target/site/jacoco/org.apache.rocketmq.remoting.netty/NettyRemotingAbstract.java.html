@@ -1,0 +1,629 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NettyRemotingAbstract.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-remoting 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.remoting.netty</a> &gt; <span class="el_source">NettyRemotingAbstract.java</span></div><h1>NettyRemotingAbstract.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.remoting.netty;
+
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslHandler;
+import java.net.SocketAddress;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+import org.apache.rocketmq.remoting.ChannelEventListener;
+import org.apache.rocketmq.remoting.InvokeCallback;
+import org.apache.rocketmq.remoting.RPCHook;
+import org.apache.rocketmq.remoting.common.Pair;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
+import org.apache.rocketmq.remoting.common.SemaphoreReleaseOnlyOnce;
+import org.apache.rocketmq.remoting.common.ServiceThread;
+import org.apache.rocketmq.remoting.exception.RemotingSendRequestException;
+import org.apache.rocketmq.remoting.exception.RemotingTimeoutException;
+import org.apache.rocketmq.remoting.exception.RemotingTooMuchRequestException;
+import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+import org.apache.rocketmq.remoting.protocol.RemotingSysResponseCode;
+
+public abstract class NettyRemotingAbstract {
+
+    /**
+     * Remoting logger instance.
+     */
+<span class="fc" id="L60">    private static final InternalLogger log = InternalLoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);</span>
+
+    /**
+     * Semaphore to limit maximum number of on-going one-way requests, which protects system memory footprint.
+     */
+    protected final Semaphore semaphoreOneway;
+
+    /**
+     * Semaphore to limit maximum number of on-going asynchronous requests, which protects system memory footprint.
+     */
+    protected final Semaphore semaphoreAsync;
+
+    /**
+     * This map caches all on-going requests.
+     */
+<span class="fc" id="L75">    protected final ConcurrentMap&lt;Integer /* opaque */, ResponseFuture&gt; responseTable =</span>
+        new ConcurrentHashMap&lt;Integer, ResponseFuture&gt;(256);
+
+    /**
+     * This container holds all processors per request code, aka, for each incoming request, we may look up the
+     * responding processor in this map to handle the request.
+     */
+<span class="fc" id="L82">    protected final HashMap&lt;Integer/* request code */, Pair&lt;NettyRequestProcessor, ExecutorService&gt;&gt; processorTable =</span>
+        new HashMap&lt;Integer, Pair&lt;NettyRequestProcessor, ExecutorService&gt;&gt;(64);
+
+    /**
+     * Executor to feed netty events to user defined {@link ChannelEventListener}.
+     */
+<span class="fc" id="L88">    protected final NettyEventExecutor nettyEventExecutor = new NettyEventExecutor();</span>
+
+    /**
+     * The default request processor to use in case there is no exact match in {@link #processorTable} per request code.
+     */
+    protected Pair&lt;NettyRequestProcessor, ExecutorService&gt; defaultRequestProcessor;
+
+    /**
+     * SSL context via which to create {@link SslHandler}.
+     */
+    protected volatile SslContext sslContext;
+
+    /**
+     * custom rpc hooks
+     */
+<span class="fc" id="L103">    protected List&lt;RPCHook&gt; rpcHooks = new ArrayList&lt;RPCHook&gt;();</span>
+
+    static {
+<span class="fc" id="L106">        NettyLogger.initNettyLogger();</span>
+<span class="fc" id="L107">    }</span>
+
+    /**
+     * Constructor, specifying capacity of one-way and asynchronous semaphores.
+     *
+     * @param permitsOneway Number of permits for one-way requests.
+     * @param permitsAsync Number of permits for asynchronous requests.
+     */
+<span class="fc" id="L115">    public NettyRemotingAbstract(final int permitsOneway, final int permitsAsync) {</span>
+<span class="fc" id="L116">        this.semaphoreOneway = new Semaphore(permitsOneway, true);</span>
+<span class="fc" id="L117">        this.semaphoreAsync = new Semaphore(permitsAsync, true);</span>
+<span class="fc" id="L118">    }</span>
+
+    /**
+     * Custom channel event listener.
+     *
+     * @return custom channel event listener if defined; null otherwise.
+     */
+    public abstract ChannelEventListener getChannelEventListener();
+
+    /**
+     * Put a netty event to the executor.
+     *
+     * @param event Netty event instance.
+     */
+    public void putNettyEvent(final NettyEvent event) {
+<span class="nc" id="L133">        this.nettyEventExecutor.putNettyEvent(event);</span>
+<span class="nc" id="L134">    }</span>
+
+    /**
+     * Entry of incoming command processing.
+     *
+     * &lt;p&gt;
+     * &lt;strong&gt;Note:&lt;/strong&gt;
+     * The incoming remoting command may be
+     * &lt;ul&gt;
+     * &lt;li&gt;An inquiry request from a remote peer component;&lt;/li&gt;
+     * &lt;li&gt;A response to a previous request issued by this very participant.&lt;/li&gt;
+     * &lt;/ul&gt;
+     * &lt;/p&gt;
+     *
+     * @param ctx Channel handler context.
+     * @param msg incoming remoting command.
+     * @throws Exception if there were any error while processing the incoming command.
+     */
+    public void processMessageReceived(ChannelHandlerContext ctx, RemotingCommand msg) throws Exception {
+<span class="fc" id="L153">        final RemotingCommand cmd = msg;</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (cmd != null) {</span>
+<span class="pc bpc" id="L155" title="1 of 3 branches missed.">            switch (cmd.getType()) {</span>
+                case REQUEST_COMMAND:
+<span class="fc" id="L157">                    processRequestCommand(ctx, cmd);</span>
+<span class="fc" id="L158">                    break;</span>
+                case RESPONSE_COMMAND:
+<span class="fc" id="L160">                    processResponseCommand(ctx, cmd);</span>
+<span class="fc" id="L161">                    break;</span>
+                default:
+                    break;
+            }
+        }
+<span class="fc" id="L166">    }</span>
+
+    protected void doBeforeRpcHooks(String addr, RemotingCommand request) {
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (rpcHooks.size() &gt; 0) {</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            for (RPCHook rpcHook : rpcHooks) {</span>
+<span class="nc" id="L171">                rpcHook.doBeforeRequest(addr, request);</span>
+<span class="nc" id="L172">            }</span>
+        }
+<span class="fc" id="L174">    }</span>
+
+    public void doAfterRpcHooks(String addr, RemotingCommand request, RemotingCommand response) {
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (rpcHooks.size() &gt; 0) {</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">            for (RPCHook rpcHook : rpcHooks) {</span>
+<span class="nc" id="L179">                rpcHook.doAfterResponse(addr, request, response);</span>
+<span class="nc" id="L180">            }</span>
+        }
+<span class="fc" id="L182">    }</span>
+
+    /**
+     * Process incoming request command issued by remote peer.
+     *
+     * @param ctx channel handler context.
+     * @param cmd request command.
+     */
+    public void processRequestCommand(final ChannelHandlerContext ctx, final RemotingCommand cmd) {
+<span class="fc" id="L191">        final Pair&lt;NettyRequestProcessor, ExecutorService&gt; matched = this.processorTable.get(cmd.getCode());</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        final Pair&lt;NettyRequestProcessor, ExecutorService&gt; pair = null == matched ? this.defaultRequestProcessor : matched;</span>
+<span class="fc" id="L193">        final int opaque = cmd.getOpaque();</span>
+
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (pair != null) {</span>
+<span class="fc" id="L196">            Runnable run = new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L199">                    Exception exception = null;</span>
+                    RemotingCommand response;
+
+                    try {
+<span class="fc" id="L203">                        String remoteAddr = RemotingHelper.parseChannelRemoteAddr(ctx.channel());</span>
+                        try {
+<span class="fc" id="L205">                            doBeforeRpcHooks(remoteAddr, cmd);</span>
+<span class="nc" id="L206">                        } catch (Exception e) {</span>
+<span class="nc" id="L207">                            exception = e;</span>
+<span class="fc" id="L208">                        }</span>
+
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                        if (exception == null) {</span>
+<span class="fc" id="L211">                            response = pair.getObject1().processRequest(ctx, cmd);</span>
+                        } else {
+<span class="nc" id="L213">                            response = RemotingCommand.createResponseCommand(null);</span>
+<span class="nc" id="L214">                            response.setCode(RemotingSysResponseCode.SYSTEM_ERROR);</span>
+                        }
+
+                        try {
+<span class="fc" id="L218">                            doAfterRpcHooks(remoteAddr, cmd, response);</span>
+<span class="nc" id="L219">                        } catch (Exception e) {</span>
+<span class="nc" id="L220">                            exception = e;</span>
+<span class="fc" id="L221">                        }</span>
+
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">                        if (exception != null) {</span>
+<span class="nc" id="L224">                            throw exception;</span>
+                        }
+
+<span class="fc bfc" id="L227" title="All 2 branches covered.">                        if (!cmd.isOnewayRPC()) {</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                            if (response != null) {</span>
+<span class="fc" id="L229">                                response.setOpaque(opaque);</span>
+<span class="fc" id="L230">                                response.markResponseType();</span>
+                                try {
+<span class="fc" id="L232">                                    ctx.writeAndFlush(response);</span>
+<span class="nc" id="L233">                                } catch (Throwable e) {</span>
+<span class="nc" id="L234">                                    log.error(&quot;process request over, but response failed&quot;, e);</span>
+<span class="nc" id="L235">                                    log.error(cmd.toString());</span>
+<span class="nc" id="L236">                                    log.error(response.toString());</span>
+<span class="fc" id="L237">                                }</span>
+                            } else {
+
+                            }
+                        }
+<span class="nc" id="L242">                    } catch (Throwable e) {</span>
+<span class="nc" id="L243">                        log.error(&quot;process request exception&quot;, e);</span>
+<span class="nc" id="L244">                        log.error(cmd.toString());</span>
+
+<span class="nc bnc" id="L246" title="All 2 branches missed.">                        if (!cmd.isOnewayRPC()) {</span>
+<span class="nc" id="L247">                            response = RemotingCommand.createResponseCommand(RemotingSysResponseCode.SYSTEM_ERROR,</span>
+<span class="nc" id="L248">                                RemotingHelper.exceptionSimpleDesc(e));</span>
+<span class="nc" id="L249">                            response.setOpaque(opaque);</span>
+<span class="nc" id="L250">                            ctx.writeAndFlush(response);</span>
+                        }
+<span class="fc" id="L252">                    }</span>
+<span class="fc" id="L253">                }</span>
+            };
+
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">            if (pair.getObject1().rejectRequest()) {</span>
+<span class="nc" id="L257">                final RemotingCommand response = RemotingCommand.createResponseCommand(RemotingSysResponseCode.SYSTEM_BUSY,</span>
+                    &quot;[REJECTREQUEST]system busy, start flow control for a while&quot;);
+<span class="nc" id="L259">                response.setOpaque(opaque);</span>
+<span class="nc" id="L260">                ctx.writeAndFlush(response);</span>
+<span class="nc" id="L261">                return;</span>
+            }
+
+            try {
+<span class="fc" id="L265">                final RequestTask requestTask = new RequestTask(run, ctx.channel(), cmd);</span>
+<span class="fc" id="L266">                pair.getObject2().submit(requestTask);</span>
+<span class="nc" id="L267">            } catch (RejectedExecutionException e) {</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">                if ((System.currentTimeMillis() % 10000) == 0) {</span>
+<span class="nc" id="L269">                    log.warn(RemotingHelper.parseChannelRemoteAddr(ctx.channel())</span>
+                        + &quot;, too many requests and system thread pool busy, RejectedExecutionException &quot;
+<span class="nc" id="L271">                        + pair.getObject2().toString()</span>
+<span class="nc" id="L272">                        + &quot; request code: &quot; + cmd.getCode());</span>
+                }
+
+<span class="nc bnc" id="L275" title="All 2 branches missed.">                if (!cmd.isOnewayRPC()) {</span>
+<span class="nc" id="L276">                    final RemotingCommand response = RemotingCommand.createResponseCommand(RemotingSysResponseCode.SYSTEM_BUSY,</span>
+                        &quot;[OVERLOAD]system busy, start flow control for a while&quot;);
+<span class="nc" id="L278">                    response.setOpaque(opaque);</span>
+<span class="nc" id="L279">                    ctx.writeAndFlush(response);</span>
+                }
+<span class="fc" id="L281">            }</span>
+<span class="fc" id="L282">        } else {</span>
+<span class="fc" id="L283">            String error = &quot; request type &quot; + cmd.getCode() + &quot; not supported&quot;;</span>
+<span class="fc" id="L284">            final RemotingCommand response =</span>
+<span class="fc" id="L285">                RemotingCommand.createResponseCommand(RemotingSysResponseCode.REQUEST_CODE_NOT_SUPPORTED, error);</span>
+<span class="fc" id="L286">            response.setOpaque(opaque);</span>
+<span class="fc" id="L287">            ctx.writeAndFlush(response);</span>
+<span class="fc" id="L288">            log.error(RemotingHelper.parseChannelRemoteAddr(ctx.channel()) + error);</span>
+        }
+<span class="fc" id="L290">    }</span>
+
+    /**
+     * Process response from remote peer to the previous issued requests.
+     *
+     * @param ctx channel handler context.
+     * @param cmd response command instance.
+     */
+    public void processResponseCommand(ChannelHandlerContext ctx, RemotingCommand cmd) {
+<span class="fc" id="L299">        final int opaque = cmd.getOpaque();</span>
+<span class="fc" id="L300">        final ResponseFuture responseFuture = responseTable.get(opaque);</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (responseFuture != null) {</span>
+<span class="fc" id="L302">            responseFuture.setResponseCommand(cmd);</span>
+
+<span class="fc" id="L304">            responseTable.remove(opaque);</span>
+
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            if (responseFuture.getInvokeCallback() != null) {</span>
+<span class="fc" id="L307">                executeInvokeCallback(responseFuture);</span>
+            } else {
+<span class="fc" id="L309">                responseFuture.putResponse(cmd);</span>
+<span class="fc" id="L310">                responseFuture.release();</span>
+            }
+        } else {
+<span class="nc" id="L313">            log.warn(&quot;receive response, but not matched any request, &quot; + RemotingHelper.parseChannelRemoteAddr(ctx.channel()));</span>
+<span class="nc" id="L314">            log.warn(cmd.toString());</span>
+        }
+<span class="fc" id="L316">    }</span>
+
+    /**
+     * Execute callback in callback executor. If callback executor is null, run directly in current thread
+     */
+    private void executeInvokeCallback(final ResponseFuture responseFuture) {
+<span class="fc" id="L322">        boolean runInThisThread = false;</span>
+<span class="fc" id="L323">        ExecutorService executor = this.getCallbackExecutor();</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (executor != null) {</span>
+            try {
+<span class="fc" id="L326">                executor.submit(new Runnable() {</span>
+                    @Override
+                    public void run() {
+                        try {
+<span class="fc" id="L330">                            responseFuture.executeInvokeCallback();</span>
+<span class="fc" id="L331">                        } catch (Throwable e) {</span>
+<span class="fc" id="L332">                            log.warn(&quot;execute callback in executor exception, and callback throw&quot;, e);</span>
+                        } finally {
+<span class="fc" id="L334">                            responseFuture.release();</span>
+                        }
+<span class="fc" id="L336">                    }</span>
+                });
+<span class="nc" id="L338">            } catch (Exception e) {</span>
+<span class="nc" id="L339">                runInThisThread = true;</span>
+<span class="nc" id="L340">                log.warn(&quot;execute callback in executor exception, maybe executor busy&quot;, e);</span>
+<span class="pc" id="L341">            }</span>
+        } else {
+<span class="fc" id="L343">            runInThisThread = true;</span>
+        }
+
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        if (runInThisThread) {</span>
+            try {
+<span class="fc" id="L348">                responseFuture.executeInvokeCallback();</span>
+<span class="nc" id="L349">            } catch (Throwable e) {</span>
+<span class="nc" id="L350">                log.warn(&quot;executeInvokeCallback Exception&quot;, e);</span>
+            } finally {
+<span class="fc" id="L352">                responseFuture.release();</span>
+            }
+        }
+<span class="fc" id="L355">    }</span>
+
+    /**
+     * Custom RPC hooks.
+     *
+     * @return RPC hooks if specified; null otherwise.
+     */
+    public List&lt;RPCHook&gt; getRPCHook() {
+<span class="nc" id="L363">        return rpcHooks;</span>
+    }
+
+    public void registerRPCHook(RPCHook rpcHook) {
+<span class="nc bnc" id="L367" title="All 4 branches missed.">        if (rpcHook != null &amp;&amp; !rpcHooks.contains(rpcHook)) {</span>
+<span class="nc" id="L368">            rpcHooks.add(rpcHook);</span>
+        }
+<span class="nc" id="L370">    }</span>
+
+    public void clearRPCHook() {
+<span class="nc" id="L373">        rpcHooks.clear();</span>
+<span class="nc" id="L374">    }</span>
+
+    /**
+     * This method specifies thread pool to use while invoking callback methods.
+     *
+     * @return Dedicated thread pool instance if specified; or null if the callback is supposed to be executed in the
+     * netty event-loop thread.
+     */
+    public abstract ExecutorService getCallbackExecutor();
+
+    /**
+     * &lt;p&gt;
+     * This method is periodically invoked to scan and expire deprecated request.
+     * &lt;/p&gt;
+     */
+    public void scanResponseTable() {
+<span class="fc" id="L390">        final List&lt;ResponseFuture&gt; rfList = new LinkedList&lt;ResponseFuture&gt;();</span>
+<span class="fc" id="L391">        Iterator&lt;Entry&lt;Integer, ResponseFuture&gt;&gt; it = this.responseTable.entrySet().iterator();</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        while (it.hasNext()) {</span>
+<span class="fc" id="L393">            Entry&lt;Integer, ResponseFuture&gt; next = it.next();</span>
+<span class="fc" id="L394">            ResponseFuture rep = next.getValue();</span>
+
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            if ((rep.getBeginTimestamp() + rep.getTimeoutMillis() + 1000) &lt;= System.currentTimeMillis()) {</span>
+<span class="fc" id="L397">                rep.release();</span>
+<span class="fc" id="L398">                it.remove();</span>
+<span class="fc" id="L399">                rfList.add(rep);</span>
+<span class="fc" id="L400">                log.warn(&quot;remove timeout request, &quot; + rep);</span>
+            }
+<span class="fc" id="L402">        }</span>
+
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        for (ResponseFuture rf : rfList) {</span>
+            try {
+<span class="fc" id="L406">                executeInvokeCallback(rf);</span>
+<span class="nc" id="L407">            } catch (Throwable e) {</span>
+<span class="nc" id="L408">                log.warn(&quot;scanResponseTable, operationComplete Exception&quot;, e);</span>
+<span class="fc" id="L409">            }</span>
+<span class="fc" id="L410">        }</span>
+<span class="fc" id="L411">    }</span>
+
+    public RemotingCommand invokeSyncImpl(final Channel channel, final RemotingCommand request,
+        final long timeoutMillis)
+        throws InterruptedException, RemotingSendRequestException, RemotingTimeoutException {
+<span class="fc" id="L416">        final int opaque = request.getOpaque();</span>
+
+        try {
+<span class="fc" id="L419">            final ResponseFuture responseFuture = new ResponseFuture(channel, opaque, timeoutMillis, null, null);</span>
+<span class="fc" id="L420">            this.responseTable.put(opaque, responseFuture);</span>
+<span class="fc" id="L421">            final SocketAddress addr = channel.remoteAddress();</span>
+<span class="fc" id="L422">            channel.writeAndFlush(request).addListener(new ChannelFutureListener() {</span>
+                @Override
+                public void operationComplete(ChannelFuture f) throws Exception {
+<span class="fc bfc" id="L425" title="All 2 branches covered.">                    if (f.isSuccess()) {</span>
+<span class="fc" id="L426">                        responseFuture.setSendRequestOK(true);</span>
+<span class="fc" id="L427">                        return;</span>
+                    } else {
+<span class="fc" id="L429">                        responseFuture.setSendRequestOK(false);</span>
+                    }
+
+<span class="fc" id="L432">                    responseTable.remove(opaque);</span>
+<span class="fc" id="L433">                    responseFuture.setCause(f.cause());</span>
+<span class="fc" id="L434">                    responseFuture.putResponse(null);</span>
+<span class="fc" id="L435">                    log.warn(&quot;send a request command to channel &lt;&quot; + addr + &quot;&gt; failed.&quot;);</span>
+<span class="fc" id="L436">                }</span>
+            });
+
+<span class="fc" id="L439">            RemotingCommand responseCommand = responseFuture.waitResponse(timeoutMillis);</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">            if (null == responseCommand) {</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">                if (responseFuture.isSendRequestOK()) {</span>
+<span class="fc" id="L442">                    throw new RemotingTimeoutException(RemotingHelper.parseSocketAddressAddr(addr), timeoutMillis,</span>
+<span class="fc" id="L443">                        responseFuture.getCause());</span>
+                } else {
+<span class="fc" id="L445">                    throw new RemotingSendRequestException(RemotingHelper.parseSocketAddressAddr(addr), responseFuture.getCause());</span>
+                }
+            }
+
+<span class="fc" id="L449">            return responseCommand;</span>
+        } finally {
+<span class="fc" id="L451">            this.responseTable.remove(opaque);</span>
+        }
+    }
+
+    public void invokeAsyncImpl(final Channel channel, final RemotingCommand request, final long timeoutMillis,
+        final InvokeCallback invokeCallback)
+        throws InterruptedException, RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException {
+<span class="fc" id="L458">        long beginStartTime = System.currentTimeMillis();</span>
+<span class="fc" id="L459">        final int opaque = request.getOpaque();</span>
+<span class="fc" id="L460">        boolean acquired = this.semaphoreAsync.tryAcquire(timeoutMillis, TimeUnit.MILLISECONDS);</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">        if (acquired) {</span>
+<span class="fc" id="L462">            final SemaphoreReleaseOnlyOnce once = new SemaphoreReleaseOnlyOnce(this.semaphoreAsync);</span>
+<span class="fc" id="L463">            long costTime = System.currentTimeMillis() - beginStartTime;</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">            if (timeoutMillis &lt; costTime) {</span>
+<span class="nc" id="L465">                once.release();</span>
+<span class="nc" id="L466">                throw new RemotingTimeoutException(&quot;invokeAsyncImpl call timeout&quot;);</span>
+            }
+
+<span class="fc" id="L469">            final ResponseFuture responseFuture = new ResponseFuture(channel, opaque, timeoutMillis - costTime, invokeCallback, once);</span>
+<span class="fc" id="L470">            this.responseTable.put(opaque, responseFuture);</span>
+            try {
+<span class="fc" id="L472">                channel.writeAndFlush(request).addListener(new ChannelFutureListener() {</span>
+                    @Override
+                    public void operationComplete(ChannelFuture f) throws Exception {
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">                        if (f.isSuccess()) {</span>
+<span class="fc" id="L476">                            responseFuture.setSendRequestOK(true);</span>
+<span class="fc" id="L477">                            return;</span>
+                        }
+<span class="nc" id="L479">                        requestFail(opaque);</span>
+<span class="nc" id="L480">                        log.warn(&quot;send a request command to channel &lt;{}&gt; failed.&quot;, RemotingHelper.parseChannelRemoteAddr(channel));</span>
+<span class="nc" id="L481">                    }</span>
+                });
+<span class="nc" id="L483">            } catch (Exception e) {</span>
+<span class="nc" id="L484">                responseFuture.release();</span>
+<span class="nc" id="L485">                log.warn(&quot;send a request command to channel &lt;&quot; + RemotingHelper.parseChannelRemoteAddr(channel) + &quot;&gt; Exception&quot;, e);</span>
+<span class="nc" id="L486">                throw new RemotingSendRequestException(RemotingHelper.parseChannelRemoteAddr(channel), e);</span>
+<span class="fc" id="L487">            }</span>
+<span class="fc" id="L488">        } else {</span>
+<span class="nc bnc" id="L489" title="All 2 branches missed.">            if (timeoutMillis &lt;= 0) {</span>
+<span class="nc" id="L490">                throw new RemotingTooMuchRequestException(&quot;invokeAsyncImpl invoke too fast&quot;);</span>
+            } else {
+<span class="nc" id="L492">                String info =</span>
+<span class="nc" id="L493">                    String.format(&quot;invokeAsyncImpl tryAcquire semaphore timeout, %dms, waiting thread nums: %d semaphoreAsyncValue: %d&quot;,</span>
+<span class="nc" id="L494">                        timeoutMillis,</span>
+<span class="nc" id="L495">                        this.semaphoreAsync.getQueueLength(),</span>
+<span class="nc" id="L496">                        this.semaphoreAsync.availablePermits()</span>
+                    );
+<span class="nc" id="L498">                log.warn(info);</span>
+<span class="nc" id="L499">                throw new RemotingTimeoutException(info);</span>
+            }
+        }
+<span class="fc" id="L502">    }</span>
+
+    private void requestFail(final int opaque) {
+<span class="fc" id="L505">        ResponseFuture responseFuture = responseTable.remove(opaque);</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">        if (responseFuture != null) {</span>
+<span class="fc" id="L507">            responseFuture.setSendRequestOK(false);</span>
+<span class="fc" id="L508">            responseFuture.putResponse(null);</span>
+            try {
+<span class="fc" id="L510">                executeInvokeCallback(responseFuture);</span>
+<span class="nc" id="L511">            } catch (Throwable e) {</span>
+<span class="nc" id="L512">                log.warn(&quot;execute callback in requestFail, and callback throw&quot;, e);</span>
+            } finally {
+<span class="fc" id="L514">                responseFuture.release();</span>
+            }
+        }
+<span class="fc" id="L517">    }</span>
+
+    /**
+     * mark the request of the specified channel as fail and to invoke fail callback immediately
+     *
+     * @param channel the channel which is close already
+     */
+    protected void failFast(final Channel channel) {
+<span class="fc" id="L525">        Iterator&lt;Entry&lt;Integer, ResponseFuture&gt;&gt; it = responseTable.entrySet().iterator();</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">        while (it.hasNext()) {</span>
+<span class="fc" id="L527">            Entry&lt;Integer, ResponseFuture&gt; entry = it.next();</span>
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">            if (entry.getValue().getChannel() == channel) {</span>
+<span class="fc" id="L529">                Integer opaque = entry.getKey();</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">                if (opaque != null) {</span>
+<span class="fc" id="L531">                    requestFail(opaque);</span>
+                }
+            }
+<span class="fc" id="L534">        }</span>
+<span class="fc" id="L535">    }</span>
+
+    public void invokeOnewayImpl(final Channel channel, final RemotingCommand request, final long timeoutMillis)
+        throws InterruptedException, RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException {
+<span class="fc" id="L539">        request.markOnewayRPC();</span>
+<span class="fc" id="L540">        boolean acquired = this.semaphoreOneway.tryAcquire(timeoutMillis, TimeUnit.MILLISECONDS);</span>
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">        if (acquired) {</span>
+<span class="fc" id="L542">            final SemaphoreReleaseOnlyOnce once = new SemaphoreReleaseOnlyOnce(this.semaphoreOneway);</span>
+            try {
+<span class="fc" id="L544">                channel.writeAndFlush(request).addListener(new ChannelFutureListener() {</span>
+                    @Override
+                    public void operationComplete(ChannelFuture f) throws Exception {
+<span class="fc" id="L547">                        once.release();</span>
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">                        if (!f.isSuccess()) {</span>
+<span class="nc" id="L549">                            log.warn(&quot;send a request command to channel &lt;&quot; + channel.remoteAddress() + &quot;&gt; failed.&quot;);</span>
+                        }
+<span class="fc" id="L551">                    }</span>
+                });
+<span class="nc" id="L553">            } catch (Exception e) {</span>
+<span class="nc" id="L554">                once.release();</span>
+<span class="nc" id="L555">                log.warn(&quot;write send a request command to channel &lt;&quot; + channel.remoteAddress() + &quot;&gt; failed.&quot;);</span>
+<span class="nc" id="L556">                throw new RemotingSendRequestException(RemotingHelper.parseChannelRemoteAddr(channel), e);</span>
+<span class="fc" id="L557">            }</span>
+<span class="fc" id="L558">        } else {</span>
+<span class="nc bnc" id="L559" title="All 2 branches missed.">            if (timeoutMillis &lt;= 0) {</span>
+<span class="nc" id="L560">                throw new RemotingTooMuchRequestException(&quot;invokeOnewayImpl invoke too fast&quot;);</span>
+            } else {
+<span class="nc" id="L562">                String info = String.format(</span>
+                    &quot;invokeOnewayImpl tryAcquire semaphore timeout, %dms, waiting thread nums: %d semaphoreOnewayValue: %d&quot;,
+<span class="nc" id="L564">                    timeoutMillis,</span>
+<span class="nc" id="L565">                    this.semaphoreOneway.getQueueLength(),</span>
+<span class="nc" id="L566">                    this.semaphoreOneway.availablePermits()</span>
+                );
+<span class="nc" id="L568">                log.warn(info);</span>
+<span class="nc" id="L569">                throw new RemotingTimeoutException(info);</span>
+            }
+        }
+<span class="fc" id="L572">    }</span>
+
+<span class="fc" id="L574">    class NettyEventExecutor extends ServiceThread {</span>
+<span class="fc" id="L575">        private final LinkedBlockingQueue&lt;NettyEvent&gt; eventQueue = new LinkedBlockingQueue&lt;NettyEvent&gt;();</span>
+<span class="fc" id="L576">        private final int maxSize = 10000;</span>
+
+        public void putNettyEvent(final NettyEvent event) {
+<span class="nc" id="L579">            int currentSize = this.eventQueue.size();</span>
+<span class="nc bnc" id="L580" title="All 2 branches missed.">            if (currentSize &lt;= maxSize) {</span>
+<span class="nc" id="L581">                this.eventQueue.add(event);</span>
+            } else {
+<span class="nc" id="L583">                log.warn(&quot;event queue size [{}] over the limit [{}], so drop this event {}&quot;, currentSize, maxSize, event.toString());</span>
+            }
+<span class="nc" id="L585">        }</span>
+
+        @Override
+        public void run() {
+<span class="nc" id="L589">            log.info(this.getServiceName() + &quot; service started&quot;);</span>
+
+<span class="nc" id="L591">            final ChannelEventListener listener = NettyRemotingAbstract.this.getChannelEventListener();</span>
+
+<span class="nc bnc" id="L593" title="All 2 branches missed.">            while (!this.isStopped()) {</span>
+                try {
+<span class="nc" id="L595">                    NettyEvent event = this.eventQueue.poll(3000, TimeUnit.MILLISECONDS);</span>
+<span class="nc bnc" id="L596" title="All 4 branches missed.">                    if (event != null &amp;&amp; listener != null) {</span>
+<span class="nc bnc" id="L597" title="All 5 branches missed.">                        switch (event.getType()) {</span>
+                            case IDLE:
+<span class="nc" id="L599">                                listener.onChannelIdle(event.getRemoteAddr(), event.getChannel());</span>
+<span class="nc" id="L600">                                break;</span>
+                            case CLOSE:
+<span class="nc" id="L602">                                listener.onChannelClose(event.getRemoteAddr(), event.getChannel());</span>
+<span class="nc" id="L603">                                break;</span>
+                            case CONNECT:
+<span class="nc" id="L605">                                listener.onChannelConnect(event.getRemoteAddr(), event.getChannel());</span>
+<span class="nc" id="L606">                                break;</span>
+                            case EXCEPTION:
+<span class="nc" id="L608">                                listener.onChannelException(event.getRemoteAddr(), event.getChannel());</span>
+<span class="nc" id="L609">                                break;</span>
+                            default:
+                                break;
+
+                        }
+                    }
+<span class="nc" id="L615">                } catch (Exception e) {</span>
+<span class="nc" id="L616">                    log.warn(this.getServiceName() + &quot; service has exception. &quot;, e);</span>
+<span class="nc" id="L617">                }</span>
+            }
+
+<span class="nc" id="L620">            log.info(this.getServiceName() + &quot; service end&quot;);</span>
+<span class="nc" id="L621">        }</span>
+
+        @Override
+        public String getServiceName() {
+<span class="fc" id="L625">            return NettyEventExecutor.class.getSimpleName();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

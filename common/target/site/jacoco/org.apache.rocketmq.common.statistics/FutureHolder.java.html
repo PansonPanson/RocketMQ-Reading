@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FutureHolder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.statistics</a> &gt; <span class="el_source">FutureHolder.java</span></div><h1>FutureHolder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.statistics;
+
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+
+<span class="nc" id="L25">public class FutureHolder&lt;T&gt; {</span>
+<span class="nc" id="L26">    private ConcurrentMap&lt;T, BlockingQueue&lt;Future&gt;&gt; futureMap = new ConcurrentHashMap&lt;T, BlockingQueue&lt;Future&gt;&gt;(8);</span>
+
+    public void addFuture(T t, Future future) {
+<span class="nc" id="L29">        BlockingQueue&lt;Future&gt; list = futureMap.get(t);</span>
+<span class="nc bnc" id="L30" title="All 2 branches missed.">        if (list == null) {</span>
+<span class="nc" id="L31">            list = new LinkedBlockingQueue&lt;Future&gt;();</span>
+<span class="nc" id="L32">            BlockingQueue&lt;Future&gt; old = futureMap.putIfAbsent(t, list);</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">            if (old != null) {</span>
+<span class="nc" id="L34">                list = old;</span>
+            }
+        }
+<span class="nc" id="L37">        list.add(future);</span>
+<span class="nc" id="L38">    }</span>
+
+    public void removeAllFuture(T t) {
+<span class="nc" id="L41">        cancelAll(t, false);</span>
+<span class="nc" id="L42">        futureMap.remove(t);</span>
+<span class="nc" id="L43">    }</span>
+
+    private void cancelAll(T t, boolean mayInterruptIfRunning) {
+<span class="nc" id="L46">        BlockingQueue&lt;Future&gt; list = futureMap.get(t);</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (list != null) {</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">            for (Future future : list) {</span>
+<span class="nc" id="L49">                future.cancel(mayInterruptIfRunning);</span>
+<span class="nc" id="L50">            }</span>
+        }
+<span class="nc" id="L52">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

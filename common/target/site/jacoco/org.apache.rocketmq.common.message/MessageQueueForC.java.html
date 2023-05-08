@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MessageQueueForC.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.message</a> &gt; <span class="el_source">MessageQueueForC.java</span></div><h1>MessageQueueForC.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.message;
+
+import java.io.Serializable;
+
+public class MessageQueueForC implements Comparable&lt;MessageQueueForC&gt;, Serializable {
+
+    private static final long serialVersionUID = 5320967846569962104L;
+    private String topic;
+    private String brokerName;
+    private int queueId;
+    private long offset;
+
+<span class="nc" id="L30">    public MessageQueueForC(String topic, String brokerName, int queueId, long offset) {</span>
+<span class="nc" id="L31">        this.topic = topic;</span>
+<span class="nc" id="L32">        this.brokerName = brokerName;</span>
+<span class="nc" id="L33">        this.queueId = queueId;</span>
+<span class="nc" id="L34">        this.offset = offset;</span>
+<span class="nc" id="L35">    }</span>
+
+    @Override
+    public int compareTo(MessageQueueForC o) {
+<span class="nc" id="L39">        int result = this.topic.compareTo(o.topic);</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        if (result != 0) {</span>
+<span class="nc" id="L41">            return result;</span>
+        }
+<span class="nc" id="L43">        result = this.brokerName.compareTo(o.brokerName);</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (result != 0) {</span>
+<span class="nc" id="L45">            return result;</span>
+        }
+<span class="nc" id="L47">        result = this.queueId - o.queueId;</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (result != 0) {</span>
+<span class="nc" id="L49">            return result;</span>
+        }
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if ((this.offset - o.offset) &gt; 0) {</span>
+<span class="nc" id="L52">            return 1;</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        } else if ((this.offset - o.offset) == 0) {</span>
+<span class="nc" id="L54">            return 0;</span>
+        } else {
+<span class="nc" id="L56">            return -1;</span>
+        }
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L62">        final int prime = 31;</span>
+<span class="nc" id="L63">        int result = 1;</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        result = prime * result + ((brokerName == null) ? 0 : brokerName.hashCode());</span>
+<span class="nc" id="L65">        result = prime * result + queueId;</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        result = prime * result + ((topic == null) ? 0 : topic.hashCode());</span>
+<span class="nc" id="L67">        return result;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (this == obj)</span>
+<span class="nc" id="L73">            return true;</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (obj == null)</span>
+<span class="nc" id="L75">            return false;</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (getClass() != obj.getClass())</span>
+<span class="nc" id="L77">            return false;</span>
+<span class="nc" id="L78">        MessageQueueForC other = (MessageQueueForC) obj;</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (brokerName == null) {</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (other.brokerName != null)</span>
+<span class="nc" id="L81">                return false;</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        } else if (!brokerName.equals(other.brokerName))</span>
+<span class="nc" id="L83">            return false;</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (queueId != other.queueId)</span>
+<span class="nc" id="L85">            return false;</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (topic == null) {</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (other.topic != null)</span>
+<span class="nc" id="L88">                return false;</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        } else if (!topic.equals(other.topic))</span>
+<span class="nc" id="L90">            return false;</span>
+
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (offset != other.offset) {</span>
+<span class="nc" id="L93">            return false;</span>
+        }
+<span class="nc" id="L95">        return true;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L100">        return &quot;MessageQueueForC [topic=&quot; + topic + &quot;, brokerName=&quot; + brokerName + &quot;, queueId=&quot; + queueId</span>
+            + &quot;, offset=&quot; + offset + &quot;]&quot;;
+    }
+
+    public String getTopic() {
+<span class="nc" id="L105">        return topic;</span>
+    }
+
+    public void setTopic(String topic) {
+<span class="nc" id="L109">        this.topic = topic;</span>
+<span class="nc" id="L110">    }</span>
+
+    public String getBrokerName() {
+<span class="nc" id="L113">        return brokerName;</span>
+    }
+
+    public void setBrokerName(String brokerName) {
+<span class="nc" id="L117">        this.brokerName = brokerName;</span>
+<span class="nc" id="L118">    }</span>
+
+    public int getQueueId() {
+<span class="nc" id="L121">        return queueId;</span>
+    }
+
+    public void setQueueId(int queueId) {
+<span class="nc" id="L125">        this.queueId = queueId;</span>
+<span class="nc" id="L126">    }</span>
+
+    public long getOffset() {
+<span class="nc" id="L129">        return offset;</span>
+    }
+
+    public void setOffset(long offset) {
+<span class="nc" id="L133">        this.offset = offset;</span>
+<span class="nc" id="L134">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

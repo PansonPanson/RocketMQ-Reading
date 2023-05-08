@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BrokerIdentity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common</a> &gt; <span class="el_source">BrokerIdentity.java</span></div><h1>BrokerIdentity.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common;
+
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.rocketmq.common.annotation.ImportantField;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.logging.InnerLoggerFactory;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+
+public class BrokerIdentity {
+    private static final String DEFAULT_CLUSTER_NAME = &quot;DefaultCluster&quot;;
+<span class="fc" id="L32">    protected static final InternalLogger LOGGER = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);</span>
+
+<span class="fc" id="L34">    public static final BrokerIdentity BROKER_CONTAINER_IDENTITY = new BrokerIdentity(true);</span>
+
+<span class="pc" id="L36">    @ImportantField</span>
+<span class="pc" id="L37">    private String brokerName = localHostName();</span>
+<span class="pc" id="L38">    @ImportantField</span>
+    private String brokerClusterName = DEFAULT_CLUSTER_NAME;
+<span class="pc" id="L40">    @ImportantField</span>
+    private volatile long brokerId = MixAll.MASTER_ID;
+
+<span class="pc" id="L43">    private boolean isBrokerContainer = false;</span>
+
+    // Do not set it manually, it depends on the startup mode
+    // Broker start by BrokerStartup is false, start or add by BrokerContainer is true
+<span class="pc" id="L47">    private boolean isInBrokerContainer = false;</span>
+
+<span class="fc" id="L49">    public BrokerIdentity() {</span>
+<span class="fc" id="L50">    }</span>
+
+<span class="fc" id="L52">    public BrokerIdentity(boolean isBrokerContainer) {</span>
+<span class="fc" id="L53">        this.isBrokerContainer = isBrokerContainer;</span>
+<span class="fc" id="L54">    }</span>
+
+<span class="nc" id="L56">    public BrokerIdentity(String brokerClusterName, String brokerName, long brokerId) {</span>
+<span class="nc" id="L57">        this.brokerName = brokerName;</span>
+<span class="nc" id="L58">        this.brokerClusterName = brokerClusterName;</span>
+<span class="nc" id="L59">        this.brokerId = brokerId;</span>
+<span class="nc" id="L60">    }</span>
+
+<span class="nc" id="L62">    public BrokerIdentity(String brokerClusterName, String brokerName, long brokerId, boolean isInBrokerContainer) {</span>
+<span class="nc" id="L63">        this.brokerName = brokerName;</span>
+<span class="nc" id="L64">        this.brokerClusterName = brokerClusterName;</span>
+<span class="nc" id="L65">        this.brokerId = brokerId;</span>
+<span class="nc" id="L66">        this.isInBrokerContainer = isInBrokerContainer;</span>
+<span class="nc" id="L67">    }</span>
+
+    public String getBrokerName() {
+<span class="fc" id="L70">        return brokerName;</span>
+    }
+
+    public void setBrokerName(final String brokerName) {
+<span class="fc" id="L74">        this.brokerName = brokerName;</span>
+<span class="fc" id="L75">    }</span>
+
+    public String getBrokerClusterName() {
+<span class="fc" id="L78">        return brokerClusterName;</span>
+    }
+
+    public void setBrokerClusterName(final String brokerClusterName) {
+<span class="fc" id="L82">        this.brokerClusterName = brokerClusterName;</span>
+<span class="fc" id="L83">    }</span>
+
+    public long getBrokerId() {
+<span class="fc" id="L86">        return brokerId;</span>
+    }
+
+    public void setBrokerId(final long brokerId) {
+<span class="fc" id="L90">        this.brokerId = brokerId;</span>
+<span class="fc" id="L91">    }</span>
+
+    public boolean isInBrokerContainer() {
+<span class="nc" id="L94">        return isInBrokerContainer;</span>
+    }
+
+    public void setInBrokerContainer(boolean inBrokerContainer) {
+<span class="nc" id="L98">        isInBrokerContainer = inBrokerContainer;</span>
+<span class="nc" id="L99">    }</span>
+
+    protected static String localHostName() {
+        try {
+<span class="fc" id="L103">            return InetAddress.getLocalHost().getHostName();</span>
+<span class="nc" id="L104">        } catch (UnknownHostException e) {</span>
+<span class="nc" id="L105">            LOGGER.error(&quot;Failed to obtain the host name&quot;, e);</span>
+        }
+
+<span class="nc" id="L108">        return &quot;DEFAULT_BROKER&quot;;</span>
+    }
+
+    public String getCanonicalName() {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (isBrokerContainer) {</span>
+<span class="nc" id="L113">            return InnerLoggerFactory.BROKER_CONTAINER_NAME;</span>
+        }
+<span class="nc" id="L115">        return this.getBrokerClusterName() + &quot;_&quot; + this.getBrokerName() + &quot;_&quot; + this.getBrokerId();</span>
+    }
+
+    public String getLoggerIdentifier() {
+<span class="nc" id="L119">        return &quot;#&quot; + getCanonicalName() + &quot;#&quot;;</span>
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L125">            return true;</span>
+        }
+
+<span class="nc bnc" id="L128" title="All 4 branches missed.">        if (o == null || getClass() != o.getClass()) {</span>
+<span class="nc" id="L129">            return false;</span>
+        }
+
+<span class="nc" id="L132">        final BrokerIdentity identity = (BrokerIdentity) o;</span>
+
+<span class="nc" id="L134">        return new EqualsBuilder()</span>
+<span class="nc" id="L135">            .append(brokerId, identity.brokerId)</span>
+<span class="nc" id="L136">            .append(brokerName, identity.brokerName)</span>
+<span class="nc" id="L137">            .append(brokerClusterName, identity.brokerClusterName)</span>
+<span class="nc" id="L138">            .isEquals();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L143">        return new HashCodeBuilder(17, 37)</span>
+<span class="nc" id="L144">            .append(brokerName)</span>
+<span class="nc" id="L145">            .append(brokerClusterName)</span>
+<span class="nc" id="L146">            .append(brokerId)</span>
+<span class="nc" id="L147">            .toHashCode();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

@@ -1,0 +1,460 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AsyncTraceDispatcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.trace</a> &gt; <span class="el_source">AsyncTraceDispatcher.java</span></div><h1>AsyncTraceDispatcher.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.trace;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.apache.rocketmq.client.AccessChannel;
+import org.apache.rocketmq.client.common.ThreadLocalIndex;
+import org.apache.rocketmq.client.exception.MQClientException;
+import org.apache.rocketmq.client.impl.consumer.DefaultMQPushConsumerImpl;
+import org.apache.rocketmq.client.impl.producer.DefaultMQProducerImpl;
+import org.apache.rocketmq.client.impl.producer.TopicPublishInfo;
+import org.apache.rocketmq.client.log.ClientLogger;
+import org.apache.rocketmq.client.producer.DefaultMQProducer;
+import org.apache.rocketmq.client.producer.MessageQueueSelector;
+import org.apache.rocketmq.client.producer.SendCallback;
+import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.rocketmq.common.ThreadFactoryImpl;
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.topic.TopicValidator;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.remoting.RPCHook;
+
+import static org.apache.rocketmq.client.trace.TraceConstants.TRACE_INSTANCE_NAME;
+
+public class AsyncTraceDispatcher implements TraceDispatcher {
+
+<span class="fc" id="L55">    private final static InternalLogger log = ClientLogger.getLog();</span>
+<span class="fc" id="L56">    private final static AtomicInteger COUNTER = new AtomicInteger();</span>
+    private final int queueSize;
+    private final int batchSize;
+    private final int maxMsgSize;
+    private final long pollingTimeMil;
+    private final long waitTimeThresholdMil;
+    private final DefaultMQProducer traceProducer;
+    private final ThreadPoolExecutor traceExecutor;
+    // The last discard number of log
+    private AtomicLong discardCount;
+    private Thread worker;
+    private final ArrayBlockingQueue&lt;TraceContext&gt; traceContextQueue;
+    private final HashMap&lt;String, TraceDataSegment&gt; taskQueueByTopic;
+    private ArrayBlockingQueue&lt;Runnable&gt; appenderQueue;
+    private volatile Thread shutDownHook;
+<span class="fc" id="L71">    private volatile boolean stopped = false;</span>
+    private DefaultMQProducerImpl hostProducer;
+    private DefaultMQPushConsumerImpl hostConsumer;
+<span class="fc" id="L74">    private volatile ThreadLocalIndex sendWhichQueue = new ThreadLocalIndex();</span>
+<span class="fc" id="L75">    private String dispatcherId = UUID.randomUUID().toString();</span>
+    private volatile String traceTopicName;
+<span class="fc" id="L77">    private AtomicBoolean isStarted = new AtomicBoolean(false);</span>
+<span class="fc" id="L78">    private volatile AccessChannel accessChannel = AccessChannel.LOCAL;</span>
+    private String group;
+    private Type type;
+
+<span class="fc" id="L82">    public AsyncTraceDispatcher(String group, Type type, String traceTopicName, RPCHook rpcHook) {</span>
+        // queueSize is greater than or equal to the n power of 2 of value
+<span class="fc" id="L84">        this.queueSize = 2048;</span>
+<span class="fc" id="L85">        this.batchSize = 100;</span>
+<span class="fc" id="L86">        this.maxMsgSize = 128000;</span>
+<span class="fc" id="L87">        this.pollingTimeMil = 100;</span>
+<span class="fc" id="L88">        this.waitTimeThresholdMil = 500;</span>
+<span class="fc" id="L89">        this.discardCount = new AtomicLong(0L);</span>
+<span class="fc" id="L90">        this.traceContextQueue = new ArrayBlockingQueue&lt;TraceContext&gt;(1024);</span>
+<span class="fc" id="L91">        this.taskQueueByTopic = new HashMap();</span>
+<span class="fc" id="L92">        this.group = group;</span>
+<span class="fc" id="L93">        this.type = type;</span>
+
+<span class="fc" id="L95">        this.appenderQueue = new ArrayBlockingQueue&lt;Runnable&gt;(queueSize);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (!UtilAll.isBlank(traceTopicName)) {</span>
+<span class="fc" id="L97">            this.traceTopicName = traceTopicName;</span>
+        } else {
+<span class="fc" id="L99">            this.traceTopicName = TopicValidator.RMQ_SYS_TRACE_TOPIC;</span>
+        }
+<span class="fc" id="L101">        this.traceExecutor = new ThreadPoolExecutor(//</span>
+            10, //
+            20, //
+            1000 * 60, //
+            TimeUnit.MILLISECONDS, //
+            this.appenderQueue, //
+            new ThreadFactoryImpl(&quot;MQTraceSendThread_&quot;));
+<span class="fc" id="L108">        traceProducer = getAndCreateTraceProducer(rpcHook);</span>
+<span class="fc" id="L109">    }</span>
+
+    public AccessChannel getAccessChannel() {
+<span class="fc" id="L112">        return accessChannel;</span>
+    }
+
+    public void setAccessChannel(AccessChannel accessChannel) {
+<span class="nc" id="L116">        this.accessChannel = accessChannel;</span>
+<span class="nc" id="L117">    }</span>
+
+    public String getTraceTopicName() {
+<span class="fc" id="L120">        return traceTopicName;</span>
+    }
+
+    public void setTraceTopicName(String traceTopicName) {
+<span class="fc" id="L124">        this.traceTopicName = traceTopicName;</span>
+<span class="fc" id="L125">    }</span>
+
+    public DefaultMQProducer getTraceProducer() {
+<span class="fc" id="L128">        return traceProducer;</span>
+    }
+
+    public DefaultMQProducerImpl getHostProducer() {
+<span class="fc" id="L132">        return hostProducer;</span>
+    }
+
+    public void setHostProducer(DefaultMQProducerImpl hostProducer) {
+<span class="fc" id="L136">        this.hostProducer = hostProducer;</span>
+<span class="fc" id="L137">    }</span>
+
+    public DefaultMQPushConsumerImpl getHostConsumer() {
+<span class="fc" id="L140">        return hostConsumer;</span>
+    }
+
+    public void setHostConsumer(DefaultMQPushConsumerImpl hostConsumer) {
+<span class="fc" id="L144">        this.hostConsumer = hostConsumer;</span>
+<span class="fc" id="L145">    }</span>
+
+    public void start(String nameSrvAddr, AccessChannel accessChannel) throws MQClientException {
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (isStarted.compareAndSet(false, true)) {</span>
+<span class="fc" id="L149">            traceProducer.setNamesrvAddr(nameSrvAddr);</span>
+<span class="fc" id="L150">            traceProducer.setInstanceName(TRACE_INSTANCE_NAME + &quot;_&quot; + nameSrvAddr);</span>
+<span class="fc" id="L151">            traceProducer.start();</span>
+        }
+<span class="fc" id="L153">        this.accessChannel = accessChannel;</span>
+<span class="fc" id="L154">        this.worker = new Thread(new AsyncRunnable(), &quot;MQ-AsyncTraceDispatcher-Thread-&quot; + dispatcherId);</span>
+<span class="fc" id="L155">        this.worker.setDaemon(true);</span>
+<span class="fc" id="L156">        this.worker.start();</span>
+<span class="fc" id="L157">        this.registerShutDownHook();</span>
+<span class="fc" id="L158">    }</span>
+
+    private DefaultMQProducer getAndCreateTraceProducer(RPCHook rpcHook) {
+<span class="fc" id="L161">        DefaultMQProducer traceProducerInstance = this.traceProducer;</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (traceProducerInstance == null) {</span>
+<span class="fc" id="L163">            traceProducerInstance = new DefaultMQProducer(rpcHook);</span>
+<span class="fc" id="L164">            traceProducerInstance.setProducerGroup(genGroupNameForTrace());</span>
+<span class="fc" id="L165">            traceProducerInstance.setSendMsgTimeout(5000);</span>
+<span class="fc" id="L166">            traceProducerInstance.setVipChannelEnabled(false);</span>
+            // The max size of message is 128K
+<span class="fc" id="L168">            traceProducerInstance.setMaxMessageSize(maxMsgSize);</span>
+        }
+<span class="fc" id="L170">        return traceProducerInstance;</span>
+    }
+
+    private String genGroupNameForTrace() {
+<span class="fc" id="L174">        return TraceConstants.GROUP_NAME_PREFIX + &quot;-&quot; + this.group + &quot;-&quot; + this.type + &quot;-&quot; + COUNTER.incrementAndGet();</span>
+    }
+
+    @Override
+    public boolean append(final Object ctx) {
+<span class="fc" id="L179">        boolean result = traceContextQueue.offer((TraceContext) ctx);</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (!result) {</span>
+<span class="nc" id="L181">            log.info(&quot;buffer full&quot; + discardCount.incrementAndGet() + &quot; ,context is &quot; + ctx);</span>
+        }
+<span class="fc" id="L183">        return result;</span>
+    }
+
+    @Override
+    public void flush() {
+        // The maximum waiting time for refresh,avoid being written all the time, resulting in failure to return.
+<span class="fc" id="L189">        long end = System.currentTimeMillis() + 500;</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        while (System.currentTimeMillis() &lt;= end) {</span>
+<span class="fc" id="L191">            synchronized (taskQueueByTopic) {</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                for (TraceDataSegment taskInfo : taskQueueByTopic.values()) {</span>
+<span class="fc" id="L193">                    taskInfo.sendAllData();</span>
+<span class="fc" id="L194">                }</span>
+<span class="fc" id="L195">            }</span>
+<span class="fc" id="L196">            synchronized (traceContextQueue) {</span>
+<span class="pc bpc" id="L197" title="2 of 4 branches missed.">                if (traceContextQueue.size() == 0 &amp;&amp; appenderQueue.size() == 0) {</span>
+<span class="fc" id="L198">                    break;</span>
+                }
+<span class="nc" id="L200">            }</span>
+            try {
+<span class="nc" id="L202">                Thread.sleep(1);</span>
+<span class="nc" id="L203">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L204">                break;</span>
+<span class="nc" id="L205">            }</span>
+        }
+<span class="fc" id="L207">        log.info(&quot;------end trace send &quot; + traceContextQueue.size() + &quot;   &quot; + appenderQueue.size());</span>
+<span class="fc" id="L208">    }</span>
+
+    @Override
+    public void shutdown() {
+<span class="fc" id="L212">        this.stopped = true;</span>
+<span class="fc" id="L213">        flush();</span>
+<span class="fc" id="L214">        this.traceExecutor.shutdown();</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (isStarted.get()) {</span>
+<span class="fc" id="L216">            traceProducer.shutdown();</span>
+        }
+<span class="fc" id="L218">        this.removeShutdownHook();</span>
+<span class="fc" id="L219">    }</span>
+
+    public void registerShutDownHook() {
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (shutDownHook == null) {</span>
+<span class="fc" id="L223">            shutDownHook = new Thread(new Runnable() {</span>
+<span class="fc" id="L224">                private volatile boolean hasShutdown = false;</span>
+
+                @Override
+                public void run() {
+<span class="fc" id="L228">                    synchronized (this) {</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">                        if (!this.hasShutdown) {</span>
+<span class="nc" id="L230">                            flush();</span>
+                        }
+<span class="nc" id="L232">                    }</span>
+<span class="nc" id="L233">                }</span>
+            }, &quot;ShutdownHookMQTrace&quot;);
+<span class="fc" id="L235">            Runtime.getRuntime().addShutdownHook(shutDownHook);</span>
+        }
+<span class="fc" id="L237">    }</span>
+
+    public void removeShutdownHook() {
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        if (shutDownHook != null) {</span>
+            try {
+<span class="fc" id="L242">                Runtime.getRuntime().removeShutdownHook(shutDownHook);</span>
+<span class="nc" id="L243">            } catch (IllegalStateException e) {</span>
+                // ignore - VM is already shutting down
+<span class="fc" id="L245">            }</span>
+        }
+<span class="fc" id="L247">    }</span>
+
+<span class="fc" id="L249">    class AsyncRunnable implements Runnable {</span>
+        private boolean stopped;
+
+        @Override
+        public void run() {
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            while (!stopped) {</span>
+<span class="fc" id="L255">                synchronized (traceContextQueue) {</span>
+<span class="fc" id="L256">                    long endTime = System.currentTimeMillis() + pollingTimeMil;</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">                    while (System.currentTimeMillis() &lt; endTime) {</span>
+                        try {
+<span class="fc" id="L259">                            TraceContext traceContext = traceContextQueue.poll(</span>
+<span class="fc" id="L260">                                endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS</span>
+                            );
+
+<span class="pc bpc" id="L263" title="1 of 4 branches missed.">                            if (traceContext != null &amp;&amp; !traceContext.getTraceBeans().isEmpty()) {</span>
+                                // get the topic which the trace message will send to
+<span class="fc" id="L265">                                String traceTopicName = this.getTraceTopicName(traceContext.getRegionId());</span>
+
+                                // get the traceDataSegment which will save this trace message, create if null
+<span class="fc" id="L268">                                TraceDataSegment traceDataSegment = taskQueueByTopic.get(traceTopicName);</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                                if (traceDataSegment == null) {</span>
+<span class="fc" id="L270">                                    traceDataSegment = new TraceDataSegment(traceTopicName, traceContext.getRegionId());</span>
+<span class="fc" id="L271">                                    taskQueueByTopic.put(traceTopicName, traceDataSegment);</span>
+                                }
+
+                                // encode traceContext and save it into traceDataSegment
+                                // NOTE if data size in traceDataSegment more than maxMsgSize,
+                                //  a AsyncDataSendTask will be created and submitted
+<span class="fc" id="L277">                                TraceTransferBean traceTransferBean = TraceDataEncoder.encoderFromContextBean(traceContext);</span>
+<span class="fc" id="L278">                                traceDataSegment.addTraceTransferBean(traceTransferBean);</span>
+                            }
+<span class="nc" id="L280">                        } catch (InterruptedException ignore) {</span>
+<span class="nc" id="L281">                            log.debug(&quot;traceContextQueue#poll exception&quot;);</span>
+<span class="pc" id="L282">                        }</span>
+                    }
+
+                    // NOTE send the data in traceDataSegment which the first TraceTransferBean
+                    //  is longer than waitTimeThreshold
+<span class="fc" id="L287">                    sendDataByTimeThreshold();</span>
+
+<span class="fc bfc" id="L289" title="All 2 branches covered.">                    if (AsyncTraceDispatcher.this.stopped) {</span>
+<span class="fc" id="L290">                        this.stopped = true;</span>
+                    }
+<span class="fc" id="L292">                }</span>
+            }
+
+<span class="fc" id="L295">        }</span>
+
+        private void sendDataByTimeThreshold() {
+<span class="fc" id="L298">            long now = System.currentTimeMillis();</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">            for (TraceDataSegment taskInfo : taskQueueByTopic.values()) {</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">                if (now - taskInfo.firstBeanAddTime &gt;= waitTimeThresholdMil) {</span>
+<span class="fc" id="L301">                    taskInfo.sendAllData();</span>
+                }
+<span class="fc" id="L303">            }</span>
+<span class="fc" id="L304">        }</span>
+
+        private String getTraceTopicName(String regionId) {
+<span class="fc" id="L307">            AccessChannel accessChannel = AsyncTraceDispatcher.this.getAccessChannel();</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">            if (AccessChannel.CLOUD == accessChannel) {</span>
+<span class="nc" id="L309">                return TraceConstants.TRACE_TOPIC_PREFIX + regionId;</span>
+            }
+
+<span class="fc" id="L312">            return AsyncTraceDispatcher.this.getTraceTopicName();</span>
+        }
+    }
+
+    class TraceDataSegment {
+        private long firstBeanAddTime;
+        private int currentMsgSize;
+        private final String traceTopicName;
+        private final String regionId;
+<span class="fc" id="L321">        private final List&lt;TraceTransferBean&gt; traceTransferBeanList = new ArrayList();</span>
+
+<span class="fc" id="L323">        TraceDataSegment(String traceTopicName, String regionId) {</span>
+<span class="fc" id="L324">            this.traceTopicName = traceTopicName;</span>
+<span class="fc" id="L325">            this.regionId = regionId;</span>
+<span class="fc" id="L326">        }</span>
+
+        public void addTraceTransferBean(TraceTransferBean traceTransferBean) {
+<span class="fc" id="L329">            initFirstBeanAddTime();</span>
+<span class="fc" id="L330">            this.traceTransferBeanList.add(traceTransferBean);</span>
+<span class="fc" id="L331">            this.currentMsgSize += traceTransferBean.getTransData().length();</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">            if (currentMsgSize &gt;= traceProducer.getMaxMessageSize() - 10 * 1000) {</span>
+<span class="nc" id="L333">                List&lt;TraceTransferBean&gt; dataToSend = new ArrayList(traceTransferBeanList);</span>
+<span class="nc" id="L334">                AsyncDataSendTask asyncDataSendTask = new AsyncDataSendTask(traceTopicName, regionId, dataToSend);</span>
+<span class="nc" id="L335">                traceExecutor.submit(asyncDataSendTask);</span>
+
+<span class="nc" id="L337">                this.clear();</span>
+
+            }
+<span class="fc" id="L340">        }</span>
+
+        public void sendAllData() {
+<span class="fc bfc" id="L343" title="All 2 branches covered.">            if (this.traceTransferBeanList.isEmpty()) {</span>
+<span class="fc" id="L344">                return;</span>
+            }
+<span class="fc" id="L346">            List&lt;TraceTransferBean&gt; dataToSend = new ArrayList(traceTransferBeanList);</span>
+<span class="fc" id="L347">            AsyncDataSendTask asyncDataSendTask = new AsyncDataSendTask(traceTopicName, regionId, dataToSend);</span>
+<span class="fc" id="L348">            traceExecutor.submit(asyncDataSendTask);</span>
+
+<span class="fc" id="L350">            this.clear();</span>
+<span class="fc" id="L351">        }</span>
+
+        private void initFirstBeanAddTime() {
+<span class="fc bfc" id="L354" title="All 2 branches covered.">            if (firstBeanAddTime == 0) {</span>
+<span class="fc" id="L355">                firstBeanAddTime = System.currentTimeMillis();</span>
+            }
+<span class="fc" id="L357">        }</span>
+
+        private void clear() {
+<span class="fc" id="L360">            this.firstBeanAddTime = 0;</span>
+<span class="fc" id="L361">            this.currentMsgSize = 0;</span>
+<span class="fc" id="L362">            this.traceTransferBeanList.clear();</span>
+<span class="fc" id="L363">        }</span>
+    }
+
+
+    class AsyncDataSendTask implements Runnable {
+        private final String traceTopicName;
+        private final String regionId;
+        private final List&lt;TraceTransferBean&gt; traceTransferBeanList;
+
+<span class="fc" id="L372">        public AsyncDataSendTask(String traceTopicName, String regionId, List&lt;TraceTransferBean&gt; traceTransferBeanList) {</span>
+<span class="fc" id="L373">            this.traceTopicName = traceTopicName;</span>
+<span class="fc" id="L374">            this.regionId = regionId;</span>
+<span class="fc" id="L375">            this.traceTransferBeanList = traceTransferBeanList;</span>
+<span class="fc" id="L376">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L380">            StringBuilder buffer = new StringBuilder(1024);</span>
+<span class="fc" id="L381">            Set&lt;String&gt; keySet = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">            for (TraceTransferBean bean : traceTransferBeanList) {</span>
+<span class="fc" id="L383">                keySet.addAll(bean.getTransKey());</span>
+<span class="fc" id="L384">                buffer.append(bean.getTransData());</span>
+<span class="fc" id="L385">            }</span>
+<span class="fc" id="L386">            sendTraceDataByMQ(keySet, buffer.toString(), traceTopicName);</span>
+<span class="fc" id="L387">        }</span>
+
+        /**
+         * Send message trace data
+         *
+         * @param keySet the keyset in this batch(including msgId in original message not offsetMsgId)
+         * @param data   the message trace data in this batch
+         * @param traceTopic the topic which message trace data will send to
+         */
+        private void sendTraceDataByMQ(Set&lt;String&gt; keySet, final String data, String traceTopic) {
+<span class="fc" id="L397">            final Message message = new Message(traceTopic, data.getBytes());</span>
+            // Keyset of message trace includes msgId of or original message
+<span class="fc" id="L399">            message.setKeys(keySet);</span>
+            try {
+<span class="fc" id="L401">                Set&lt;String&gt; traceBrokerSet = tryGetMessageQueueBrokerSet(traceProducer.getDefaultMQProducerImpl(), traceTopic);</span>
+<span class="fc" id="L402">                SendCallback callback = new SendCallback() {</span>
+                    @Override
+                    public void onSuccess(SendResult sendResult) {
+
+<span class="nc" id="L406">                    }</span>
+
+                    @Override
+                    public void onException(Throwable e) {
+<span class="fc" id="L410">                        log.error(&quot;send trace data failed, the traceData is {}&quot;, data, e);</span>
+<span class="fc" id="L411">                    }</span>
+                };
+<span class="fc bfc" id="L413" title="All 2 branches covered.">                if (traceBrokerSet.isEmpty()) {</span>
+                    // No cross set
+<span class="fc" id="L415">                    traceProducer.send(message, callback, 5000);</span>
+                } else {
+<span class="fc" id="L417">                    traceProducer.send(message, new MessageQueueSelector() {</span>
+                        @Override
+                        public MessageQueue select(List&lt;MessageQueue&gt; mqs, Message msg, Object arg) {
+<span class="fc" id="L420">                            Set&lt;String&gt; brokerSet = (Set&lt;String&gt;) arg;</span>
+<span class="fc" id="L421">                            List&lt;MessageQueue&gt; filterMqs = new ArrayList&lt;MessageQueue&gt;();</span>
+<span class="fc bfc" id="L422" title="All 2 branches covered.">                            for (MessageQueue queue : mqs) {</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">                                if (brokerSet.contains(queue.getBrokerName())) {</span>
+<span class="fc" id="L424">                                    filterMqs.add(queue);</span>
+                                }
+<span class="fc" id="L426">                            }</span>
+<span class="fc" id="L427">                            int index = sendWhichQueue.incrementAndGet();</span>
+<span class="fc" id="L428">                            int pos = Math.abs(index) % filterMqs.size();</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">                            if (pos &lt; 0) {</span>
+<span class="nc" id="L430">                                pos = 0;</span>
+                            }
+<span class="fc" id="L432">                            return filterMqs.get(pos);</span>
+                        }
+                    }, traceBrokerSet, callback);
+                }
+
+<span class="nc" id="L437">            } catch (Exception e) {</span>
+<span class="nc" id="L438">                log.error(&quot;send trace data failed, the traceData is {}&quot;, data, e);</span>
+<span class="fc" id="L439">            }</span>
+<span class="fc" id="L440">        }</span>
+
+        private Set&lt;String&gt; tryGetMessageQueueBrokerSet(DefaultMQProducerImpl producer, String topic) {
+<span class="fc" id="L443">            Set&lt;String&gt; brokerSet = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L444">            TopicPublishInfo topicPublishInfo = producer.getTopicPublishInfoTable().get(topic);</span>
+<span class="pc bpc" id="L445" title="3 of 4 branches missed.">            if (null == topicPublishInfo || !topicPublishInfo.ok()) {</span>
+<span class="fc" id="L446">                producer.getTopicPublishInfoTable().putIfAbsent(topic, new TopicPublishInfo());</span>
+<span class="fc" id="L447">                producer.getMqClientFactory().updateTopicRouteInfoFromNameServer(topic);</span>
+<span class="fc" id="L448">                topicPublishInfo = producer.getTopicPublishInfoTable().get(topic);</span>
+            }
+<span class="pc bpc" id="L450" title="1 of 4 branches missed.">            if (topicPublishInfo.isHaveTopicRouterInfo() || topicPublishInfo.ok()) {</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">                for (MessageQueue queue : topicPublishInfo.getMessageQueueList()) {</span>
+<span class="fc" id="L452">                    brokerSet.add(queue.getBrokerName());</span>
+<span class="fc" id="L453">                }</span>
+            }
+<span class="fc" id="L455">            return brokerSet;</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

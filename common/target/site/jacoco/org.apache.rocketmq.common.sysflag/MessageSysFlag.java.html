@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MessageSysFlag.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.sysflag</a> &gt; <span class="el_source">MessageSysFlag.java</span></div><h1>MessageSysFlag.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.sysflag;
+
+import org.apache.rocketmq.common.compression.CompressionType;
+
+<span class="nc" id="L21">public class MessageSysFlag {</span>
+
+    /**
+     * Meaning of each bit in the system flag
+     *
+     * | bit    | 7 | 6 | 5         | 4        | 3           | 2                | 1                | 0                |
+     * |--------|---|---|-----------|----------|-------------|------------------|------------------|------------------|
+     * | byte 1 |   |   | STOREHOST | BORNHOST | TRANSACTION | TRANSACTION      | MULTI_TAGS       | COMPRESSED       |
+     * | byte 2 |   |   |           |          |             | COMPRESSION_TYPE | COMPRESSION_TYPE | COMPRESSION_TYPE |
+     * | byte 3 |   |   |           |          |             |                  |                  |                  |
+     * | byte 4 |   |   |           |          |             |                  |                  |                  |
+     */
+    public final static int COMPRESSED_FLAG = 0x1;
+    public final static int MULTI_TAGS_FLAG = 0x1 &lt;&lt; 1;
+    public final static int TRANSACTION_NOT_TYPE = 0;
+    public final static int TRANSACTION_PREPARED_TYPE = 0x1 &lt;&lt; 2;
+    public final static int TRANSACTION_COMMIT_TYPE = 0x2 &lt;&lt; 2;
+    public final static int TRANSACTION_ROLLBACK_TYPE = 0x3 &lt;&lt; 2;
+    public final static int BORNHOST_V6_FLAG = 0x1 &lt;&lt; 4;
+    public final static int STOREHOSTADDRESS_V6_FLAG = 0x1 &lt;&lt; 5;
+    //Mark the flag for batch to avoid conflict
+    public final static int NEED_UNWRAP_FLAG = 0x1 &lt;&lt; 6;
+    public final static int INNER_BATCH_FLAG = 0x1 &lt;&lt; 7;
+
+    // COMPRESSION_TYPE
+    public final static int COMPRESSION_LZ4_TYPE = 0x1 &lt;&lt; 8;
+    public final static int COMPRESSION_ZSTD_TYPE = 0x2 &lt;&lt; 8;
+    public final static int COMPRESSION_ZLIB_TYPE = 0x3 &lt;&lt; 8;
+    public final static int COMPRESSION_TYPE_COMPARATOR = 0x7 &lt;&lt; 8;
+
+    public static int getTransactionValue(final int flag) {
+<span class="nc" id="L52">        return flag &amp; TRANSACTION_ROLLBACK_TYPE;</span>
+    }
+
+    public static int resetTransactionValue(final int flag, final int type) {
+<span class="nc" id="L56">        return (flag &amp; (~TRANSACTION_ROLLBACK_TYPE)) | type;</span>
+    }
+
+    public static int clearCompressedFlag(final int flag) {
+<span class="nc" id="L60">        return flag &amp; (~COMPRESSED_FLAG);</span>
+    }
+
+    // To match the compression type
+    public static CompressionType getCompressionType(final int flag) {
+<span class="fc" id="L65">        return CompressionType.findByValue((flag &amp; COMPRESSION_TYPE_COMPARATOR) &gt;&gt; 8);</span>
+    }
+
+    public static boolean check(int flag, int expectedFlag) {
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        return (flag &amp; expectedFlag) != 0;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

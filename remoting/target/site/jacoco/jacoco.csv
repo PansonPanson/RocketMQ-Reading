@@ -1,0 +1,73 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.common,Pair,8,15,0,0,4,6,2,3,2,3
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.common,RemotingUtil.new ChannelFutureListener() {...},0,15,0,0,0,4,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.common,TlsMode,2,71,1,3,1,11,1,5,0,4
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.common,RemotingUtil,310,43,45,5,93,12,36,3,11,3
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.common,ServiceThread,15,95,2,2,6,24,4,5,2,5
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.common,RemotingHelper,305,104,48,10,84,27,34,7,6,6
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.common,SemaphoreReleaseOnlyOnce,3,25,2,2,1,8,3,2,1,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.exception,RemotingSendRequestException,5,14,0,0,2,2,1,1,1,1
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.exception,RemotingCommandException,10,0,0,0,4,0,2,0,2,0
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.exception,RemotingTooMuchRequestException,4,0,0,0,2,0,1,0,1,0
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.exception,RemotingException,4,5,0,0,2,2,1,1,1,1
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.exception,RemotingConnectException,19,0,0,0,4,0,2,0,2,0
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.exception,RemotingTimeoutException,10,18,0,0,4,2,2,1,2,1
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient,723,738,125,65,169,185,93,30,10,18
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient.NettyConnectManageHandler,101,89,12,6,18,23,10,5,1,5
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer.SubRemotingServer,66,58,2,2,17,17,13,4,11,4
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingAbstract.new Runnable() {...},56,75,5,5,19,18,4,3,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyLogger,4,21,1,1,2,7,2,2,1,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingAbstract.new Runnable() {...},0,21,0,0,0,6,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyDecoder,4,58,1,3,1,15,1,4,0,3
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer.NettyConnectManageHandler,63,90,8,4,11,28,6,7,0,7
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingAbstract.new ChannelFutureListener() {...},0,58,0,2,0,10,0,3,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingAbstract.new ChannelFutureListener() {...},12,23,1,1,3,4,1,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer,155,366,19,19,32,88,25,14,9,11
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyServerConfig,66,81,0,0,31,27,17,13,17,13
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,FileRegionEncoder,0,29,0,2,0,9,0,3,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingAbstract,288,500,28,35,65,126,24,26,4,14
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyEvent,43,0,0,0,9,0,5,0,5,0
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyLogger.NettyBridgeLogger,435,64,60,2,118,19,64,11,34,10
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,TlsHelper,30,348,15,33,14,80,17,15,2,6
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer.HandshakeHandler,22,85,3,6,9,21,3,4,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyEncoder,27,17,3,1,6,7,2,3,0,3
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,TlsHelper.new TlsHelper.DecryptionStrategy() {...},0,8,0,0,0,2,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient.new ThreadFactory() {...},0,27,0,0,0,3,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,TlsSystemConfig,3,66,0,0,1,15,1,1,1,1
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient.new ChannelInitializer() {...},3,85,1,3,1,10,1,3,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient.new TimerTask() {...},5,11,0,0,2,4,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient.new TimerTask() {...},5,11,0,0,2,4,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient.ChannelWrapper,9,32,2,2,2,9,4,5,2,5
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,ResponseFuture,29,168,3,5,8,41,7,19,5,17
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient.new Runnable() {...},43,0,2,0,9,0,3,0,2,0
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyLogger.NettyBridgeLoggerFactory,0,5,0,0,0,1,0,1,0,1
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettySystemConfig,3,61,0,0,1,24,1,1,1,1
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient.InvokeCallbackWrapper,5,25,3,3,2,6,3,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,FileRegionEncoder.new WritableByteChannel() {...},1,20,0,0,1,4,1,3,1,3
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient.new ThreadFactory() {...},0,27,0,0,0,3,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient.new ThreadFactory() {...},15,12,0,0,1,2,1,1,1,1
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient.new ThreadFactory() {...},0,28,0,0,0,3,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer.new TimerTask() {...},5,11,0,0,2,4,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer.new ThreadFactory() {...},0,27,0,0,0,3,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer.new ChannelInitializer() {...},0,60,0,0,0,9,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer.new ThreadFactory() {...},0,28,0,0,0,3,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer.new ThreadFactory() {...},0,42,0,0,0,4,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyClientConfig,62,98,0,0,30,33,16,15,16,15
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingAbstract.NettyEventExecutor,124,17,13,0,24,4,10,2,2,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer.new ThreadFactory() {...},28,0,0,0,3,0,2,0,2,0
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingAbstract.new ChannelFutureListener() {...},14,19,1,1,1,4,1,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer.new ThreadFactory() {...},42,0,0,0,4,0,2,0,2,0
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingClient.NettyClientHandler,0,12,0,0,0,3,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer.new ThreadFactory() {...},0,27,0,0,0,3,0,2,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyRemotingServer.NettyServerHandler,0,33,1,3,0,8,1,3,0,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,RequestTask,150,25,29,1,26,10,21,2,6,2
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.netty,NettyEventType,0,44,0,0,0,5,0,1,0,1
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.protocol,RemotingSerializable,8,55,2,2,3,15,3,10,1,10
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.protocol,LanguageCode,2,180,1,3,1,21,1,5,0,4
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.protocol,SerializeType,4,57,2,2,1,10,2,4,0,4
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.protocol,RequestType,0,50,0,4,0,10,0,6,0,4
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.protocol,RemotingSysResponseCode,3,0,0,0,1,0,1,0,1,0
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.protocol,FastCodesHeader,30,0,4,0,9,0,4,0,2,0
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.protocol,RemotingCommandType,0,24,0,0,0,3,0,1,0,1
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.protocol,RocketMQSerializable,44,476,18,50,6,115,19,27,1,11
+rocketmq-remoting 5.0.0-SNAPSHOT,org.apache.rocketmq.remoting.protocol,RemotingCommand,308,797,37,66,72,216,39,71,10,48

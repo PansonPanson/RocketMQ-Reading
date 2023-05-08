@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RegisterBrokerToControllerResponseHeader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.header.namesrv.controller</a> &gt; <span class="el_source">RegisterBrokerToControllerResponseHeader.java</span></div><h1>RegisterBrokerToControllerResponseHeader.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.protocol.header.namesrv.controller;
+
+import org.apache.rocketmq.remoting.CommandCustomHeader;
+import org.apache.rocketmq.remoting.exception.RemotingCommandException;
+
+public class RegisterBrokerToControllerResponseHeader implements CommandCustomHeader {
+    private String masterAddress;
+    private int masterEpoch;
+    private int syncStateSetEpoch;
+    // The id of this registered replicas.
+    private long brokerId;
+
+<span class="nc" id="L29">    public RegisterBrokerToControllerResponseHeader() {</span>
+<span class="nc" id="L30">    }</span>
+
+    public String getMasterAddress() {
+<span class="nc" id="L33">        return masterAddress;</span>
+    }
+
+    public void setMasterAddress(String masterAddress) {
+<span class="nc" id="L37">        this.masterAddress = masterAddress;</span>
+<span class="nc" id="L38">    }</span>
+
+    public int getMasterEpoch() {
+<span class="nc" id="L41">        return masterEpoch;</span>
+    }
+
+    public void setMasterEpoch(int masterEpoch) {
+<span class="nc" id="L45">        this.masterEpoch = masterEpoch;</span>
+<span class="nc" id="L46">    }</span>
+
+    public int getSyncStateSetEpoch() {
+<span class="nc" id="L49">        return syncStateSetEpoch;</span>
+    }
+
+    public void setSyncStateSetEpoch(int syncStateSetEpoch) {
+<span class="nc" id="L53">        this.syncStateSetEpoch = syncStateSetEpoch;</span>
+<span class="nc" id="L54">    }</span>
+
+    public long getBrokerId() {
+<span class="nc" id="L57">        return brokerId;</span>
+    }
+
+    public void setBrokerId(long brokerId) {
+<span class="nc" id="L61">        this.brokerId = brokerId;</span>
+<span class="nc" id="L62">    }</span>
+
+    @Override public String toString() {
+<span class="nc" id="L65">        return &quot;RegisterBrokerResponseHeader{&quot; +</span>
+            &quot;masterAddress='&quot; + masterAddress + '\'' +
+            &quot;, masterEpoch=&quot; + masterEpoch +
+            &quot;, syncStateSetEpoch=&quot; + syncStateSetEpoch +
+            &quot;, brokerId=&quot; + brokerId +
+            '}';
+    }
+
+    @Override
+    public void checkFields() throws RemotingCommandException {
+<span class="nc" id="L75">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

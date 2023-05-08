@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KVConfigManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-namesrv 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.namesrv.kvconfig</a> &gt; <span class="el_source">KVConfigManager.java</span></div><h1>KVConfigManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.namesrv.kvconfig;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map.Entry;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+import org.apache.rocketmq.common.protocol.body.KVTable;
+import org.apache.rocketmq.namesrv.NamesrvController;
+
+public class KVConfigManager {
+<span class="fc" id="L32">    private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.NAMESRV_LOGGER_NAME);</span>
+
+    private final NamesrvController namesrvController;
+
+<span class="fc" id="L36">    private final ReadWriteLock lock = new ReentrantReadWriteLock();</span>
+<span class="fc" id="L37">    private final HashMap&lt;String/* Namespace */, HashMap&lt;String/* Key */, String/* Value */&gt;&gt; configTable =</span>
+        new HashMap&lt;String, HashMap&lt;String, String&gt;&gt;();
+
+<span class="fc" id="L40">    public KVConfigManager(NamesrvController namesrvController) {</span>
+<span class="fc" id="L41">        this.namesrvController = namesrvController;</span>
+<span class="fc" id="L42">    }</span>
+
+    public void load() {
+<span class="fc" id="L45">        String content = null;</span>
+        try {
+<span class="fc" id="L47">            content = MixAll.file2String(this.namesrvController.getNamesrvConfig().getKvConfigPath());</span>
+<span class="nc" id="L48">        } catch (IOException e) {</span>
+<span class="nc" id="L49">            log.warn(&quot;Load KV config table exception&quot;, e);</span>
+<span class="fc" id="L50">        }</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (content != null) {</span>
+<span class="fc" id="L52">            KVConfigSerializeWrapper kvConfigSerializeWrapper =</span>
+<span class="fc" id="L53">                KVConfigSerializeWrapper.fromJson(content, KVConfigSerializeWrapper.class);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (null != kvConfigSerializeWrapper) {</span>
+<span class="fc" id="L55">                this.configTable.putAll(kvConfigSerializeWrapper.getConfigTable());</span>
+<span class="fc" id="L56">                log.info(&quot;load KV config table OK&quot;);</span>
+            }
+        }
+<span class="fc" id="L59">    }</span>
+
+    public void putKVConfig(final String namespace, final String key, final String value) {
+        try {
+<span class="fc" id="L63">            this.lock.writeLock().lockInterruptibly();</span>
+            try {
+<span class="fc" id="L65">                HashMap&lt;String, String&gt; kvTable = this.configTable.get(namespace);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                if (null == kvTable) {</span>
+<span class="fc" id="L67">                    kvTable = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L68">                    this.configTable.put(namespace, kvTable);</span>
+<span class="fc" id="L69">                    log.info(&quot;putKVConfig create new Namespace {}&quot;, namespace);</span>
+                }
+
+<span class="fc" id="L72">                final String prev = kvTable.put(key, value);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">                if (null != prev) {</span>
+<span class="nc" id="L74">                    log.info(&quot;putKVConfig update config item, Namespace: {} Key: {} Value: {}&quot;,</span>
+                        namespace, key, value);
+                } else {
+<span class="fc" id="L77">                    log.info(&quot;putKVConfig create new config item, Namespace: {} Key: {} Value: {}&quot;,</span>
+                        namespace, key, value);
+                }
+            } finally {
+<span class="fc" id="L81">                this.lock.writeLock().unlock();</span>
+            }
+<span class="nc" id="L83">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L84">            log.error(&quot;putKVConfig InterruptedException&quot;, e);</span>
+<span class="fc" id="L85">        }</span>
+
+<span class="fc" id="L87">        this.persist();</span>
+<span class="fc" id="L88">    }</span>
+
+    public void persist() {
+        try {
+<span class="fc" id="L92">            this.lock.readLock().lockInterruptibly();</span>
+            try {
+<span class="fc" id="L94">                KVConfigSerializeWrapper kvConfigSerializeWrapper = new KVConfigSerializeWrapper();</span>
+<span class="fc" id="L95">                kvConfigSerializeWrapper.setConfigTable(this.configTable);</span>
+
+<span class="fc" id="L97">                String content = kvConfigSerializeWrapper.toJson();</span>
+
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                if (null != content) {</span>
+<span class="fc" id="L100">                    MixAll.string2File(content, this.namesrvController.getNamesrvConfig().getKvConfigPath());</span>
+                }
+<span class="nc" id="L102">            } catch (IOException e) {</span>
+<span class="nc" id="L103">                log.error(&quot;persist kvconfig Exception, &quot;</span>
+<span class="nc" id="L104">                    + this.namesrvController.getNamesrvConfig().getKvConfigPath(), e);</span>
+            } finally {
+<span class="fc" id="L106">                this.lock.readLock().unlock();</span>
+            }
+<span class="nc" id="L108">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L109">            log.error(&quot;persist InterruptedException&quot;, e);</span>
+<span class="fc" id="L110">        }</span>
+
+<span class="fc" id="L112">    }</span>
+
+    public void deleteKVConfig(final String namespace, final String key) {
+        try {
+<span class="fc" id="L116">            this.lock.writeLock().lockInterruptibly();</span>
+            try {
+<span class="fc" id="L118">                HashMap&lt;String, String&gt; kvTable = this.configTable.get(namespace);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                if (null != kvTable) {</span>
+<span class="fc" id="L120">                    String value = kvTable.remove(key);</span>
+<span class="fc" id="L121">                    log.info(&quot;deleteKVConfig delete a config item, Namespace: {} Key: {} Value: {}&quot;,</span>
+                        namespace, key, value);
+                }
+            } finally {
+<span class="fc" id="L125">                this.lock.writeLock().unlock();</span>
+            }
+<span class="nc" id="L127">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L128">            log.error(&quot;deleteKVConfig InterruptedException&quot;, e);</span>
+<span class="fc" id="L129">        }</span>
+
+<span class="fc" id="L131">        this.persist();</span>
+<span class="fc" id="L132">    }</span>
+
+    public byte[] getKVListByNamespace(final String namespace) {
+        try {
+<span class="fc" id="L136">            this.lock.readLock().lockInterruptibly();</span>
+            try {
+<span class="fc" id="L138">                HashMap&lt;String, String&gt; kvTable = this.configTable.get(namespace);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                if (null != kvTable) {</span>
+<span class="fc" id="L140">                    KVTable table = new KVTable();</span>
+<span class="fc" id="L141">                    table.setTable(kvTable);</span>
+<span class="fc" id="L142">                    return table.encode();</span>
+                }
+            } finally {
+<span class="fc" id="L145">                this.lock.readLock().unlock();</span>
+            }
+<span class="nc" id="L147">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L148">            log.error(&quot;getKVListByNamespace InterruptedException&quot;, e);</span>
+<span class="fc" id="L149">        }</span>
+
+<span class="fc" id="L151">        return null;</span>
+    }
+
+    public String getKVConfig(final String namespace, final String key) {
+        try {
+<span class="fc" id="L156">            this.lock.readLock().lockInterruptibly();</span>
+            try {
+<span class="fc" id="L158">                HashMap&lt;String, String&gt; kvTable = this.configTable.get(namespace);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">                if (null != kvTable) {</span>
+<span class="fc" id="L160">                    return kvTable.get(key);</span>
+                }
+            } finally {
+<span class="fc" id="L163">                this.lock.readLock().unlock();</span>
+            }
+<span class="nc" id="L165">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L166">            log.error(&quot;getKVConfig InterruptedException&quot;, e);</span>
+<span class="fc" id="L167">        }</span>
+
+<span class="fc" id="L169">        return null;</span>
+    }
+
+    public void printAllPeriodically() {
+        try {
+<span class="nc" id="L174">            this.lock.readLock().lockInterruptibly();</span>
+            try {
+<span class="nc" id="L176">                log.info(&quot;--------------------------------------------------------&quot;);</span>
+
+                {
+<span class="nc" id="L179">                    log.info(&quot;configTable SIZE: {}&quot;, this.configTable.size());</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                    for (Entry&lt;String, HashMap&lt;String, String&gt;&gt; next : this.configTable.entrySet()) {</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">                        for (Entry&lt;String, String&gt; nextSub : next.getValue().entrySet()) {</span>
+<span class="nc" id="L182">                            log.info(&quot;configTable NS: {} Key: {} Value: {}&quot;, next.getKey(), nextSub.getKey(), nextSub.getValue());</span>
+<span class="nc" id="L183">                        }</span>
+<span class="nc" id="L184">                    }</span>
+                }
+            } finally {
+<span class="nc" id="L187">                this.lock.readLock().unlock();</span>
+            }
+<span class="nc" id="L189">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L190">            log.error(&quot;printAllPeriodically InterruptedException&quot;, e);</span>
+<span class="nc" id="L191">        }</span>
+<span class="nc" id="L192">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

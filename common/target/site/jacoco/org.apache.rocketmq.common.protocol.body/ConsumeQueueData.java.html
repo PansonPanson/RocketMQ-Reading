@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumeQueueData.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.protocol.body</a> &gt; <span class="el_source">ConsumeQueueData.java</span></div><h1>ConsumeQueueData.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.protocol.body;
+
+<span class="fc" id="L20">public class ConsumeQueueData {</span>
+
+    private long physicOffset;
+    private int physicSize;
+    private long tagsCode;
+    private String extendDataJson;
+    private String bitMap;
+    private boolean eval;
+    private String msg;
+
+    public long getPhysicOffset() {
+<span class="fc" id="L31">        return physicOffset;</span>
+    }
+
+    public void setPhysicOffset(long physicOffset) {
+<span class="fc" id="L35">        this.physicOffset = physicOffset;</span>
+<span class="fc" id="L36">    }</span>
+
+    public int getPhysicSize() {
+<span class="fc" id="L39">        return physicSize;</span>
+    }
+
+    public void setPhysicSize(int physicSize) {
+<span class="fc" id="L43">        this.physicSize = physicSize;</span>
+<span class="fc" id="L44">    }</span>
+
+    public long getTagsCode() {
+<span class="fc" id="L47">        return tagsCode;</span>
+    }
+
+    public void setTagsCode(long tagsCode) {
+<span class="fc" id="L51">        this.tagsCode = tagsCode;</span>
+<span class="fc" id="L52">    }</span>
+
+    public String getExtendDataJson() {
+<span class="fc" id="L55">        return extendDataJson;</span>
+    }
+
+    public void setExtendDataJson(String extendDataJson) {
+<span class="nc" id="L59">        this.extendDataJson = extendDataJson;</span>
+<span class="nc" id="L60">    }</span>
+
+    public String getBitMap() {
+<span class="fc" id="L63">        return bitMap;</span>
+    }
+
+    public void setBitMap(String bitMap) {
+<span class="fc" id="L67">        this.bitMap = bitMap;</span>
+<span class="fc" id="L68">    }</span>
+
+    public boolean isEval() {
+<span class="fc" id="L71">        return eval;</span>
+    }
+
+    public void setEval(boolean eval) {
+<span class="fc" id="L75">        this.eval = eval;</span>
+<span class="fc" id="L76">    }</span>
+
+    public String getMsg() {
+<span class="fc" id="L79">        return msg;</span>
+    }
+
+    public void setMsg(String msg) {
+<span class="fc" id="L83">        this.msg = msg;</span>
+<span class="fc" id="L84">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L88">        return &quot;ConsumeQueueData{&quot; +</span>
+            &quot;physicOffset=&quot; + physicOffset +
+            &quot;, physicSize=&quot; + physicSize +
+            &quot;, tagsCode=&quot; + tagsCode +
+            &quot;, extendDataJson='&quot; + extendDataJson + '\'' +
+            &quot;, bitMap='&quot; + bitMap + '\'' +
+            &quot;, eval=&quot; + eval +
+            &quot;, msg='&quot; + msg + '\'' +
+            '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

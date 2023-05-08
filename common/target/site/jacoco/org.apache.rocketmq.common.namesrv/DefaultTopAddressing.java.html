@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultTopAddressing.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.namesrv</a> &gt; <span class="el_source">DefaultTopAddressing.java</span></div><h1>DefaultTopAddressing.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.namesrv;
+
+import com.google.common.base.Strings;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.ServiceLoader;
+import java.util.Map;
+import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.common.help.FAQUrl;
+import org.apache.rocketmq.common.utils.HttpTinyClient;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+
+public class DefaultTopAddressing implements TopAddressing {
+
+<span class="nc" id="L36">    private static final InternalLogger LOGGER = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);</span>
+
+    private String nsAddr;
+    private String wsAddr;
+    private String unitName;
+    private Map&lt;String, String&gt; para;
+    private List&lt;TopAddressing&gt; topAddressingList;
+
+    public DefaultTopAddressing(final String wsAddr) {
+<span class="nc" id="L45">        this(wsAddr, null);</span>
+<span class="nc" id="L46">    }</span>
+
+<span class="nc" id="L48">    public DefaultTopAddressing(final String wsAddr, final String unitName) {</span>
+<span class="nc" id="L49">        this.wsAddr = wsAddr;</span>
+<span class="nc" id="L50">        this.unitName = unitName;</span>
+<span class="nc" id="L51">        this.topAddressingList = loadCustomTopAddressing();</span>
+<span class="nc" id="L52">    }</span>
+
+
+<span class="nc" id="L55">    public DefaultTopAddressing(final String unitName, final Map&lt;String, String&gt; para, final String wsAddr) {</span>
+<span class="nc" id="L56">        this.wsAddr = wsAddr;</span>
+<span class="nc" id="L57">        this.unitName = unitName;</span>
+<span class="nc" id="L58">        this.para = para;</span>
+<span class="nc" id="L59">        this.topAddressingList = loadCustomTopAddressing();</span>
+<span class="nc" id="L60">    }</span>
+
+    private static String clearNewLine(final String str) {
+<span class="nc" id="L63">        String newString = str.trim();</span>
+<span class="nc" id="L64">        int index = newString.indexOf(&quot;\r&quot;);</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (index != -1) {</span>
+<span class="nc" id="L66">            return newString.substring(0, index);</span>
+        }
+
+<span class="nc" id="L69">        index = newString.indexOf(&quot;\n&quot;);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (index != -1) {</span>
+<span class="nc" id="L71">            return newString.substring(0, index);</span>
+        }
+
+<span class="nc" id="L74">        return newString;</span>
+    }
+
+    private List&lt;TopAddressing&gt; loadCustomTopAddressing() {
+<span class="nc" id="L78">        ServiceLoader&lt;TopAddressing&gt; serviceLoader = ServiceLoader.load(TopAddressing.class);</span>
+<span class="nc" id="L79">        Iterator&lt;TopAddressing&gt; iterator = serviceLoader.iterator();</span>
+<span class="nc" id="L80">        List&lt;TopAddressing&gt; topAddressingList = new ArrayList&lt;TopAddressing&gt;();</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (iterator.hasNext()) {</span>
+<span class="nc" id="L82">            topAddressingList.add(iterator.next());</span>
+        }
+<span class="nc" id="L84">        return topAddressingList;</span>
+    }
+
+    @Override
+    public final String fetchNSAddr() {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (!topAddressingList.isEmpty()) {</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            for (TopAddressing topAddressing : topAddressingList) {</span>
+<span class="nc" id="L91">                String nsAddress = topAddressing.fetchNSAddr();</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                if (!Strings.isNullOrEmpty(nsAddress)) {</span>
+<span class="nc" id="L93">                    return nsAddress;</span>
+                }
+<span class="nc" id="L95">            }</span>
+        }
+        // Return result of default implementation
+<span class="nc" id="L98">        return fetchNSAddr(true, 3000);</span>
+    }
+
+    @Override
+    public void registerChangeCallBack(NameServerUpdateCallback changeCallBack) {
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (!topAddressingList.isEmpty()) {</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            for (TopAddressing topAddressing : topAddressingList) {</span>
+<span class="nc" id="L105">                topAddressing.registerChangeCallBack(changeCallBack);</span>
+<span class="nc" id="L106">            }</span>
+        }
+<span class="nc" id="L108">    }</span>
+
+    public final String fetchNSAddr(boolean verbose, long timeoutMills) {
+<span class="nc" id="L111">        String url = this.wsAddr;</span>
+        try {
+<span class="nc bnc" id="L113" title="All 4 branches missed.">            if (null != para &amp;&amp; para.size() &gt; 0) {</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                if (!UtilAll.isBlank(this.unitName)) {</span>
+<span class="nc" id="L115">                    url = url + &quot;-&quot; + this.unitName + &quot;?nofix=1&amp;&quot;;</span>
+                }
+                else {
+<span class="nc" id="L118">                    url = url + &quot;?&quot;;</span>
+                }
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                for (Map.Entry&lt;String, String&gt; entry : this.para.entrySet()) {</span>
+<span class="nc" id="L121">                    url += entry.getKey() + &quot;=&quot; + entry.getValue() + &quot;&amp;&quot;;</span>
+<span class="nc" id="L122">                }</span>
+<span class="nc" id="L123">                url = url.substring(0, url.length() - 1);</span>
+            }
+            else {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                if (!UtilAll.isBlank(this.unitName)) {</span>
+<span class="nc" id="L127">                    url = url + &quot;-&quot; + this.unitName + &quot;?nofix=1&quot;;</span>
+                }
+            }
+
+<span class="nc" id="L131">            HttpTinyClient.HttpResult result = HttpTinyClient.httpGet(url, null, null, &quot;UTF-8&quot;, timeoutMills);</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            if (200 == result.code) {</span>
+<span class="nc" id="L133">                String responseStr = result.content;</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                if (responseStr != null) {</span>
+<span class="nc" id="L135">                    return clearNewLine(responseStr);</span>
+                } else {
+<span class="nc" id="L137">                    LOGGER.error(&quot;fetch nameserver address is null&quot;);</span>
+                }
+<span class="nc" id="L139">            } else {</span>
+<span class="nc" id="L140">                LOGGER.error(&quot;fetch nameserver address failed. statusCode=&quot; + result.code);</span>
+            }
+<span class="nc" id="L142">        } catch (IOException e) {</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            if (verbose) {</span>
+<span class="nc" id="L144">                LOGGER.error(&quot;fetch name server address exception&quot;, e);</span>
+            }
+<span class="nc" id="L146">        }</span>
+
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L149">            String errorMsg =</span>
+<span class="nc" id="L150">                &quot;connect to &quot; + url + &quot; failed, maybe the domain name &quot; + MixAll.getWSAddr() + &quot; not bind in /etc/hosts&quot;;</span>
+<span class="nc" id="L151">            errorMsg += FAQUrl.suggestTodo(FAQUrl.NAME_SERVER_ADDR_NOT_EXIST_URL);</span>
+
+<span class="nc" id="L153">            LOGGER.warn(errorMsg);</span>
+        }
+<span class="nc" id="L155">        return null;</span>
+    }
+
+    public String getNsAddr() {
+<span class="nc" id="L159">        return nsAddr;</span>
+    }
+
+    public void setNsAddr(String nsAddr) {
+<span class="nc" id="L163">        this.nsAddr = nsAddr;</span>
+<span class="nc" id="L164">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

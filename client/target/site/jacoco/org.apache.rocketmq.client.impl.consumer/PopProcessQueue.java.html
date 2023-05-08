@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PopProcessQueue.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.impl.consumer</a> &gt; <span class="el_source">PopProcessQueue.java</span></div><h1>PopProcessQueue.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.client.impl.consumer;
+
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.rocketmq.common.protocol.body.PopProcessQueueInfo;
+
+/**
+ * Queue consumption snapshot
+ */
+<span class="nc" id="L25">public class PopProcessQueue {</span>
+
+<span class="nc" id="L27">    private final static long PULL_MAX_IDLE_TIME = Long.parseLong(System.getProperty(&quot;rocketmq.client.pull.pullMaxIdleTime&quot;, &quot;120000&quot;));</span>
+
+    private long lastPopTimestamp;
+<span class="nc" id="L30">    private AtomicInteger waitAckCounter = new AtomicInteger(0);</span>
+<span class="nc" id="L31">    private volatile boolean dropped = false;</span>
+
+    public long getLastPopTimestamp() {
+<span class="nc" id="L34">        return lastPopTimestamp;</span>
+    }
+
+    public void setLastPopTimestamp(long lastPopTimestamp) {
+<span class="nc" id="L38">        this.lastPopTimestamp = lastPopTimestamp;</span>
+<span class="nc" id="L39">    }</span>
+
+    public void incFoundMsg(int count) {
+<span class="nc" id="L42">        this.waitAckCounter.getAndAdd(count);</span>
+<span class="nc" id="L43">    }</span>
+
+    /**
+     * @return the value before decrement.
+     */
+    public int ack() {
+<span class="nc" id="L49">        return this.waitAckCounter.getAndDecrement();</span>
+    }
+
+    public void decFoundMsg(int count) {
+<span class="nc" id="L53">        this.waitAckCounter.addAndGet(count);</span>
+<span class="nc" id="L54">    }</span>
+
+    public int getWaiAckMsgCount() {
+<span class="nc" id="L57">        return this.waitAckCounter.get();</span>
+    }
+
+    public boolean isDropped() {
+<span class="nc" id="L61">        return dropped;</span>
+    }
+
+    public void setDropped(boolean dropped) {
+<span class="nc" id="L65">        this.dropped = dropped;</span>
+<span class="nc" id="L66">    }</span>
+
+    public void fillPopProcessQueueInfo(final PopProcessQueueInfo info) {
+<span class="nc" id="L69">        info.setWaitAckCount(getWaiAckMsgCount());</span>
+<span class="nc" id="L70">        info.setDroped(isDropped());</span>
+<span class="nc" id="L71">        info.setLastPopTimestamp(getLastPopTimestamp());</span>
+<span class="nc" id="L72">    }</span>
+
+    public boolean isPullExpired() {
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        return (System.currentTimeMillis() - this.lastPopTimestamp) &gt; PULL_MAX_IDLE_TIME;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L80">        return &quot;PopProcessQueue[waitAckCounter:&quot; + this.waitAckCounter.get()</span>
+<span class="nc" id="L81">                + &quot;, lastPopTimestamp:&quot; + getLastPopTimestamp()</span>
+                + &quot;, drop:&quot; + dropped +  &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

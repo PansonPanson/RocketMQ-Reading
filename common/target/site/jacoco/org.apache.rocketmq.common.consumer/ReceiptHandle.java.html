@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReceiptHandle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.consumer</a> &gt; <span class="el_source">ReceiptHandle.java</span></div><h1>ReceiptHandle.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.consumer;
+
+import java.util.Arrays;
+import java.util.List;
+import org.apache.rocketmq.common.KeyBuilder;
+import org.apache.rocketmq.common.message.MessageConst;
+
+public class ReceiptHandle {
+    private static final String SEPARATOR = MessageConst.KEY_SEPARATOR;
+    public static final String NORMAL_TOPIC = &quot;0&quot;;
+    public static final String RETRY_TOPIC = &quot;1&quot;;
+    private final long startOffset;
+    private final long retrieveTime;
+    private final long invisibleTime;
+    private final long nextVisibleTime;
+    private final int reviveQueueId;
+    private final String topicType;
+    private final String brokerName;
+    private final int queueId;
+    private final long offset;
+    private final long commitLogOffset;
+    private final String receiptHandle;
+
+    public String encode() {
+<span class="nc" id="L42">        return startOffset + SEPARATOR + retrieveTime + SEPARATOR + invisibleTime + SEPARATOR + reviveQueueId</span>
+            + SEPARATOR + topicType + SEPARATOR + brokerName + SEPARATOR + queueId + SEPARATOR + offset + SEPARATOR
+            + commitLogOffset;
+    }
+
+    public boolean isExpired() {
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        return nextVisibleTime &lt;= System.currentTimeMillis();</span>
+    }
+
+    public static ReceiptHandle decode(String receiptHandle) {
+<span class="nc" id="L52">        List&lt;String&gt; dataList = Arrays.asList(receiptHandle.split(SEPARATOR));</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (dataList.size() &lt; 8) {</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(&quot;Parse failed, dataList size &quot; + dataList.size());</span>
+        }
+<span class="nc" id="L56">        long startOffset = Long.parseLong(dataList.get(0));</span>
+<span class="nc" id="L57">        long retrieveTime = Long.parseLong(dataList.get(1));</span>
+<span class="nc" id="L58">        long invisibleTime = Long.parseLong(dataList.get(2));</span>
+<span class="nc" id="L59">        int reviveQueueId = Integer.parseInt(dataList.get(3));</span>
+<span class="nc" id="L60">        String topicType = dataList.get(4);</span>
+<span class="nc" id="L61">        String brokerName = dataList.get(5);</span>
+<span class="nc" id="L62">        int queueId = Integer.parseInt(dataList.get(6));</span>
+<span class="nc" id="L63">        long offset = Long.parseLong(dataList.get(7));</span>
+<span class="nc" id="L64">        long commitLogOffset = -1L;</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (dataList.size() &gt;= 9) {</span>
+<span class="nc" id="L66">            commitLogOffset = Long.parseLong(dataList.get(8));</span>
+        }
+
+<span class="nc" id="L69">        return new ReceiptHandleBuilder()</span>
+<span class="nc" id="L70">            .startOffset(startOffset)</span>
+<span class="nc" id="L71">            .retrieveTime(retrieveTime)</span>
+<span class="nc" id="L72">            .invisibleTime(invisibleTime)</span>
+<span class="nc" id="L73">            .reviveQueueId(reviveQueueId)</span>
+<span class="nc" id="L74">            .topicType(topicType)</span>
+<span class="nc" id="L75">            .brokerName(brokerName)</span>
+<span class="nc" id="L76">            .queueId(queueId)</span>
+<span class="nc" id="L77">            .offset(offset)</span>
+<span class="nc" id="L78">            .commitLogOffset(commitLogOffset)</span>
+<span class="nc" id="L79">            .receiptHandle(receiptHandle).build();</span>
+    }
+
+    ReceiptHandle(final long startOffset, final long retrieveTime, final long invisibleTime, final long nextVisibleTime,
+        final int reviveQueueId, final String topicType, final String brokerName, final int queueId, final long offset,
+<span class="nc" id="L84">        final long commitLogOffset, final String receiptHandle) {</span>
+<span class="nc" id="L85">        this.startOffset = startOffset;</span>
+<span class="nc" id="L86">        this.retrieveTime = retrieveTime;</span>
+<span class="nc" id="L87">        this.invisibleTime = invisibleTime;</span>
+<span class="nc" id="L88">        this.nextVisibleTime = nextVisibleTime;</span>
+<span class="nc" id="L89">        this.reviveQueueId = reviveQueueId;</span>
+<span class="nc" id="L90">        this.topicType = topicType;</span>
+<span class="nc" id="L91">        this.brokerName = brokerName;</span>
+<span class="nc" id="L92">        this.queueId = queueId;</span>
+<span class="nc" id="L93">        this.offset = offset;</span>
+<span class="nc" id="L94">        this.commitLogOffset = commitLogOffset;</span>
+<span class="nc" id="L95">        this.receiptHandle = receiptHandle;</span>
+<span class="nc" id="L96">    }</span>
+
+    public static class ReceiptHandleBuilder {
+        private long startOffset;
+        private long retrieveTime;
+        private long invisibleTime;
+        private int reviveQueueId;
+        private String topicType;
+        private String brokerName;
+        private int queueId;
+        private long offset;
+        private long commitLogOffset;
+        private String receiptHandle;
+
+<span class="nc" id="L110">        ReceiptHandleBuilder() {</span>
+<span class="nc" id="L111">        }</span>
+
+        public ReceiptHandle.ReceiptHandleBuilder startOffset(final long startOffset) {
+<span class="nc" id="L114">            this.startOffset = startOffset;</span>
+<span class="nc" id="L115">            return this;</span>
+        }
+
+        public ReceiptHandle.ReceiptHandleBuilder retrieveTime(final long retrieveTime) {
+<span class="nc" id="L119">            this.retrieveTime = retrieveTime;</span>
+<span class="nc" id="L120">            return this;</span>
+        }
+
+        public ReceiptHandle.ReceiptHandleBuilder invisibleTime(final long invisibleTime) {
+<span class="nc" id="L124">            this.invisibleTime = invisibleTime;</span>
+<span class="nc" id="L125">            return this;</span>
+        }
+
+        public ReceiptHandle.ReceiptHandleBuilder reviveQueueId(final int reviveQueueId) {
+<span class="nc" id="L129">            this.reviveQueueId = reviveQueueId;</span>
+<span class="nc" id="L130">            return this;</span>
+        }
+
+        public ReceiptHandle.ReceiptHandleBuilder topicType(final String topicType) {
+<span class="nc" id="L134">            this.topicType = topicType;</span>
+<span class="nc" id="L135">            return this;</span>
+        }
+
+        public ReceiptHandle.ReceiptHandleBuilder brokerName(final String brokerName) {
+<span class="nc" id="L139">            this.brokerName = brokerName;</span>
+<span class="nc" id="L140">            return this;</span>
+        }
+
+        public ReceiptHandle.ReceiptHandleBuilder queueId(final int queueId) {
+<span class="nc" id="L144">            this.queueId = queueId;</span>
+<span class="nc" id="L145">            return this;</span>
+        }
+
+        public ReceiptHandle.ReceiptHandleBuilder offset(final long offset) {
+<span class="nc" id="L149">            this.offset = offset;</span>
+<span class="nc" id="L150">            return this;</span>
+        }
+
+        public ReceiptHandle.ReceiptHandleBuilder commitLogOffset(final long commitLogOffset) {
+<span class="nc" id="L154">            this.commitLogOffset = commitLogOffset;</span>
+<span class="nc" id="L155">            return this;</span>
+        }
+
+        public ReceiptHandle.ReceiptHandleBuilder receiptHandle(final String receiptHandle) {
+<span class="nc" id="L159">            this.receiptHandle = receiptHandle;</span>
+<span class="nc" id="L160">            return this;</span>
+        }
+
+        public ReceiptHandle build() {
+<span class="nc" id="L164">            return new ReceiptHandle(this.startOffset, this.retrieveTime, this.invisibleTime, this.retrieveTime + this.invisibleTime,</span>
+                this.reviveQueueId, this.topicType, this.brokerName, this.queueId, this.offset, this.commitLogOffset, this.receiptHandle);
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L170">            return &quot;ReceiptHandle.ReceiptHandleBuilder(startOffset=&quot; + this.startOffset + &quot;, retrieveTime=&quot; + this.retrieveTime + &quot;, invisibleTime=&quot; + this.invisibleTime + &quot;, reviveQueueId=&quot; + this.reviveQueueId + &quot;, topic=&quot; + this.topicType + &quot;, brokerName=&quot; + this.brokerName + &quot;, queueId=&quot; + this.queueId + &quot;, offset=&quot; + this.offset + &quot;, commitLogOffset=&quot; + this.commitLogOffset + &quot;, receiptHandle=&quot; + this.receiptHandle + &quot;)&quot;;</span>
+        }
+    }
+
+    public static ReceiptHandle.ReceiptHandleBuilder builder() {
+<span class="nc" id="L175">        return new ReceiptHandle.ReceiptHandleBuilder();</span>
+    }
+
+    public long getStartOffset() {
+<span class="nc" id="L179">        return this.startOffset;</span>
+    }
+
+    public long getRetrieveTime() {
+<span class="nc" id="L183">        return this.retrieveTime;</span>
+    }
+
+    public long getInvisibleTime() {
+<span class="nc" id="L187">        return this.invisibleTime;</span>
+    }
+
+    public long getNextVisibleTime() {
+<span class="nc" id="L191">        return this.nextVisibleTime;</span>
+    }
+
+    public int getReviveQueueId() {
+<span class="nc" id="L195">        return this.reviveQueueId;</span>
+    }
+
+    public String getTopicType() {
+<span class="nc" id="L199">        return this.topicType;</span>
+    }
+
+    public String getBrokerName() {
+<span class="nc" id="L203">        return this.brokerName;</span>
+    }
+
+    public int getQueueId() {
+<span class="nc" id="L207">        return this.queueId;</span>
+    }
+
+    public long getOffset() {
+<span class="nc" id="L211">        return this.offset;</span>
+    }
+
+    public long getCommitLogOffset() {
+<span class="nc" id="L215">        return commitLogOffset;</span>
+    }
+
+    public String getReceiptHandle() {
+<span class="nc" id="L219">        return this.receiptHandle;</span>
+    }
+
+    public boolean isRetryTopic() {
+<span class="nc" id="L223">        return RETRY_TOPIC.equals(topicType);</span>
+    }
+
+    public String getRealTopic(String topic, String groupName) {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        if (isRetryTopic()) {</span>
+<span class="nc" id="L228">            return KeyBuilder.buildPopRetryTopic(topic, groupName);</span>
+        }
+<span class="nc" id="L230">        return topic;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

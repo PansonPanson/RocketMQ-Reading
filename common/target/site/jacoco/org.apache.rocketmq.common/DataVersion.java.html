@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DataVersion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common</a> &gt; <span class="el_source">DataVersion.java</span></div><h1>DataVersion.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common;
+
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
+
+<span class="fc" id="L22">public class DataVersion extends RemotingSerializable {</span>
+<span class="fc" id="L23">    private long stateVersion = 0L;</span>
+<span class="fc" id="L24">    private long timestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L25">    private AtomicLong counter = new AtomicLong(0);</span>
+
+    public void assignNewOne(final DataVersion dataVersion) {
+<span class="nc" id="L28">        this.timestamp = dataVersion.timestamp;</span>
+<span class="nc" id="L29">        this.stateVersion = dataVersion.stateVersion;</span>
+<span class="nc" id="L30">        this.counter.set(dataVersion.counter.get());</span>
+<span class="nc" id="L31">    }</span>
+
+    public void nextVersion() {
+<span class="fc" id="L34">        this.nextVersion(0L);</span>
+<span class="fc" id="L35">    }</span>
+
+    public void nextVersion(long stateVersion) {
+<span class="fc" id="L38">        this.timestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L39">        this.stateVersion = stateVersion;</span>
+<span class="fc" id="L40">        this.counter.incrementAndGet();</span>
+<span class="fc" id="L41">    }</span>
+
+    public long getStateVersion() {
+<span class="fc" id="L44">        return stateVersion;</span>
+    }
+
+    public void setStateVersion(long stateVersion) {
+<span class="fc" id="L48">        this.stateVersion = stateVersion;</span>
+<span class="fc" id="L49">    }</span>
+
+    public long getTimestamp() {
+<span class="fc" id="L52">        return timestamp;</span>
+    }
+
+    public void setTimestamp(long timestamp) {
+<span class="fc" id="L56">        this.timestamp = timestamp;</span>
+<span class="fc" id="L57">    }</span>
+
+    public AtomicLong getCounter() {
+<span class="fc" id="L60">        return counter;</span>
+    }
+
+    public void setCounter(AtomicLong counter) {
+<span class="fc" id="L64">        this.counter = counter;</span>
+<span class="fc" id="L65">    }</span>
+
+    @Override
+    public boolean equals(final Object o) {
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (this == o)</span>
+<span class="nc" id="L70">            return true;</span>
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">        if (o == null || getClass() != o.getClass())</span>
+<span class="nc" id="L72">            return false;</span>
+
+<span class="fc" id="L74">        DataVersion version = (DataVersion) o;</span>
+
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (getStateVersion() != version.getStateVersion())</span>
+<span class="nc" id="L77">            return false;</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (getTimestamp() != version.getTimestamp())</span>
+<span class="nc" id="L79">            return false;</span>
+
+<span class="fc bfc" id="L81" title="All 4 branches covered.">        if (counter != null &amp;&amp; version.counter != null) {</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            return counter.longValue() == version.counter.longValue();</span>
+        }
+
+<span class="fc bfc" id="L85" title="All 4 branches covered.">        return (null == counter) &amp;&amp; (null == version.counter);</span>
+
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L91">        int result = (int) (getStateVersion() ^ (getStateVersion() &gt;&gt;&gt; 32));</span>
+<span class="nc" id="L92">        result = 31 * result + (int) (getTimestamp() ^ (getTimestamp() &gt;&gt;&gt; 32));</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (null != counter) {</span>
+<span class="nc" id="L94">            long l = counter.get();</span>
+<span class="nc" id="L95">            result = 31 * result + (int) (l ^ (l &gt;&gt;&gt; 32));</span>
+        }
+<span class="nc" id="L97">        return result;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L102">        final StringBuilder sb = new StringBuilder(&quot;DataVersion[&quot;);</span>
+<span class="nc" id="L103">        sb.append(&quot;timestamp=&quot;).append(timestamp);</span>
+<span class="nc" id="L104">        sb.append(&quot;, counter=&quot;).append(counter);</span>
+<span class="nc" id="L105">        sb.append(']');</span>
+<span class="nc" id="L106">        return sb.toString();</span>
+    }
+
+    public int compare(DataVersion dataVersion) {
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (this.getStateVersion() &gt; dataVersion.getStateVersion()) {</span>
+<span class="nc" id="L111">            return 1;</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        } else if (this.getStateVersion() &lt; dataVersion.getStateVersion()) {</span>
+<span class="nc" id="L113">            return -1;</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        } else if (this.getCounter().get() &gt; dataVersion.getCounter().get()) {</span>
+<span class="nc" id="L115">            return 1;</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        } else if (this.getCounter().get() &lt; dataVersion.getCounter().get()) {</span>
+<span class="nc" id="L117">            return -1;</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        } else if (this.getTimestamp() &gt; dataVersion.getTimestamp()) {</span>
+<span class="nc" id="L119">            return 1;</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        } else if (this.getTimestamp() &lt; dataVersion.getTimestamp()) {</span>
+<span class="nc" id="L121">            return -1;</span>
+        }
+<span class="nc" id="L123">        return 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestResponseFuture.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-client 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.client.producer</a> &gt; <span class="el_source">RequestResponseFuture.java</span></div><h1>RequestResponseFuture.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.client.producer;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import org.apache.rocketmq.common.message.Message;
+
+public class RequestResponseFuture {
+    private final String correlationId;
+    private final RequestCallback requestCallback;
+<span class="fc" id="L27">    private final long beginTimestamp = System.currentTimeMillis();</span>
+<span class="fc" id="L28">    private final Message requestMsg = null;</span>
+    private long timeoutMillis;
+<span class="fc" id="L30">    private CountDownLatch countDownLatch = new CountDownLatch(1);</span>
+<span class="fc" id="L31">    private volatile Message responseMsg = null;</span>
+<span class="fc" id="L32">    private volatile boolean sendRequestOk = true;</span>
+<span class="fc" id="L33">    private volatile Throwable cause = null;</span>
+
+<span class="fc" id="L35">    public RequestResponseFuture(String correlationId, long timeoutMillis, RequestCallback requestCallback) {</span>
+<span class="fc" id="L36">        this.correlationId = correlationId;</span>
+<span class="fc" id="L37">        this.timeoutMillis = timeoutMillis;</span>
+<span class="fc" id="L38">        this.requestCallback = requestCallback;</span>
+<span class="fc" id="L39">    }</span>
+
+    public void executeRequestCallback() {
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (requestCallback != null) {</span>
+<span class="pc bpc" id="L43" title="1 of 4 branches missed.">            if (sendRequestOk &amp;&amp; cause == null) {</span>
+<span class="fc" id="L44">                requestCallback.onSuccess(responseMsg);</span>
+            } else {
+<span class="fc" id="L46">                requestCallback.onException(cause);</span>
+            }
+        }
+<span class="fc" id="L49">    }</span>
+
+    public boolean isTimeout() {
+<span class="fc" id="L52">        long diff = System.currentTimeMillis() - this.beginTimestamp;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        return diff &gt; this.timeoutMillis;</span>
+    }
+
+    public Message waitResponseMessage(final long timeout) throws InterruptedException {
+<span class="fc" id="L57">        this.countDownLatch.await(timeout, TimeUnit.MILLISECONDS);</span>
+<span class="fc" id="L58">        return this.responseMsg;</span>
+    }
+
+    public void putResponseMessage(final Message responseMsg) {
+<span class="fc" id="L62">        this.responseMsg = responseMsg;</span>
+<span class="fc" id="L63">        this.countDownLatch.countDown();</span>
+<span class="fc" id="L64">    }</span>
+
+    public String getCorrelationId() {
+<span class="fc" id="L67">        return correlationId;</span>
+    }
+
+    public long getTimeoutMillis() {
+<span class="nc" id="L71">        return timeoutMillis;</span>
+    }
+
+    public void setTimeoutMillis(long timeoutMillis) {
+<span class="nc" id="L75">        this.timeoutMillis = timeoutMillis;</span>
+<span class="nc" id="L76">    }</span>
+
+    public RequestCallback getRequestCallback() {
+<span class="fc" id="L79">        return requestCallback;</span>
+    }
+
+    public long getBeginTimestamp() {
+<span class="nc" id="L83">        return beginTimestamp;</span>
+    }
+
+    public CountDownLatch getCountDownLatch() {
+<span class="nc" id="L87">        return countDownLatch;</span>
+    }
+
+    public void setCountDownLatch(CountDownLatch countDownLatch) {
+<span class="nc" id="L91">        this.countDownLatch = countDownLatch;</span>
+<span class="nc" id="L92">    }</span>
+
+    public Message getResponseMsg() {
+<span class="nc" id="L95">        return responseMsg;</span>
+    }
+
+    public void setResponseMsg(Message responseMsg) {
+<span class="nc" id="L99">        this.responseMsg = responseMsg;</span>
+<span class="nc" id="L100">    }</span>
+
+    public boolean isSendRequestOk() {
+<span class="fc" id="L103">        return sendRequestOk;</span>
+    }
+
+    public void setSendRequestOk(boolean sendRequestOk) {
+<span class="fc" id="L107">        this.sendRequestOk = sendRequestOk;</span>
+<span class="fc" id="L108">    }</span>
+
+    public Message getRequestMsg() {
+<span class="nc" id="L111">        return requestMsg;</span>
+    }
+
+    public Throwable getCause() {
+<span class="nc" id="L115">        return cause;</span>
+    }
+
+    public void setCause(Throwable cause) {
+<span class="fc" id="L119">        this.cause = cause;</span>
+<span class="fc" id="L120">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

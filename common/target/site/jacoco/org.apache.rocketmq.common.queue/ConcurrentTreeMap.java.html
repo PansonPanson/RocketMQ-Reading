@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConcurrentTreeMap.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.queue</a> &gt; <span class="el_source">ConcurrentTreeMap.java</span></div><h1>ConcurrentTreeMap.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.rocketmq.common.queue;
+
+import java.util.Comparator;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.locks.ReentrantLock;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.logging.InternalLoggerFactory;
+
+/**
+ * thread safe
+ */
+public class ConcurrentTreeMap&lt;K, V&gt; {
+<span class="nc" id="L32">    private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);</span>
+    private final ReentrantLock lock;
+    private TreeMap&lt;K, V&gt; tree;
+    private RoundQueue&lt;K&gt; roundQueue;
+
+<span class="nc" id="L37">    public ConcurrentTreeMap(int capacity, Comparator&lt;? super K&gt; comparator) {</span>
+<span class="nc" id="L38">        tree = new TreeMap&lt;K, V&gt;(comparator);</span>
+<span class="nc" id="L39">        roundQueue = new RoundQueue&lt;K&gt;(capacity);</span>
+<span class="nc" id="L40">        lock = new ReentrantLock(true);</span>
+<span class="nc" id="L41">    }</span>
+
+    public Map.Entry&lt;K, V&gt; pollFirstEntry() {
+<span class="nc" id="L44">        lock.lock();</span>
+        try {
+<span class="nc" id="L46">            return tree.pollFirstEntry();</span>
+        } finally {
+<span class="nc" id="L48">            lock.unlock();</span>
+        }
+    }
+
+    public V putIfAbsentAndRetExsit(K key, V value) {
+<span class="nc" id="L53">        lock.lock();</span>
+        try {
+<span class="nc bnc" id="L55" title="All 2 branches missed.">            if (roundQueue.put(key)) {</span>
+<span class="nc" id="L56">                V exsit = tree.get(key);</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">                if (null == exsit) {</span>
+<span class="nc" id="L58">                    tree.put(key, value);</span>
+<span class="nc" id="L59">                    exsit = value;</span>
+                }
+<span class="nc" id="L61">                log.warn(&quot;putIfAbsentAndRetExsit success. &quot; + key);</span>
+<span class="nc" id="L62">                return exsit;</span>
+            } else {
+<span class="nc" id="L64">                V exsit = tree.get(key);</span>
+<span class="nc" id="L65">                return exsit;</span>
+            }
+        } finally {
+<span class="nc" id="L68">            lock.unlock();</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>

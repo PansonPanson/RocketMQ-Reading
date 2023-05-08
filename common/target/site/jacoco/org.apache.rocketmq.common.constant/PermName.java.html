@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PermName.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">rocketmq-common 5.0.0-SNAPSHOT</a> &gt; <a href="index.source.html" class="el_package">org.apache.rocketmq.common.constant</a> &gt; <span class="el_source">PermName.java</span></div><h1>PermName.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.rocketmq.common.constant;
+
+<span class="nc" id="L19">public class PermName {</span>
+    public static final int INDEX_PERM_PRIORITY = 3;
+    public static final int INDEX_PERM_READ = 2;
+    public static final int INDEX_PERM_WRITE = 1;
+    public static final int INDEX_PERM_INHERIT = 0;
+
+
+    public static final int PERM_PRIORITY = 0x1 &lt;&lt; INDEX_PERM_PRIORITY;
+    public static final int PERM_READ = 0x1 &lt;&lt; INDEX_PERM_READ;
+    public static final int PERM_WRITE = 0x1 &lt;&lt; INDEX_PERM_WRITE;
+    public static final int PERM_INHERIT = 0x1 &lt;&lt; INDEX_PERM_INHERIT;
+
+    public static String perm2String(final int perm) {
+<span class="nc" id="L32">        final StringBuilder sb = new StringBuilder(&quot;---&quot;);</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">        if (isReadable(perm)) {</span>
+<span class="nc" id="L34">            sb.replace(0, 1, &quot;R&quot;);</span>
+        }
+
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        if (isWriteable(perm)) {</span>
+<span class="nc" id="L38">            sb.replace(1, 2, &quot;W&quot;);</span>
+        }
+
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (isInherited(perm)) {</span>
+<span class="nc" id="L42">            sb.replace(2, 3, &quot;X&quot;);</span>
+        }
+
+<span class="nc" id="L45">        return sb.toString();</span>
+    }
+
+    public static boolean isReadable(final int perm) {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        return (perm &amp; PERM_READ) == PERM_READ;</span>
+    }
+
+    public static boolean isWriteable(final int perm) {
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        return (perm &amp; PERM_WRITE) == PERM_WRITE;</span>
+    }
+
+    public static boolean isInherited(final int perm) {
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        return (perm &amp; PERM_INHERIT) == PERM_INHERIT;</span>
+    }
+
+    public static boolean isPriority(final int perm) {
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        return (perm &amp; PERM_PRIORITY) == PERM_PRIORITY;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.5.201910111838</span></div></body></html>
