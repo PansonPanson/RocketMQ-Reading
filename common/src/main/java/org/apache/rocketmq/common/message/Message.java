@@ -22,13 +22,36 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 消息：<a href="https://rocketmq.apache.org/zh/docs/domainModel/04message">...</a>
+ */
 public class Message implements Serializable {
     private static final long serialVersionUID = 8445773977080406428L;
 
+    /**
+     * 主题：<a href="https://rocketmq.apache.org/zh/docs/domainModel/02topic">...</a>
+     */
     private String topic;
+
+    /**
+     *
+     */
     private int flag;
+
+
+    /**
+     * 存储扩展属性：包括 tags、keys 等
+     */
     private Map<String, String> properties;
+
+    /**
+     * 消息体
+     */
     private byte[] body;
+
+    /**
+     * 发送事务消息时使用
+     */
     private String transactionId;
 
     public Message() {
@@ -156,6 +179,11 @@ public class Message implements Serializable {
         return Boolean.parseBoolean(result);
     }
 
+    /**
+     * Producer 是否需要等待消息存储成功
+     *
+     * @param waitStoreMsgOK
+     */
     public void setWaitStoreMsgOK(boolean waitStoreMsgOK) {
         this.putProperty(MessageConst.PROPERTY_WAIT_STORE_MSG_OK, Boolean.toString(waitStoreMsgOK));
     }
