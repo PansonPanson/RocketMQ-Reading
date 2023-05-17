@@ -23,18 +23,22 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 消息：<a href="https://rocketmq.apache.org/zh/docs/domainModel/04message">...</a>
+ * 消息：
+ * 1. <a href="https://rocketmq.apache.org/zh/docs/domainModel/04message">...</a>
+ * 2. <a href="https://github.com/apache/rocketmq/blob/develop/docs/cn/best_practice.md">...</a>
+ *
  */
 public class Message implements Serializable {
     private static final long serialVersionUID = 8445773977080406428L;
 
     /**
      * 主题：<a href="https://rocketmq.apache.org/zh/docs/domainModel/02topic">...</a>
+     * 必填，消息所属topic的名称
      */
     private String topic;
 
     /**
-     *
+     * 选填，完全由应用来设置，RocketMQ不做干预
      */
     private int flag;
 
@@ -45,7 +49,7 @@ public class Message implements Serializable {
     private Map<String, String> properties;
 
     /**
-     * 消息体
+     * 必填，消息体
      */
     private byte[] body;
 
@@ -139,6 +143,9 @@ public class Message implements Serializable {
         this.topic = topic;
     }
 
+    /**
+     * 选填，消息标签，方便服务器过滤使用。目前只支持每个消息设置一个tag
+     */
     public String getTags() {
         return this.getProperty(MessageConst.PROPERTY_TAGS);
     }
@@ -157,6 +164,9 @@ public class Message implements Serializable {
         this.setKeys(keys);
     }
 
+    /**
+     * 选填，消息延时级别，0表示不延时，大于0会延时特定的时间才会被消费
+     */
     public int getDelayTimeLevel() {
         String t = this.getProperty(MessageConst.PROPERTY_DELAY_TIME_LEVEL);
         if (t != null) {
@@ -170,6 +180,9 @@ public class Message implements Serializable {
         this.putProperty(MessageConst.PROPERTY_DELAY_TIME_LEVEL, String.valueOf(level));
     }
 
+    /**
+     * 选填，表示消息是否在服务器落盘后才返回应答。
+     */
     public boolean isWaitStoreMsgOK() {
         String result = this.getProperty(MessageConst.PROPERTY_WAIT_STORE_MSG_OK);
         if (null == result) {
