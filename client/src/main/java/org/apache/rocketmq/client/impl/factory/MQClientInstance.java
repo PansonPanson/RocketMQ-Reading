@@ -278,6 +278,7 @@ public class MQClientInstance {
     }
 
     private void startScheduledTask() {
+        // 如果未指定 NameServer 地址，则定时获取 NameServer 地址
         if (null == this.clientConfig.getNamesrvAddr()) {
             this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
@@ -288,6 +289,7 @@ public class MQClientInstance {
             }, 1000 * 10, 1000 * 60 * 2, TimeUnit.MILLISECONDS);
         }
 
+        // 定时从 NameServer 更新本地 Topic 数据
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.updateTopicRouteInfoFromNameServer();
@@ -296,15 +298,19 @@ public class MQClientInstance {
             }
         }, 10, this.clientConfig.getPollNameServerInterval(), TimeUnit.MILLISECONDS);
 
+
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
+                //  清理无效、下线的 Broker
                 MQClientInstance.this.cleanOfflineBroker();
+                // 向所有 broker 发送心跳
                 MQClientInstance.this.sendHeartbeatToAllBrokerWithLock();
             } catch (Exception e) {
                 log.error("ScheduledTask sendHeartbeatToAllBroker exception", e);
             }
         }, 1000, this.clientConfig.getHeartbeatBrokerInterval(), TimeUnit.MILLISECONDS);
 
+        // 消费者持久化 offset
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.persistAllConsumerOffset();
@@ -313,6 +319,7 @@ public class MQClientInstance {
             }
         }, 1000 * 10, this.clientConfig.getPersistConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
 
+        // 调整线程池
         this.scheduledExecutorService.scheduleAtFixedRate(() -> {
             try {
                 MQClientInstance.this.adjustThreadPool();
