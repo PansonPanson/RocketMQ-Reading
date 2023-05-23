@@ -35,7 +35,12 @@ public class Producer {
 
         // Uncomment the following line while debugging, namesrvAddr should be set to your local address
         //producer.setNamesrvAddr(DEFAULT_NAMESRVADDR);
-
+        /**
+         * 消息发送模式：
+         * 1. SYNC：同步， Producer 将 Message 发送出去之后，会等待 Broker 的返回，然后再发送下一条消息
+         * 2. ONEWAY：单向，Producer 发送消息就不会等待 Broker 返回，通过回调的方式来处理 Broker 的响应
+         * 3. ASYNC：异步，Producer 就只发送消息，不等待 broker 的返回，也没有任何回调函数。性能比较好，类似于日志收集的场景可以考虑使用 ONEWAY 模式
+         */
         producer.start();
         for (int i = 0; i < 128; i++) {
             try {
