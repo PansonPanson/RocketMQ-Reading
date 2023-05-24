@@ -23,10 +23,21 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.remoting.protocol.route.QueueData;
 import org.apache.rocketmq.remoting.protocol.route.TopicRouteData;
 
+/**
+ * Topic 相关信息
+ */
 public class TopicPublishInfo {
+
+    /**
+     * 使用场景未知： <a href="https://github.com/apache/rocketmq/issues/4462">...</a>
+     */
     private boolean orderTopic = false;
     private boolean haveTopicRouterInfo = false;
     private List<MessageQueue> messageQueueList = new ArrayList<>();
+
+    /**
+     * 选择 MessageQueue 时使用
+     */
     private volatile ThreadLocalIndex sendWhichQueue = new ThreadLocalIndex();
     private TopicRouteData topicRouteData;
 

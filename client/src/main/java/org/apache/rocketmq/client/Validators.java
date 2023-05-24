@@ -62,6 +62,7 @@ public class Validators {
         }
         // topic
         Validators.checkTopic(msg.getTopic());
+        // 内置主题不允许使用
         Validators.isNotAllowedSendTopic(msg.getTopic());
 
         // body
@@ -73,6 +74,7 @@ public class Validators {
             throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL, "the message body length is zero");
         }
 
+        // MaxMessageSize 默认是 4M
         if (msg.getBody().length > defaultMQProducer.getMaxMessageSize()) {
             throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL,
                 "the message body size over max value, MAX: " + defaultMQProducer.getMaxMessageSize());

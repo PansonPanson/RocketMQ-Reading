@@ -600,13 +600,27 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
     }
 
+    /**
+     *
+     * @param msg 消息
+     * @param communicationMode  消息发送模式，见 {@link CommunicationMode}
+     * @param sendCallback  CommunicationMode 为 ASYNC 时，传入回调函数
+     * @param timeout 发送的超时时间，超过阈值，会抛出异常
+     * @return
+     * @throws MQClientException
+     * @throws RemotingException
+     * @throws MQBrokerException
+     * @throws InterruptedException
+     */
     private SendResult sendDefaultImpl(
         Message msg,
         final CommunicationMode communicationMode,
         final SendCallback sendCallback,
         final long timeout
     ) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+        // serviceState 必须为 ServiceState.RUNNING，否则抛异常
         this.makeSureStateOK();
+        // 消息校验
         Validators.checkMessage(msg, this.defaultMQProducer);
         final long invokeID = random.nextLong();
         long beginTimestampFirst = System.currentTimeMillis();
@@ -1404,6 +1418,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
     public SendResult send(Message msg,
         long timeout) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
+        // 默认采用 SYNC 的方式
         return this.sendDefaultImpl(msg, CommunicationMode.SYNC, null, timeout);
     }
 
