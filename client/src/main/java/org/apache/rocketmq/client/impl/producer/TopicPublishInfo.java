@@ -33,12 +33,20 @@ public class TopicPublishInfo {
      */
     private boolean orderTopic = false;
     private boolean haveTopicRouterInfo = false;
+
+    /**
+     * MessageQueue 列表
+     */
     private List<MessageQueue> messageQueueList = new ArrayList<>();
 
     /**
      * 选择 MessageQueue 时使用
      */
     private volatile ThreadLocalIndex sendWhichQueue = new ThreadLocalIndex();
+
+    /**
+     * Topic 路由数据
+     */
     private TopicRouteData topicRouteData;
 
     public boolean isOrderTopic() {

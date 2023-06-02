@@ -29,7 +29,15 @@ import org.apache.rocketmq.common.MixAll;
  * that it belongs to, and all the single instance information for this cluster.
  */
 public class BrokerData implements Comparable<BrokerData> {
+
+    /**
+     * 集群
+     */
     private String cluster;
+
+    /**
+     * broker 名称
+     */
     private String brokerName;
 
     /**
