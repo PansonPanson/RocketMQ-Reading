@@ -639,6 +639,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             String[] brokersSent = new String[timesTotal];
             for (; times < timesTotal; times++) {
                 String lastBrokerName = null == mq ? null : mq.getBrokerName();
+                // 选择 MessageQueue
                 MessageQueue mqSelected = this.selectOneMessageQueue(topicPublishInfo, lastBrokerName);
                 if (mqSelected != null) {
                     mq = mqSelected;
@@ -655,6 +656,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                             break;
                         }
 
+                        // 发消息
                         sendResult = this.sendKernelImpl(msg, mq, communicationMode, sendCallback, topicPublishInfo, timeout - costTime);
                         endTimestamp = System.currentTimeMillis();
                         this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, false);
@@ -794,6 +796,8 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
                 int sysFlag = 0;
                 boolean msgBodyCompressed = false;
+                // 对 Message 进行压缩，来提高传输的效率
+                // 消息长度大于 compressMsgBodyOverHowmuch 值时才会执行压缩，其默认是 4K
                 if (this.tryToCompressMessage(msg)) {
                     sysFlag |= MessageSysFlag.COMPRESSED_FLAG;
                     sysFlag |= compressType.getCompressionFlag();
@@ -839,14 +843,23 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 }
 
                 SendMessageRequestHeader requestHeader = new SendMessageRequestHeader();
+                // 生产者组名称
                 requestHeader.setProducerGroup(this.defaultMQProducer.getProducerGroup());
+                // topic 名称
                 requestHeader.setTopic(msg.getTopic());
+                // isAutoCreateTopicEnable 开启时设置默认 topic
                 requestHeader.setDefaultTopic(this.defaultMQProducer.getCreateTopicKey());
+                // 默认 queue 数量，默认为 4
                 requestHeader.setDefaultTopicQueueNums(this.defaultMQProducer.getDefaultTopicQueueNums());
+                // 目标 queue id
                 requestHeader.setQueueId(mq.getQueueId());
+                // 消息标记：压缩、事务
                 requestHeader.setSysFlag(sysFlag);
+                // 消息创建时间
                 requestHeader.setBornTimestamp(System.currentTimeMillis());
+                // 选填，完全由应用来设置，RocketMQ不做干预
                 requestHeader.setFlag(msg.getFlag());
+                // 存储扩展属性：包括 tags、keys 等
                 requestHeader.setProperties(MessageDecoder.messageProperties2String(msg.getProperties()));
                 requestHeader.setReconsumeTimes(0);
                 requestHeader.setUnitMode(this.isUnitMode());
