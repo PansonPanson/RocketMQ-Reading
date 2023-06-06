@@ -86,6 +86,7 @@ public class TopicPublishInfo {
     }
 
     public MessageQueue selectOneMessageQueue(final String lastBrokerName) {
+        // lastBrokerName 代表上一次选择的 MessageQueue 所在的 Broker，并且它只会在第一次投递失败之后的后续重试流程中有值。
         if (lastBrokerName == null) {
             return selectOneMessageQueue();
         } else {
