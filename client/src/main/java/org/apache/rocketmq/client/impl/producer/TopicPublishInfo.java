@@ -87,9 +87,13 @@ public class TopicPublishInfo {
 
     public MessageQueue selectOneMessageQueue(final String lastBrokerName) {
         // lastBrokerName 代表上一次选择的 MessageQueue 所在的 Broker，并且它只会在第一次投递失败之后的后续重试流程中有值。
+        // lastBrokerName 不为空，代表首次投递出了问题，而选择 MessageQueue 的背后还有一个隐含的逻辑：选择 Broker。
+        // 最终一个 MessageQueue 是需要具体存在于某个 Broker 上的，所以选 MessageQueue 也有一层隐含的意思是在选择 Broker
         if (lastBrokerName == null) {
             return selectOneMessageQueue();
         } else {
+            // 投递失败可能代表着，单台 Broker 的网络、或者所在机器出了问题，那么下次重新选择时，
+            // 如果再选到同一台 Broker 投递大概率还是会继续失败，所以为了尽可能地让 Message 投递成功，会选择另一台 Broker 进行投递
             for (int i = 0; i < this.messageQueueList.size(); i++) {
                 int index = this.sendWhichQueue.incrementAndGet();
                 int pos = index % this.messageQueueList.size();
