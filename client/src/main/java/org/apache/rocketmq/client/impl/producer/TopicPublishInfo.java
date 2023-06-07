@@ -94,6 +94,7 @@ public class TopicPublishInfo {
         } else {
             // 投递失败可能代表着，单台 Broker 的网络、或者所在机器出了问题，那么下次重新选择时，
             // 如果再选到同一台 Broker 投递大概率还是会继续失败，所以为了尽可能地让 Message 投递成功，会选择另一台 Broker 进行投递
+            // BrokerName、QueueId 可以唯一确定一个 MessageQueue。
             for (int i = 0; i < this.messageQueueList.size(); i++) {
                 int index = this.sendWhichQueue.incrementAndGet();
                 int pos = index % this.messageQueueList.size();
