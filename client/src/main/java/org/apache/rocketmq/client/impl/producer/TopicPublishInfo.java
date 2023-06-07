@@ -107,6 +107,11 @@ public class TopicPublishInfo {
         }
     }
 
+    /**
+     * 核心的计算逻辑就是将这个 index 和 MessageQueue 的数量取余，得到的结果就代表 this.messageQueueList 数组的下标，
+     * 比如是 1，那么就选择下标为 1 的 MessageQueue
+     * @return
+     */
     public MessageQueue selectOneMessageQueue() {
         int index = this.sendWhichQueue.incrementAndGet();
         int pos = index % this.messageQueueList.size();
