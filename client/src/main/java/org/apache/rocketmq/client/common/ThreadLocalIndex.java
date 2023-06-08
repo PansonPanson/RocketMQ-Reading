@@ -24,8 +24,10 @@ public class ThreadLocalIndex {
     private final Random random = new Random();
     private final static int POSITIVE_MASK = 0x7FFFFFFF;
 
+    // 线性轮询
     public int incrementAndGet() {
         Integer index = this.threadLocalIndex.get();
+        // 首次获取，随机生成一个值
         if (null == index) {
             index = random.nextInt();
         }
