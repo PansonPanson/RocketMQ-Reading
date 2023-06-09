@@ -47,6 +47,7 @@ public class BrokerStartup {
     public static final SystemConfigFileHelper CONFIG_FILE_HELPER = new SystemConfigFileHelper();
 
     public static void main(String[] args) {
+        // Broker 启动入口
         start(createBrokerController(args));
     }
 
@@ -89,6 +90,7 @@ public class BrokerStartup {
         nettyServerConfig.setListenPort(10911);
 
         Options options = ServerUtil.buildCommandlineOptions(new Options());
+        // 解析命令行参数
         CommandLine commandLine = ServerUtil.parseCmdLine(
             "mqbroker", args, buildCommandlineOptions(options), new DefaultParser());
         if (null == commandLine) {
@@ -113,6 +115,7 @@ public class BrokerStartup {
             MixAll.properties2Object(properties, messageStoreConfig);
         }
 
+        // RocketmqHome 必须配置
         MixAll.properties2Object(ServerUtil.commandLine2Properties(commandLine), brokerConfig);
         if (null == brokerConfig.getRocketmqHome()) {
             System.out.printf("Please set the %s variable in your environment " +
@@ -121,6 +124,7 @@ public class BrokerStartup {
         }
 
         // Validate namesrvAddr
+        // 配置多个 NameServer，则需要将多个地址用 ; 连接起来
         String namesrvAddr = brokerConfig.getNamesrvAddr();
         if (StringUtils.isNotBlank(namesrvAddr)) {
             try {
