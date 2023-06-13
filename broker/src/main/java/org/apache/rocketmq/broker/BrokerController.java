@@ -1575,6 +1575,8 @@ public class BrokerController {
             this.registerBrokerAll(true, false, true);
         }
 
+        // broker 心跳机制解析
+        // 心跳间隔在 10 ~ 60 秒之间
         scheduledFutures.add(this.scheduledExecutorService.scheduleAtFixedRate(new AbstractBrokerRunnable(this.getBrokerIdentity()) {
             @Override
             public void run0() {
