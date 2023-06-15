@@ -1704,6 +1704,12 @@ public class BrokerController {
             topicConfigWrapper.setTopicConfigTable(topicConfigTable);
         }
 
+        // forceRegister 在 Broker 启动时，为 true
+        // needRegister : Broker 会去请求所有的 NameServer，查询自己传给 NameServer 的数据，然后跟自己本地的数据版本做一个对比。
+        // 只要有任何一台 NameServer 的数据是旧的，Broker 就会重新执行心跳
+        //
+        // 启动时会立即执行一次心跳，但后续运行时并不是每次都会执行心跳。
+        // 因为如果 Broker 的本地数据和所有远端 NameServer 都一样的话，就没有必要执行心跳，这样能够节省不必要的系统资源开销。
         if (forceRegister || needRegister(this.brokerConfig.getBrokerClusterName(),
             this.getBrokerAddr(),
             this.brokerConfig.getBrokerName(),
@@ -1829,6 +1835,19 @@ public class BrokerController {
         }
     }
 
+    /**
+     * Broker 会去请求所有的 NameServer，查询自己传给 NameServer 的数据，然后跟自己本地的数据版本做一个对比。
+     *
+     * 只要有任何一台 NameServer 的数据是旧的，Broker 就会重新执行心跳
+     *
+     * @param clusterName
+     * @param brokerAddr
+     * @param brokerName
+     * @param brokerId
+     * @param timeoutMills
+     * @param isInBrokerContainer
+     * @return
+     */
     private boolean needRegister(final String clusterName,
         final String brokerAddr,
         final String brokerName,
@@ -1836,11 +1855,15 @@ public class BrokerController {
         final int timeoutMills,
         final boolean isInBrokerContainer) {
 
+        // 心跳传输的数据
         TopicConfigSerializeWrapper topicConfigWrapper = this.getTopicConfigManager().buildTopicConfigSerializeWrapper();
+
+        // 对所有 NameServer 数据判定之后的结果
         List<Boolean> changeList = brokerOuterAPI.needRegister(clusterName, brokerAddr, brokerName, brokerId, topicConfigWrapper, timeoutMills, isInBrokerContainer);
         boolean needRegister = false;
         for (Boolean changed : changeList) {
             if (changed) {
+                // 但凡有一台 NameServer 的数据是旧的, 都要执行心跳
                 needRegister = true;
                 break;
             }
