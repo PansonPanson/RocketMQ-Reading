@@ -73,6 +73,10 @@ import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_MES
 import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_TOPIC;
 import static org.apache.rocketmq.remoting.protocol.RemotingCommand.buildErrorResponse;
 
+
+/**
+ * 处理 Producer 投递过来的消息的 Processor 类
+ */
 public class SendMessageProcessor extends AbstractSendMessageProcessor implements NettyRequestProcessor {
 
     public SendMessageProcessor(final BrokerController brokerController) {

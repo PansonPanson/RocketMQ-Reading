@@ -48,6 +48,7 @@ import org.apache.rocketmq.store.util.PerfCounter;
 
 /**
  * This class defines contracting interfaces to implement, allowing third-party vendor to use customized message store.
+ * MessageStore 是负责消息存储的核心组件，Message 的存、取都是由它来完成，并且它也是 Broker 在 start() 步骤中启动的第一个组件
  */
 public interface MessageStore {
 

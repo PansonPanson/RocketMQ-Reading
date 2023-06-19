@@ -969,6 +969,9 @@ public class BrokerController {
         }
     }
 
+    /**
+     * Broker 会调用 registerProcessor() 方法来注册各种各样的 ”Handler“
+     */
     public void registerProcessor() {
         /*
          * SendMessageProcessor
