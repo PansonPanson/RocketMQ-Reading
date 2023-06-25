@@ -206,17 +206,20 @@ public class MappedFileQueue implements Swappable {
 
     public MappedFile getLastMappedFile(final long startOffset, boolean needCreate) {
         long createOffset = -1;
+        // 首次启动, mappedFile 为空
         MappedFile mappedFileLast = getLastMappedFile();
 
         if (mappedFileLast == null) {
+            // 由于 startOffset 传入的是 0, 那么这里的 createOffset 算出来也是 0
             createOffset = startOffset - (startOffset % this.mappedFileSize);
         }
-
+        // mappedFileLast 一定为 NULL, 所以这个逻辑不会走
         if (mappedFileLast != null && mappedFileLast.isFull()) {
             createOffset = mappedFileLast.getFileFromOffset() + this.mappedFileSize;
         }
 
         if (createOffset != -1 && needCreate) {
+            // 调用核心方法, 创建 MappedFile
             return tryCreateMappedFile(createOffset);
         }
 
@@ -250,7 +253,10 @@ public class MappedFileQueue implements Swappable {
     }
 
     public MappedFile tryCreateMappedFile(long createOffset) {
+        // 代表了当前创建的文件名，示例：/Users/panson/rocketmqnamesrv/data/commitlog/00000000000000000000
         String nextFilePath = this.storePath + File.separator + UtilAll.offset2FileName(createOffset);
+        // 从命名中的两个 Next 也能看出，是代表当前这个文件写满之后的下一个文件，
+        // Broker 会预生成下一个 CommitLog 文件。这样在上一个文件写满后，可以减少这部分创建新文件的时间损耗，快速地进行切换
         String nextNextFilePath = this.storePath + File.separator + UtilAll.offset2FileName(createOffset
                 + this.mappedFileSize);
         return doCreateMappedFile(nextFilePath, nextNextFilePath);
