@@ -265,11 +265,14 @@ public class MappedFileQueue implements Swappable {
     protected MappedFile doCreateMappedFile(String nextFilePath, String nextNextFilePath) {
         MappedFile mappedFile = null;
 
+        // 实际的文件创建是由 putRequestAndReturnMappedFile 来执行的
         if (this.allocateMappedFileService != null) {
             mappedFile = this.allocateMappedFileService.putRequestAndReturnMappedFile(nextFilePath,
                     nextNextFilePath, this.mappedFileSize);
         } else {
             try {
+                // 这里只是负责把由 allocateMappedFileService 创建好
+                // 的 mappedFile 添加到 mappedFileQueue 当中管理起来
                 mappedFile = new DefaultMappedFile(nextFilePath, this.mappedFileSize);
             } catch (IOException e) {
                 log.error("create mappedFile exception", e);

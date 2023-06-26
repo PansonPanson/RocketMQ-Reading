@@ -50,6 +50,16 @@ public class AllocateMappedFileService extends ServiceThread {
         this.messageStore = messageStore;
     }
 
+    /**
+     * 创建文件采用的是内存队列的方式
+     * AllocateMappedFileService 既负责往 this.requestQueue 中生产数据，也负责从其中消费数据
+     * 通过内存队列消费到了请求之后，就会调用 MappedFile 的构造函数实例化 MappedFile
+     *
+     * @param nextFilePath
+     * @param nextNextFilePath
+     * @param fileSize
+     * @return
+     */
     public MappedFile putRequestAndReturnMappedFile(String nextFilePath, String nextNextFilePath, int fileSize) {
         int canSubmitRequests = 2;
         if (this.messageStore.isTransientStorePoolEnable()) {
